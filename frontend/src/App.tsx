@@ -426,6 +426,7 @@ export default function App() {
   const difficultyText = String(languageUi?.difficulty ?? (uiLanguage === "ja" ? "難易度" : uiLanguage === "en" ? "Difficulty" : "难度"));
   const messageListRef = useRef<HTMLElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const sessionEpochRef = useRef(0);
 
   const selectedRuleEntry = useMemo<RuleOption | undefined>(
     () => catalog?.rules.find((rule) => rule.rule_code === selectedRule),
@@ -543,10 +544,13 @@ export default function App() {
 
   const handleStartSession = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedRule || !selectedStory || !selectedLanguage || !selectedDifficulty) return;
+    if (!selectedRule || !selectedStory || !selectedLanguage || !selectedDifficulty || submittingTurn) return;
 
+    const sessionEpoch = sessionEpochRef.current + 1;
+    sessionEpochRef.current = sessionEpoch;
     setStartingSession(true);
     setOperationError("");
+    setInput("");
     setMessages([createMessage("system", text.createProgress)]);
     setAgentMonitor(makeAgentMonitorPlaceholder(text.none));
 
@@ -562,6 +566,7 @@ export default function App() {
           max_turns: maxTurns,
         },
         (streamEvent) => {
+          if (sessionEpochRef.current !== sessionEpoch) return;
           if (streamEvent.event === "runtime_log") {
             setMessages((current) => [...current, createMessage("system", streamEvent.message)]);
             return;
@@ -593,14 +598,19 @@ export default function App() {
         }
       );
     } catch (error) {
-      setOperationError(error instanceof Error ? error.message : text.processing);
+      if (sessionEpochRef.current === sessionEpoch) {
+        setOperationError(error instanceof Error ? error.message : text.processing);
+      }
     } finally {
-      setStartingSession(false);
+      if (sessionEpochRef.current === sessionEpoch) {
+        setStartingSession(false);
+      }
     }
   };
 
   const sendMessage = async (rawText: string) => {
-    if (!session || !rawText.trim()) return;
+    const sessionId = sessionIdRef.current ?? session?.session_id ?? null;
+    if (!session || !sessionId || !rawText.trim()) return;
     setSubmittingTurn(true);
     setOperationError("");
 
@@ -609,7 +619,7 @@ export default function App() {
     setMessages((current) => [...current, playerMessage, aiMessage]);
 
     try {
-      await streamTurn(session.session_id, rawText.trim(), (event) => {
+      await streamTurn(sessionId, rawText.trim(), (event) => {
         if (event.event === "turn_start") {
           setMessages((current) => [...current, createMessage("system", text.turnProgress)]);
           return;
@@ -630,6 +640,7 @@ export default function App() {
           return;
         }
         if (event.event === "turn_result") {
+          sessionIdRef.current = event.session.session_id;
           setSession(event.session);
           setSelectedLanguage(event.session.language_code);
           setSelectedDifficulty(event.session.difficulty_code);
@@ -648,7 +659,14 @@ export default function App() {
         throw new Error(event.error);
       });
     } catch (error) {
-      setOperationError(error instanceof Error ? error.message : text.processing);
+      const message = error instanceof Error ? error.message : text.processing;
+      if (message === "Session not found") {
+        sessionIdRef.current = null;
+        setSession(null);
+        setOperationError(uiLanguage === "en" ? "Session expired. Please restart the conversation." : uiLanguage === "ja" ? "セッションが無効になりました。会話を再開してください。" : "当前会话已失效，请重新开始对话。");
+      } else {
+        setOperationError(message);
+      }
     } finally {
       setSubmittingTurn(false);
     }
@@ -656,16 +674,22 @@ export default function App() {
 
   const handleLoadSession = async () => {
     if (!selectedSaveFile) return;
+    const sessionEpoch = sessionEpochRef.current + 1;
+    sessionEpochRef.current = sessionEpoch;
     try {
       await resetForNewSession();
       const loaded = await loadSession(selectedSaveFile);
+      if (sessionEpochRef.current !== sessionEpoch) return;
       sessionIdRef.current = loaded.session_id;
       setSession(loaded);
       setSelectedLanguage(loaded.language_code);
       setSelectedDifficulty(loaded.difficulty_code);
+      setInput("");
       setMessages([createMessage("system", `${text.loadDone}: ${selectedSaveFile}`), ...transcriptToMessages(loaded.transcript)]);
     } catch (error) {
-      setOperationError(error instanceof Error ? error.message : text.processing);
+      if (sessionEpochRef.current === sessionEpoch) {
+        setOperationError(error instanceof Error ? error.message : text.processing);
+      }
     }
   };
 
@@ -806,7 +830,9 @@ export default function App() {
                     </p>
                   ) : null}
                   <div className="session-form-actions">
-                    <button type="submit">{startingSession ? text.creating : session ? text.restart : text.start}</button>
+                    <button type="submit" disabled={startingSession || submittingTurn || loadingCatalog || !selectedRule || !selectedStory || !selectedLanguage || !selectedDifficulty}>
+                      {startingSession ? text.creating : session ? text.restart : text.start}
+                    </button>
                   </div>
                 </form>
                 {loadingCatalog ? <p className="form-note">{text.loading}</p> : null}
@@ -913,7 +939,7 @@ export default function App() {
                   <button type="button" onClick={() => setInput("")}>
                     {text.clear}
                   </button>
-                  <button type="submit" disabled={!session || submittingTurn}>
+                  <button type="submit" disabled={!session || submittingTurn || startingSession}>
                     {submittingTurn ? text.sending : text.send}
                   </button>
                 </div>

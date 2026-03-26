@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from user_info.option_Language import OptionLanguage
+from user_info.option_language import OptionLanguage
 
 
 LANGUAGE_ALIASES = {
