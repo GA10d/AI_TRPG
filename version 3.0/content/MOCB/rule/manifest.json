@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "VHS",
+  "version": "0.1.0",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "VHS复古恐怖录像带"
+  },
+  "themes": [
+    "horror",
+    "survival",
+    "investigation"
+  ],
+  "tones": [
+    "immersive",
+    "oppressive",
+    "high-risk"
+  ],
+  "supportsModes": [
+    "single_player",
+    "multiplayer"
+  ],
+  "gmStyles": [
+    "single_agent",
+    "multi_agent"
+  ],
+  "authoringSpec": "规则范式(1)",
+  "contentWarnings": [
+    "violence",
+    "body-harm",
+    "psychological-horror"
+  ]
+}

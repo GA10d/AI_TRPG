@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "dev:server": "node --experimental-strip-types ./apps/server/src/server.ts",
+    "dev:web": "npm run dev -w @ai-trpg/web",
+    "build:web": "npm run build -w @ai-trpg/web",
     "content:catalog": "node --experimental-strip-types ./apps/server/src/scripts/validateContent.ts",
     "content:catalog:en": "node --experimental-strip-types ./apps/server/src/scripts/validateContent.ts --locale en-US"
   }
