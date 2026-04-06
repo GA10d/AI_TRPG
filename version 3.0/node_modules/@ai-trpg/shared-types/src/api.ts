@@ -34,6 +34,17 @@ export type SessionSnapshot = {
   };
 };
 
+export type ServerProxyStatus = {
+  available: boolean;
+  configured: boolean;
+  dependence: "OpenAI" | "Google";
+  model: string | null;
+  baseUrl: string | null;
+  providerLabel: string | null;
+  missingEnvKeys: string[];
+  message: string;
+};
+
 export type BootstrapResponse = {
   defaults: {
     locale: LocaleCode;
@@ -52,7 +63,11 @@ export type BootstrapResponse = {
     code: ModelAccessMode;
     label: string;
     description: string;
+    available: boolean;
+    configured: boolean;
+    message: string;
   }>;
+  serverProxyStatus: ServerProxyStatus;
   catalog: Array<{
     ruleId: string;
     directoryName: string;

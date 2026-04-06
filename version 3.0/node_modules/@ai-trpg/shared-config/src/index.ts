@@ -34,7 +34,7 @@ export const PHASE1_MODEL_ACCESS_MODE_OPTIONS = [
   {
     code: "server_proxy",
     label: "Server Proxy",
-    description: "预留真实模型代理模式，Phase 1 暂不实际调用模型"
+    description: "通过 Node 服务端代理调用真实模型，当前支持 OpenAI-compatible 文本接口"
   }
 ] as const;
 

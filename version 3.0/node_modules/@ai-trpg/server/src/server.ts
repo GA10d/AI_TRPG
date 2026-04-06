@@ -21,6 +21,7 @@ import {
   submitMockTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
+import { getServerProxyStatus } from "./model_gateway/config.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -108,6 +109,8 @@ async function serveApiOnlyHint(response: ServerResponse): Promise<void> {
 }
 
 function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): BootstrapResponse {
+  const serverProxyStatus = getServerProxyStatus();
+
   return {
     defaults: {
       locale: PHASE1_DEFAULTS.locale,
@@ -120,8 +123,15 @@ function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): Bootstra
     modelAccessModes: PHASE1_MODEL_ACCESS_MODE_OPTIONS.map((item) => ({
       code: item.code,
       label: item.label,
-      description: item.description
+      description: item.description,
+      available: item.code === "server_proxy" ? serverProxyStatus.available : true,
+      configured: item.code === "server_proxy" ? serverProxyStatus.configured : true,
+      message:
+        item.code === "server_proxy"
+          ? serverProxyStatus.message
+          : "mock 模式始终可用。"
     })),
+    serverProxyStatus,
     catalog
   };
 }

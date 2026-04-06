@@ -3,6 +3,10 @@ import {
   buildMockOpeningText,
   buildMockTurnResponse
 } from "../mock/index.ts";
+import {
+  generateOpeningViaServerProxy,
+  generateTurnNarrationViaServerProxy
+} from "./openai_compatible.ts";
 import type {
   ModelGateway,
   OpeningGenerationInput,
@@ -40,22 +44,18 @@ class MockModelGateway implements ModelGateway {
   }
 }
 
-class ServerProxyPlaceholderGateway implements ModelGateway {
+class ServerProxyModelGateway implements ModelGateway {
   async generateOpening(input: OpeningGenerationInput): Promise<OpeningGenerationOutput> {
-    throw new Error(
-      `server_proxy mode is not implemented yet for opening generation (${input.storyTitle}).`
-    );
+    return generateOpeningViaServerProxy(input);
   }
 
   async generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput> {
-    throw new Error(
-      `server_proxy mode is not implemented yet for turn narration (round ${input.round}, scene ${input.sceneId}).`
-    );
+    return generateTurnNarrationViaServerProxy(input);
   }
 }
 
 const mockGateway = new MockModelGateway();
-const serverProxyGateway = new ServerProxyPlaceholderGateway();
+const serverProxyGateway = new ServerProxyModelGateway();
 
 export function getModelGateway(accessMode: ModelAccessMode): ModelGateway {
   if (accessMode === "mock") {
