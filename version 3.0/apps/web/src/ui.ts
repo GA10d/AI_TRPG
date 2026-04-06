@@ -2,7 +2,8 @@ import type { CreateSessionRequest } from "../../../packages/shared-types/src/in
 
 export type AppView =
   | "menu"
-  | "new"
+  | "story_select"
+  | "game_setup"
   | "continue"
   | "records"
   | "settings"
@@ -17,27 +18,62 @@ export type StatusState = {
 export const PLAY_MODE_OPTIONS: Array<{
   value: CreateSessionRequest["playMode"];
   label: string;
+  description: string;
 }> = [
-  { value: "single_player", label: "单人模式" },
-  { value: "single_player_with_npc", label: "单人 + NPC" },
-  { value: "multiplayer", label: "多人模式" }
+  {
+    value: "single_player",
+    label: "单人模式",
+    description: "由你一人推进剧情，适合最轻量的体验。"
+  },
+  {
+    value: "single_player_with_npc",
+    label: "单人 + NPC",
+    description: "除你之外还会有 AI 同伴参与讨论与行动。"
+  },
+  {
+    value: "multiplayer",
+    label: "多人模式",
+    description: "为后续联机流程预留，当前仍以单机路径为主。"
+  }
 ];
 
 export const GM_ARCHITECTURE_OPTIONS: Array<{
   value: CreateSessionRequest["gmArchitecture"];
   label: string;
+  description: string;
 }> = [
-  { value: "single_agent", label: "单 Agent 主持" },
-  { value: "multi_agent", label: "多 Agent 主持" }
+  {
+    value: "single_agent",
+    label: "单 Agent 主持",
+    description: "由一个主持模型统一负责叙事与 NPC 扮演。"
+  },
+  {
+    value: "multi_agent",
+    label: "多 Agent 主持",
+    description: "为未来多智能体协作保留入口，当前仍以单 Agent 为主。"
+  }
 ];
 
 export const LOG_VIEW_OPTIONS: Array<{
   value: NonNullable<CreateSessionRequest["logViewMode"]>;
   label: string;
+  description: string;
 }> = [
-  { value: "all", label: "全部日志" },
-  { value: "compact", label: "精简日志" },
-  { value: "hidden", label: "隐藏日志" }
+  {
+    value: "all",
+    label: "全部日志",
+    description: "显示完整运行日志，方便排查。"
+  },
+  {
+    value: "compact",
+    label: "精简日志",
+    description: "只保留关键事件，适合正常游玩。"
+  },
+  {
+    value: "hidden",
+    label: "隐藏日志",
+    description: "将日志区域收敛为最低打扰。"
+  }
 ];
 
 export function pickOption<T extends string>(
@@ -55,4 +91,35 @@ export function formatDateTime(value: string): string {
 
 export function renderJoinedList(items: string[]): string {
   return items.length > 0 ? items.join(" / ") : "暂无";
+}
+
+export function clipText(content: string | null | undefined, maxLength = 180): string {
+  const normalized = content?.replace(/\s+/g, " ").trim() ?? "";
+
+  if (!normalized) {
+    return "暂无内容。";
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
+export function buildPreviewLines(content: string | null | undefined, maxLines = 5): string[] {
+  const normalized = content?.replace(/\r\n/g, "\n").trim() ?? "";
+  if (!normalized) {
+    return [
+      "夜幕正在收拢，旧磁带里的声音还没完全显形。",
+      "这一段预览区会在后续接入真实开场生成。",
+      "当前先根据剧本简介和规则设定为你搭起氛围。"
+    ];
+  }
+
+  return normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, maxLines);
 }

@@ -22,7 +22,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 function normalizeNetworkError(error: unknown): Error {
   if (error instanceof TypeError) {
     return new Error(
-      "无法连接到本地 API 服务。请确认 gameplay server 正在运行，并访问 http://127.0.0.1:4316/ 。"
+      "无法连接到本地 API 服务。请确认游戏服务正在运行，并访问 http://127.0.0.1:4316/ 。"
     );
   }
 

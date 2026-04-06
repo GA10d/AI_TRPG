@@ -1,4 +1,9 @@
-import type { GmArchitecture, LocaleCode, PlayMode } from "./content.ts";
+import type {
+  ContentCatalogEntry,
+  GmArchitecture,
+  LocaleCode,
+  PlayMode
+} from "./content.ts";
 import type {
   Message,
   ModelAccessMode,
@@ -105,17 +110,5 @@ export type BootstrapResponse = {
   }>;
   modelProfiles: ModelProfileSummary[];
   serverProxyStatus: ServerProxyStatus;
-  catalog: Array<{
-    ruleId: string;
-    directoryName: string;
-    defaultLocale: LocaleCode;
-    availableLocales: LocaleCode[];
-    ruleTitle: string;
-    stories: Array<{
-      storyId: string;
-      directoryName: string;
-      title: string;
-      availableLocales: LocaleCode[];
-    }>;
-  }>;
+  catalog: ContentCatalogEntry[];
 };

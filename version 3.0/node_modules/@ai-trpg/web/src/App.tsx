@@ -16,15 +16,16 @@ import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
+import { GameSetupPage } from "./pages/GameSetupPage.tsx";
 import { MenuPage } from "./pages/MenuPage.tsx";
-import { NewGamePage } from "./pages/NewGamePage.tsx";
 import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
+import { StorySelectPage } from "./pages/StorySelectPage.tsx";
 import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
 import { type AppView, type StatusState } from "./ui.ts";
 
 const initialStatus: StatusState = {
-  message: "正在加载启动信息...",
+  message: "",
   tone: "neutral"
 };
 
@@ -37,6 +38,7 @@ export function App() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
+  const [characterConcept, setCharacterConcept] = useState("");
 
   const {
     bootstrap,
@@ -101,8 +103,10 @@ export function App() {
 
     const selectedRule =
       bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
+    const selectedStory =
+      selectedRule?.stories.find((item) => item.directoryName === storyDirectoryName) ?? null;
 
-    if (!bootstrap || !selectedRule || !storyDirectoryName) {
+    if (!bootstrap || !selectedRule || !selectedStory) {
       setStatus({
         message: "当前没有可用的规则或剧本。",
         tone: "error"
@@ -135,7 +139,10 @@ export function App() {
       setTurnInput("");
       setView("game");
       setStatus({
-        message: "会话创建成功。",
+        message:
+          characterConcept.trim().length > 0
+            ? "会话创建成功，你的角色概念已经记录在当前开局流程中。"
+            : "会话创建成功。",
         tone: "neutral"
       });
     } catch (error) {
@@ -296,7 +303,7 @@ export function App() {
       commitSnapshot(recentSnapshot);
       setView("game");
       setStatus({
-        message: "服务端未找到会话，已改用本地快照打开。",
+        message: "服务端未找到该会话，已改用本地快照打开。",
         tone: "neutral"
       });
     } finally {
@@ -305,7 +312,7 @@ export function App() {
   }
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
-    return restoreFromSaveBundle(record.bundle, `已载入存档 ${record.storyTitle}。`);
+    return restoreFromSaveBundle(record.bundle, `已载入存档：${record.storyTitle}`);
   }
 
   function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): void {
@@ -385,12 +392,48 @@ export function App() {
     });
   }
 
+  function handleOpenStorySelect(): void {
+    setCharacterConcept("");
+    setView("story_select");
+  }
+
+  function handleEnterGameSetup(): void {
+    const selectedRule =
+      bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
+    const selectedStory =
+      selectedRule?.stories.find((item) => item.directoryName === storyDirectoryName) ?? null;
+
+    if (!selectedRule || !selectedStory) {
+      setStatus({
+        message: "请先选择一个可用剧本。",
+        tone: "error"
+      });
+      return;
+    }
+
+    setView("game_setup");
+  }
+
   let content: React.ReactNode;
 
   switch (view) {
-    case "new":
+    case "story_select":
       content = (
-        <NewGamePage
+        <StorySelectPage
+          bootstrap={bootstrap}
+          ruleDirectoryName={ruleDirectoryName}
+          storyDirectoryName={storyDirectoryName}
+          onBack={() => setView("menu")}
+          onClose={() => setView("menu")}
+          onRuleChange={setRuleDirectoryName}
+          onStoryChange={setStoryDirectoryName}
+          onContinue={handleEnterGameSetup}
+        />
+      );
+      break;
+    case "game_setup":
+      content = (
+        <GameSetupPage
           bootstrap={bootstrap}
           ruleDirectoryName={ruleDirectoryName}
           storyDirectoryName={storyDirectoryName}
@@ -402,11 +445,11 @@ export function App() {
           runtimeModelConfig={runtimeModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
+          characterConcept={characterConcept}
           isCreating={isCreating}
-          onBack={() => setView("menu")}
+          onBack={() => setView("story_select")}
+          onClose={() => setView("menu")}
           onSubmit={handleCreateSession}
-          onRuleChange={setRuleDirectoryName}
-          onStoryChange={setStoryDirectoryName}
           onLocaleChange={setLocale}
           onPlayModeChange={setPlayMode}
           onGmArchitectureChange={setGmArchitecture}
@@ -415,6 +458,7 @@ export function App() {
           onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
+          onCharacterConceptChange={setCharacterConcept}
         />
       );
       break;
@@ -504,7 +548,7 @@ export function App() {
           gmArchitecture={gmArchitecture}
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
-          onOpenNewGame={() => setView("new")}
+          onOpenNewGame={handleOpenStorySelect}
           onOpenContinue={() => setView("continue")}
           onOpenRecords={() => setView("records")}
           onOpenSettings={() => setView("settings")}
@@ -517,9 +561,11 @@ export function App() {
   return (
     <main className="app-shell">
       {content}
-      <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
-        {status.message}
-      </p>
+      {status.message ? (
+        <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
+          {status.message}
+        </p>
+      ) : null}
     </main>
   );
 }

@@ -40,7 +40,11 @@ const mimeTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8"
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp"
 };
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
@@ -77,11 +81,12 @@ function sendText(response: ServerResponse, statusCode: number, content: string)
   response.end(content);
 }
 
-async function serveStaticFile(response: ServerResponse, relativePath: string): Promise<void> {
-  const normalizedPath = relativePath === "/" ? "/index.html" : relativePath;
-  const absolutePath = resolve(webDistRoot, `.${normalizedPath}`);
-
-  if (!absolutePath.startsWith(webDistRoot)) {
+async function serveAbsoluteFile(
+  response: ServerResponse,
+  absolutePath: string,
+  rootDir: string
+): Promise<void> {
+  if (!absolutePath.startsWith(rootDir)) {
     sendText(response, 403, "Forbidden");
     return;
   }
@@ -100,6 +105,12 @@ async function serveStaticFile(response: ServerResponse, relativePath: string): 
     "Content-Type": mimeType
   });
   response.end(fileContent);
+}
+
+async function serveStaticFile(response: ServerResponse, relativePath: string): Promise<void> {
+  const normalizedPath = relativePath === "/" ? "/index.html" : relativePath;
+  const absolutePath = resolve(webDistRoot, `.${normalizedPath}`);
+  await serveAbsoluteFile(response, absolutePath, webDistRoot);
 }
 
 async function serveApiOnlyHint(response: ServerResponse): Promise<void> {
@@ -165,6 +176,17 @@ async function handleApiRequest(
   if (url.pathname === "/api/bootstrap" && request.method === "GET") {
     const catalog = await loadContentCatalog(contentRoot);
     sendJson(response, 200, buildBootstrapResponse(catalog));
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/content-assets/") && request.method === "GET") {
+    const relativeSegments = url.pathname
+      .replace("/api/content-assets/", "")
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+    const absolutePath = resolve(contentRoot, ...relativeSegments);
+    await serveAbsoluteFile(response, absolutePath, contentRoot);
     return true;
   }
 

@@ -242,6 +242,40 @@ function normalizeContentRoot(contentRoot: string): string {
   return resolve(contentRoot);
 }
 
+function normalizeCatalogText(content: string | null | undefined): string | null {
+  const normalized = content?.replace(/\r\n/g, "\n").trim() ?? "";
+  return normalized.length > 0 ? normalized : null;
+}
+
+async function findCatalogAssets(
+  packageDir: string,
+  assetUrlPrefix: string
+): Promise<ContentCatalogEntry["stories"][number]["assets"]> {
+  const candidateFiles = [
+    "cover.png",
+    "cover.jpg",
+    "cover.jpeg",
+    "cover.webp",
+    "image.png",
+    "image.jpg",
+    "image.jpeg",
+    "image.webp"
+  ];
+
+  for (const fileName of candidateFiles) {
+    if (await pathExists(join(packageDir, fileName))) {
+      return [
+        {
+          type: "cover",
+          url: `${assetUrlPrefix}/${fileName}`
+        }
+      ];
+    }
+  }
+
+  return [];
+}
+
 export async function loadRulePackage(
   contentRoot: string,
   ruleId: string,
@@ -355,11 +389,24 @@ export async function loadContentCatalog(contentRoot: string): Promise<ContentCa
 
       try {
         const storyPackage = await loadStoryPackage(normalizedRoot, ruleId, storyItem.name, DEFAULT_LOCALE);
+        const assets = await findCatalogAssets(
+          storyPackage.baseDir,
+          `/api/content-assets/${encodeURIComponent(ruleId)}/story/${encodeURIComponent(storyItem.name)}`
+        );
         stories.push({
           storyId: storyPackage.manifest.id,
           directoryName: storyItem.name,
           title: storyPackage.manifest.title[storyPackage.manifest.defaultLocale] ?? storyItem.name,
-          availableLocales: storyPackage.manifest.availableLocales
+          availableLocales: storyPackage.manifest.availableLocales,
+          intro: normalizeCatalogText(storyPackage.intro?.content),
+          tags: storyPackage.manifest.tags,
+          supportsModes: storyPackage.manifest.supportsModes,
+          recommendedLength: storyPackage.manifest.recommendedLength,
+          recommendedPacing: storyPackage.manifest.recommendedPacing,
+          gmStyle: storyPackage.manifest.gmStyle,
+          contentWarnings: storyPackage.manifest.contentWarnings,
+          playerCount: storyPackage.manifest.playerCount,
+          assets
         });
       } catch (error) {
         console.warn(
@@ -379,6 +426,12 @@ export async function loadContentCatalog(contentRoot: string): Promise<ContentCa
       defaultLocale: rulePackage.manifest.defaultLocale,
       availableLocales: rulePackage.manifest.availableLocales,
       ruleTitle: rulePackage.manifest.title[rulePackage.manifest.defaultLocale] ?? ruleId,
+      ruleIntro: normalizeCatalogText(rulePackage.intro?.content),
+      themes: rulePackage.manifest.themes,
+      tones: rulePackage.manifest.tones,
+      supportsModes: rulePackage.manifest.supportsModes,
+      gmStyles: rulePackage.manifest.gmStyles,
+      contentWarnings: rulePackage.manifest.contentWarnings,
       stories
     });
   }

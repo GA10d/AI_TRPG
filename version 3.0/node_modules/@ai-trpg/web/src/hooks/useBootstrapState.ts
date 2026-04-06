@@ -114,9 +114,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         );
         setModelAccessMode(resolvedAccessMode);
         setModelProfileId(resolvedProfileId);
-        setRuntimeModelConfig(
-          sanitizeRuntimeModelConfig(storedDefaults?.runtimeModelConfig)
-        );
+        setRuntimeModelConfig(sanitizeRuntimeModelConfig(storedDefaults?.runtimeModelConfig));
         setDebugEnabled(storedDefaults?.debugEnabled ?? true);
         setLogViewMode(
           pickOption(
@@ -125,10 +123,6 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             data.defaults.logViewMode
           )
         );
-        onStatusChange({
-          message: "主菜单已准备好。",
-          tone: "neutral"
-        });
       } catch (error) {
         if (cancelled) {
           return;

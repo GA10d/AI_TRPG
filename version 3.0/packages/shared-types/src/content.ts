@@ -78,11 +78,28 @@ export type LoadedContentBundle = {
   story: LoadedStoryPackage;
 };
 
+export type ContentCatalogAsset = {
+  type: "cover";
+  url: string;
+};
+
 export type ContentCatalogStoryEntry = {
   storyId: string;
   directoryName: string;
   title: string;
   availableLocales: LocaleCode[];
+  intro: string | null;
+  tags: string[];
+  supportsModes: string[];
+  recommendedLength: string;
+  recommendedPacing: string;
+  gmStyle: string;
+  contentWarnings: string[];
+  playerCount: {
+    min: number;
+    max: number;
+  };
+  assets: ContentCatalogAsset[];
 };
 
 export type ContentCatalogEntry = {
@@ -91,5 +108,11 @@ export type ContentCatalogEntry = {
   defaultLocale: LocaleCode;
   availableLocales: LocaleCode[];
   ruleTitle: string;
+  ruleIntro: string | null;
+  themes: string[];
+  tones: string[];
+  supportsModes: string[];
+  gmStyles: string[];
+  contentWarnings: string[];
   stories: ContentCatalogStoryEntry[];
 };
