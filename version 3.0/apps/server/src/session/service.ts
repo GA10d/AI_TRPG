@@ -9,7 +9,8 @@ import type {
   Message,
   ReplayEvent,
   Session,
-  SessionSnapshot
+  SessionSnapshot,
+  SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
 import type { InMemorySessionStore } from "./store.ts";
@@ -42,6 +43,56 @@ function buildMockOpeningText(
     `当前开场场景：${sceneId}。`,
     "这是一段 Phase 1 的假开场文本，用来验证会话创建、内容加载和前端链路。"
   ].join("\n\n");
+}
+
+function buildMockTurnResponse(
+  playerInput: string,
+  sceneId: string,
+  locale: string,
+  round: number
+): string {
+  const cleanedInput = playerInput.replace(/\s+/g, " ").trim();
+
+  if (locale.toLowerCase().startsWith("en")) {
+    return [
+      `[Mock GM] Turn ${round} received.`,
+      `You attempted: ${cleanedInput}`,
+      `The current scene is still ${sceneId}.`,
+      "Phase 1 mock processing: the system records your action, keeps the scene stable, and returns a placeholder narration."
+    ].join("\n\n");
+  }
+
+  return [
+    `【Mock 主持】已收到第 ${round} 轮行动。`,
+    `你的输入是：${cleanedInput}`,
+    `当前场景仍然是：${sceneId}。`,
+    "这是 Phase 1 的假回合处理结果：系统会先记录玩家输入，暂时不推进复杂规则，只返回一段占位叙事。"
+  ].join("\n\n");
+}
+
+function buildSystemCreatedMessage(
+  playerParticipantId: string,
+  storyTitle: string,
+  locale: string,
+  timestamp: string
+): Message {
+  const content = locale.toLowerCase().startsWith("en")
+    ? `Session created for ${storyTitle} (${locale}).`
+    : `Session created for ${storyTitle} (${locale}).`;
+
+  return {
+    id: `msg_${randomUUID()}`,
+    round: 0,
+    createdAt: timestamp,
+    senderId: "system",
+    recipientIds: [playerParticipantId],
+    visibility: "system",
+    kind: "system",
+    content,
+    tags: [
+      "session_created"
+    ]
+  };
 }
 
 export async function createSessionSnapshot(
@@ -135,19 +186,7 @@ export async function createSessionSnapshot(
   };
 
   const messages: Message[] = [
-    {
-      id: `msg_${randomUUID()}`,
-      round: 0,
-      createdAt: timestamp,
-      senderId: "system",
-      recipientIds: [playerParticipantId],
-      visibility: "system",
-      kind: "system",
-      content: `Session created for ${storyTitle} (${bundle.resolvedLocale}).`,
-      tags: [
-        "session_created"
-      ]
-    },
+    buildSystemCreatedMessage(playerParticipantId, storyTitle, String(bundle.resolvedLocale), timestamp),
     {
       id: `msg_${randomUUID()}`,
       round: 0,
@@ -233,4 +272,130 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     promptDebugEnabled: false,
     logViewMode: PHASE1_DEFAULTS.logViewMode
   };
+}
+
+export function submitMockTurn(
+  sessionId: string,
+  request: SubmitTurnRequest,
+  store: InMemorySessionStore
+): SessionSnapshot | null {
+  const trimmedInput = request.playerInput.trim();
+  if (trimmedInput.length === 0) {
+    throw new Error("玩家输入不能为空");
+  }
+
+  return store.update(sessionId, (current) => {
+    const timestamp = nowIso();
+    const nextRound = current.session.currentRound + 1;
+    const playerParticipant = current.session.participants.find(
+      (participant) => participant.id === current.session.playerParticipantId
+    );
+    const gmParticipant = current.session.participants.find((participant) => participant.role === "gm");
+
+    if (!playerParticipant || !gmParticipant) {
+      throw new Error("Session participants 不完整，无法提交 turn");
+    }
+
+    const playerMessage: Message = {
+      id: `msg_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      senderId: playerParticipant.id,
+      recipientIds: [
+        gmParticipant.id
+      ],
+      visibility: "public",
+      kind: "player_input",
+      content: trimmedInput,
+      tags: [
+        "turn_input"
+      ]
+    };
+
+    const gmMessage: Message = {
+      id: `msg_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      senderId: gmParticipant.id,
+      recipientIds: [
+        playerParticipant.id
+      ],
+      visibility: "public",
+      kind: "gm_narration",
+      content: buildMockTurnResponse(
+        trimmedInput,
+        current.session.gameState.sceneId,
+        String(current.session.locale),
+        nextRound
+      ),
+      tags: [
+        "mock_turn_response"
+      ]
+    };
+
+    const replayEntries: ReplayEvent[] = [
+      {
+        id: `evt_${randomUUID()}`,
+        round: nextRound,
+        createdAt: timestamp,
+        actorId: playerParticipant.id,
+        type: "turn_submitted",
+        displayLevel: "core",
+        summary: `Player submitted turn ${nextRound}`,
+        payload: {
+          messageId: playerMessage.id
+        }
+      },
+      {
+        id: `evt_${randomUUID()}`,
+        round: nextRound,
+        createdAt: timestamp,
+        actorId: playerParticipant.id,
+        type: "message_created",
+        displayLevel: "detail",
+        summary: "Player input recorded",
+        payload: {
+          messageId: playerMessage.id
+        }
+      },
+      {
+        id: `evt_${randomUUID()}`,
+        round: nextRound,
+        createdAt: timestamp,
+        actorId: gmParticipant.id,
+        type: "gm_response_received",
+        displayLevel: "core",
+        summary: "Mock turn narration generated",
+        payload: {
+          messageId: gmMessage.id
+        }
+      }
+    ];
+
+    return {
+      ...current,
+      session: {
+        ...current.session,
+        currentRound: nextRound,
+        updatedAt: timestamp,
+        gameState: {
+          ...current.session.gameState,
+          storyFlags: {
+            ...current.session.gameState.storyFlags,
+            last_player_input: trimmedInput,
+            last_mock_turn_round: nextRound
+          }
+        }
+      },
+      messages: [
+        ...current.messages,
+        playerMessage,
+        gmMessage
+      ],
+      replay: [
+        ...current.replay,
+        ...replayEntries
+      ]
+    };
+  });
 }

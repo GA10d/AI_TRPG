@@ -18,6 +18,10 @@ export type CreateSessionRequest = {
   logViewMode?: "all" | "compact" | "hidden";
 };
 
+export type SubmitTurnRequest = {
+  playerInput: string;
+};
+
 export type SessionSnapshot = {
   session: Session;
   messages: Message[];

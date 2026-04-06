@@ -108,6 +108,7 @@ export type ReplayEvent = {
   type:
     | "session_created"
     | "message_created"
+    | "turn_submitted"
     | "submission_locked"
     | "gm_response_received"
     | "adjudication_received"

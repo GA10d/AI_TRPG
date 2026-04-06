@@ -11,6 +11,17 @@ export class InMemorySessionStore {
     return this.snapshots.get(sessionId) ?? null;
   }
 
+  update(sessionId: string, updater: (snapshot: SessionSnapshot) => SessionSnapshot): SessionSnapshot | null {
+    const current = this.snapshots.get(sessionId);
+    if (!current) {
+      return null;
+    }
+
+    const next = updater(current);
+    this.snapshots.set(sessionId, next);
+    return next;
+  }
+
   list(): SessionSnapshot[] {
     return Array.from(this.snapshots.values());
   }

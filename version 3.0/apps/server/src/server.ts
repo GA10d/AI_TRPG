@@ -11,12 +11,14 @@ import {
 } from "../../../packages/shared-config/src/index.ts";
 import type {
   BootstrapResponse,
-  CreateSessionRequest
+  CreateSessionRequest,
+  SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
 import { loadContentCatalog } from "./content/index.ts";
 import {
   buildDefaultCreateSessionRequest,
-  createSessionSnapshot
+  createSessionSnapshot,
+  submitMockTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
 
@@ -136,6 +138,23 @@ async function handleApiRequest(
     const payload = await readJsonBody<CreateSessionRequest>(request);
     const snapshot = await createSessionSnapshot(contentRoot, payload, store);
     sendJson(response, 201, snapshot);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/turns") && request.method === "POST") {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns", "");
+    const payload = await readJsonBody<SubmitTurnRequest>(request);
+    const snapshot = submitMockTurn(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `未找到 session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
     return true;
   }
 

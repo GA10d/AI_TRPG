@@ -68,7 +68,7 @@
 
       <section class="panel panel-result">
         <div class="result-header">
-          <h2>创建结果</h2>
+          <h2>创建结果 / 最小游戏页</h2>
           <span id="result-badge" class="badge">尚未创建</span>
         </div>
 
@@ -102,6 +102,46 @@
           <div class="opening-block">
             <div class="meta-label">Mock 开场文本</div>
             <pre id="opening-text"></pre>
+          </div>
+
+          <div id="game-area" class="game-area hidden">
+            <div class="game-topbar">
+              <div>
+                <div class="meta-label">当前状态</div>
+                <div id="game-state-summary"></div>
+              </div>
+              <div>
+                <div class="meta-label">当前回合</div>
+                <div id="game-round-summary"></div>
+              </div>
+            </div>
+
+            <div class="log-columns">
+              <div class="log-card">
+                <div class="meta-label">消息流</div>
+                <div id="message-list" class="message-list"></div>
+              </div>
+
+              <div class="log-card">
+                <div class="meta-label">回放日志</div>
+                <div id="replay-list" class="replay-list"></div>
+              </div>
+            </div>
+
+            <form id="turn-form" class="turn-form">
+              <label class="field">
+                <span>输入本轮行动</span>
+                <textarea
+                  id="turn-input"
+                  rows="5"
+                  placeholder="例如：我先检查录像厅入口的地面痕迹，然后轻声询问莉莉她姐姐最后一次出现在哪。"
+                ></textarea>
+              </label>
+
+              <button id="turn-submit-button" class="primary-button" type="submit">
+                提交本轮行动
+              </button>
+            </form>
           </div>
         </div>
       </section>
