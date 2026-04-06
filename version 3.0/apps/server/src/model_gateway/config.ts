@@ -2,9 +2,23 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  getDefaultModelProfileId,
+  getModelProfile,
+  listModelProfiles,
+  type ModelProfileDefinition
+} from "../../../../packages/shared-config/src/index.ts";
+import type {
+  ModelProfileSummary,
+  RuntimeModelConfigInput,
+  ServerProxyStatus
+} from "../../../../packages/shared-types/src/index.ts";
+
 export type ServerProxyDependence = "OpenAI" | "Google";
 
 export type ServerProxyConfig = {
+  profileId: string;
+  profileName: string;
   dependence: ServerProxyDependence;
   baseUrl: string;
   apiKey: string;
@@ -15,21 +29,10 @@ export type ServerProxyConfig = {
   providerLabel: string;
 };
 
-export type ServerProxyStatus = {
-  available: boolean;
-  configured: boolean;
-  dependence: ServerProxyDependence;
-  model: string | null;
-  baseUrl: string | null;
-  providerLabel: string | null;
-  missingEnvKeys: string[];
-  message: string;
-};
-
 let envLoaded = false;
 
 function projectRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  return resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 }
 
 function parseEnvFileContent(rawContent: string): Array<[string, string]> {
@@ -113,8 +116,8 @@ function parseOptionalNumber(rawValue: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeDependence(rawValue: string | undefined): ServerProxyDependence {
-  return rawValue === "Google" ? "Google" : "OpenAI";
+function normalizeDependence(profile: ModelProfileDefinition): ServerProxyDependence {
+  return profile.dependence === "Google" ? "Google" : "OpenAI";
 }
 
 function normalizeBaseUrl(
@@ -132,89 +135,190 @@ function normalizeBaseUrl(
   return (rawBaseUrl ?? "https://api.openai.com/v1").replace(/\/+$/u, "");
 }
 
-function resolveApiKey(dependence: ServerProxyDependence): string {
-  const apiKey =
-    dependence === "Google"
-      ? envFirst("TRPG_SERVER_PROXY_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
-      : envFirst("TRPG_SERVER_PROXY_API_KEY", "OPENAI_API_KEY");
+function resolveProviderLabel(profile: ModelProfileDefinition): string {
+  return profile.dependence === "Google"
+    ? `server-proxy:google-openai:${profile.code}`
+    : `server-proxy:openai:${profile.code}`;
+}
 
-  if (!apiKey) {
-    throw new Error(
-      dependence === "Google"
-        ? "server_proxy requires TRPG_SERVER_PROXY_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY."
-        : "server_proxy requires TRPG_SERVER_PROXY_API_KEY or OPENAI_API_KEY."
-    );
+function resolveProfile(profileId: string | undefined): ModelProfileDefinition {
+  const targetProfile =
+    (profileId ? getModelProfile(profileId) : null) ??
+    getModelProfile(getDefaultModelProfileId("server_proxy"));
+
+  if (!targetProfile) {
+    throw new Error("No model profile could be resolved for server_proxy.");
   }
 
-  return apiKey;
+  if (targetProfile.accessMode !== "server_proxy") {
+    throw new Error(`Model profile ${targetProfile.id} is not a server_proxy profile.`);
+  }
+
+  return targetProfile;
 }
 
-function getApiKeyCandidates(dependence: ServerProxyDependence): string[] {
-  return dependence === "Google"
-    ? ["TRPG_SERVER_PROXY_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"]
-    : ["TRPG_SERVER_PROXY_API_KEY", "OPENAI_API_KEY"];
+function pickRuntimeValue(
+  runtimeModelConfig: RuntimeModelConfigInput | undefined,
+  key: keyof RuntimeModelConfigInput
+): string | undefined {
+  const rawValue = runtimeModelConfig?.[key];
+  return typeof rawValue === "string" && rawValue.trim().length > 0
+    ? rawValue.trim()
+    : undefined;
 }
 
-function resolveProviderLabel(dependence: ServerProxyDependence): string {
-  return dependence === "Google" ? "server-proxy:google-openai" : "server-proxy:openai";
+function resolveApiKey(
+  profile: ModelProfileDefinition,
+  runtimeModelConfig?: RuntimeModelConfigInput
+): string | null {
+  return pickRuntimeValue(runtimeModelConfig, "apiKey") ?? envFirst(...profile.envKeyCandidates) ?? null;
+}
+
+function resolveModelName(
+  profile: ModelProfileDefinition,
+  runtimeModelConfig?: RuntimeModelConfigInput
+): string | null {
+  return (
+    pickRuntimeValue(runtimeModelConfig, "model") ??
+    envFirst(...profile.modelEnvKeyCandidates) ??
+    profile.baseModel
+  );
+}
+
+function resolveBaseUrl(
+  profile: ModelProfileDefinition,
+  runtimeModelConfig?: RuntimeModelConfigInput
+): string | null {
+  const rawBaseUrl =
+    pickRuntimeValue(runtimeModelConfig, "baseUrl") ??
+    envFirst(...profile.baseUrlEnvKeyCandidates) ??
+    profile.baseUrl ??
+    undefined;
+
+  if (!rawBaseUrl && profile.urlRequirements) {
+    return null;
+  }
+
+  return normalizeBaseUrl(normalizeDependence(profile), rawBaseUrl);
+}
+
+function buildMissingKeys(
+  profile: ModelProfileDefinition,
+  runtimeModelConfig?: RuntimeModelConfigInput
+): string[] {
+  const missingKeys: string[] = [];
+
+  if (!resolveApiKey(profile, runtimeModelConfig)) {
+    missingKeys.push(profile.envKeyCandidates.join(" | "));
+  }
+
+  if (!resolveModelName(profile, runtimeModelConfig)) {
+    missingKeys.push(profile.modelEnvKeyCandidates.join(" | "));
+  }
+
+  if (!resolveBaseUrl(profile, runtimeModelConfig)) {
+    missingKeys.push(profile.baseUrlEnvKeyCandidates.join(" | "));
+  }
+
+  return missingKeys;
+}
+
+function buildProfileMessage(
+  profile: ModelProfileDefinition,
+  runtimeModelConfig?: RuntimeModelConfigInput
+): string {
+  const missingKeys = buildMissingKeys(profile, runtimeModelConfig);
+  if (missingKeys.length === 0) {
+    const resolvedModel = resolveModelName(profile, runtimeModelConfig);
+    return `${profile.name} 已就绪，将使用 ${resolvedModel}.`;
+  }
+
+  return `${profile.name} 尚未配置完整。缺少：${missingKeys.join(", ")}`;
+}
+
+export function listModelProfileSummaries(): ModelProfileSummary[] {
+  return listModelProfiles().map((profile) => {
+    const missingKeys =
+      profile.accessMode === "server_proxy" ? buildMissingKeys(profile) : [];
+    const configured = profile.accessMode === "mock" ? true : missingKeys.length === 0;
+
+    return {
+      id: profile.id,
+      name: profile.name,
+      code: profile.code,
+      accessMode: profile.accessMode,
+      providerFamily: profile.providerFamily,
+      dependence: profile.dependence,
+      description: profile.description,
+      urlRequirements: profile.urlRequirements,
+      baseUrl:
+        profile.accessMode === "server_proxy" ? resolveBaseUrl(profile) : profile.baseUrl,
+      baseModel:
+        profile.accessMode === "server_proxy" ? resolveModelName(profile) : profile.baseModel,
+      chargeUrl: profile.chargeUrl,
+      docsUrl: profile.docsUrl,
+      envKeyCandidates: profile.envKeyCandidates,
+      supportsFeatures: Object.entries(profile.features)
+        .filter(([, featureConfig]) => featureConfig.supported)
+        .map(([featureKey]) => featureKey),
+      allowsCustomApiKey: profile.allowsCustomApiKey,
+      allowsCustomBaseUrl: profile.allowsCustomBaseUrl,
+      allowsCustomModel: profile.allowsCustomModel,
+      configured,
+      available: true,
+      missingEnvKeys: missingKeys,
+      message:
+        profile.accessMode === "mock"
+          ? "mock 模式始终可用。"
+          : buildProfileMessage(profile)
+    };
+  });
 }
 
 export function getServerProxyStatus(): ServerProxyStatus {
-  const dependence = normalizeDependence(envFirst("TRPG_SERVER_PROXY_DEPENDENCE"));
-  const model = envFirst("TRPG_SERVER_PROXY_MODEL") ?? null;
-  const apiKeyCandidates = getApiKeyCandidates(dependence);
-  const apiKey = envFirst(...apiKeyCandidates);
-  const baseUrl = normalizeBaseUrl(
-    dependence,
-    envFirst("TRPG_SERVER_PROXY_BASE_URL")
+  const summaries = listModelProfileSummaries().filter(
+    (item) => item.accessMode === "server_proxy"
   );
-  const missingEnvKeys: string[] = [];
-
-  if (!model) {
-    missingEnvKeys.push("TRPG_SERVER_PROXY_MODEL");
-  }
-  if (!apiKey) {
-    missingEnvKeys.push(apiKeyCandidates.join(" | "));
-  }
-
-  const configured = missingEnvKeys.length === 0;
-  const providerLabel = resolveProviderLabel(dependence);
+  const configuredProfiles = summaries.filter((item) => item.configured);
+  const configuredProfileIds = configuredProfiles.map((item) => item.id);
+  const defaultProfileId = getDefaultModelProfileId("server_proxy");
 
   return {
-    available: configured,
-    configured,
-    dependence,
-    model,
-    baseUrl,
-    providerLabel,
-    missingEnvKeys,
-    message: configured
-      ? `server_proxy 已就绪，将通过 ${providerLabel} 调用 ${model}.`
-      : `server_proxy 尚未配置完整。缺少：${missingEnvKeys.join(", ")}`
+    available: true,
+    configured: configuredProfiles.length > 0,
+    configuredProfileIds,
+    defaultProfileId,
+    message:
+      configuredProfiles.length > 0
+        ? `已检测到 ${configuredProfiles.length} 个可用的 server_proxy 模型档案。`
+        : "当前没有完整的 server_proxy 环境配置，但仍可通过前端临时填写 API key、base url 和模型名。"
   };
 }
 
-export function getServerProxyConfig(): ServerProxyConfig {
-  const status = getServerProxyStatus();
-  if (!status.configured || !status.model) {
-    throw new Error(status.message);
+export function getServerProxyConfig(input: {
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+}): ServerProxyConfig {
+  const profile = resolveProfile(input.modelProfileId);
+  const apiKey = resolveApiKey(profile, input.runtimeModelConfig);
+  const model = resolveModelName(profile, input.runtimeModelConfig);
+  const baseUrl = resolveBaseUrl(profile, input.runtimeModelConfig);
+  const missingKeys = buildMissingKeys(profile, input.runtimeModelConfig);
+
+  if (!apiKey || !model || !baseUrl || missingKeys.length > 0) {
+    throw new Error(buildProfileMessage(profile, input.runtimeModelConfig));
   }
-  const dependence = status.dependence;
 
   return {
-    dependence,
-    baseUrl: status.baseUrl ?? normalizeBaseUrl(dependence, undefined),
-    apiKey: resolveApiKey(dependence),
-    model: status.model,
-    temperature: parseNumberOrDefault(
-      envFirst("TRPG_SERVER_PROXY_TEMPERATURE"),
-      0.7
-    ),
+    profileId: profile.id,
+    profileName: profile.name,
+    dependence: normalizeDependence(profile),
+    baseUrl,
+    apiKey,
+    model,
+    temperature: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TEMPERATURE"), 0.7),
     maxTokens: parseOptionalNumber(envFirst("TRPG_SERVER_PROXY_MAX_TOKENS")),
-    timeoutMs: parseNumberOrDefault(
-      envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"),
-      60_000
-    ),
-    providerLabel: resolveProviderLabel(dependence)
+    timeoutMs: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"), 60_000),
+    providerLabel: resolveProviderLabel(profile)
   };
 }

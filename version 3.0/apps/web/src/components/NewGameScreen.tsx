@@ -1,6 +1,7 @@
 import type {
   BootstrapResponse,
-  CreateSessionRequest
+  CreateSessionRequest,
+  RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import {
   GM_ARCHITECTURE_OPTIONS,
@@ -17,6 +18,8 @@ type NewGameScreenProps = {
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
+  modelProfileId: string;
+  runtimeModelConfig: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   isCreating: boolean;
@@ -28,11 +31,40 @@ type NewGameScreenProps = {
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
+  onModelProfileIdChange: (value: string) => void;
+  onRuntimeModelConfigChange: (value: RuntimeModelConfigInput) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
 };
+
+function isProfileReady(
+  accessMode: CreateSessionRequest["modelAccessMode"],
+  selectedProfile: BootstrapResponse["modelProfiles"][number] | null,
+  runtimeModelConfig: RuntimeModelConfigInput
+): boolean {
+  if (accessMode === "mock") {
+    return true;
+  }
+
+  if (!selectedProfile) {
+    return false;
+  }
+
+  if (selectedProfile.configured) {
+    return true;
+  }
+
+  const hasApiKey = (runtimeModelConfig.apiKey?.trim() ?? "").length > 0;
+  const hasBaseUrl = (runtimeModelConfig.baseUrl?.trim() ?? "").length > 0;
+  const hasModel = (runtimeModelConfig.model?.trim() ?? "").length > 0;
+  const baseUrlReady =
+    !selectedProfile.urlRequirements || hasBaseUrl || Boolean(selectedProfile.baseUrl);
+  const modelReady = hasModel || Boolean(selectedProfile.baseModel);
+
+  return hasApiKey && baseUrlReady && modelReady;
+}
 
 export function NewGameScreen(props: NewGameScreenProps) {
   const {
@@ -43,6 +75,8 @@ export function NewGameScreen(props: NewGameScreenProps) {
     playMode,
     gmArchitecture,
     modelAccessMode,
+    modelProfileId,
+    runtimeModelConfig,
     debugEnabled,
     logViewMode,
     isCreating,
@@ -54,6 +88,8 @@ export function NewGameScreen(props: NewGameScreenProps) {
     onPlayModeChange,
     onGmArchitectureChange,
     onModelAccessModeChange,
+    onModelProfileIdChange,
+    onRuntimeModelConfigChange,
     onDebugEnabledChange,
     onLogViewModeChange
   } = props;
@@ -63,24 +99,38 @@ export function NewGameScreen(props: NewGameScreenProps) {
   const stories = selectedRule?.stories ?? [];
   const selectedModelMode =
     bootstrap?.modelAccessModes.find((item) => item.code === modelAccessMode) ?? null;
-  const isSelectedModeUnavailable = selectedModelMode?.available === false;
+  const availableProfiles =
+    bootstrap?.modelProfiles.filter((item) => item.accessMode === modelAccessMode) ?? [];
+  const selectedProfile =
+    availableProfiles.find((item) => item.id === modelProfileId) ?? availableProfiles[0] ?? null;
+  const profileReady = isProfileReady(modelAccessMode, selectedProfile, runtimeModelConfig);
+  const isSelectedModeUnavailable = modelAccessMode === "server_proxy" && !profileReady;
 
   return (
     <section className="panel page-panel">
       <ScreenHeader
         title="开始游戏"
-        description="创建新会话，并进入当前的 mock 假闭环。"
+        description="创建新会话，并进入当前可运行的假闭环。"
         onBack={onBack}
       />
 
       {selectedModelMode ? (
         <div
           className={`info-banner ${
-            selectedModelMode.available ? "info-banner-success" : "info-banner-warning"
+            isSelectedModeUnavailable ? "info-banner-warning" : "info-banner-success"
           }`}
         >
-          <strong>{selectedModelMode.label}</strong>
-          <div>{selectedModelMode.message}</div>
+          <strong>{selectedProfile?.name ?? selectedModelMode.label}</strong>
+          <div>{selectedProfile?.message ?? selectedModelMode.message}</div>
+          {selectedProfile?.missingEnvKeys.length ? (
+            <div>缺少环境变量：{selectedProfile.missingEnvKeys.join("，")}</div>
+          ) : null}
+          {modelAccessMode === "server_proxy" ? (
+            <div>
+              留空时会优先读取 `.env`；你也可以在当前页面临时覆盖 API key、模型名和 base
+              URL。
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -112,7 +162,10 @@ export function NewGameScreen(props: NewGameScreenProps) {
         <div className="grid-two">
           <label className="field">
             <span>语言</span>
-            <select value={locale} onChange={(event) => onLocaleChange(event.target.value as CreateSessionRequest["locale"])}>
+            <select
+              value={locale}
+              onChange={(event) => onLocaleChange(event.target.value as CreateSessionRequest["locale"])}
+            >
               {bootstrap?.languages.map((language) => (
                 <option key={language.code} value={language.code}>
                   {language.nativeLabel} / {language.label}
@@ -140,6 +193,20 @@ export function NewGameScreen(props: NewGameScreenProps) {
 
         <div className="grid-two">
           <label className="field">
+            <span>模型档案</span>
+            <select
+              value={selectedProfile?.id ?? modelProfileId}
+              onChange={(event) => onModelProfileIdChange(event.target.value)}
+            >
+              {availableProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
             <span>游戏模式</span>
             <select
               value={playMode}
@@ -154,7 +221,9 @@ export function NewGameScreen(props: NewGameScreenProps) {
               ))}
             </select>
           </label>
+        </div>
 
+        <div className="grid-two">
           <label className="field">
             <span>主持架构</span>
             <select
@@ -170,9 +239,7 @@ export function NewGameScreen(props: NewGameScreenProps) {
               ))}
             </select>
           </label>
-        </div>
 
-        <div className="grid-two">
           <label className="field">
             <span>日志显示</span>
             <select
@@ -190,19 +257,79 @@ export function NewGameScreen(props: NewGameScreenProps) {
               ))}
             </select>
           </label>
-
-          <label className="field checkbox-field">
-            <span>调试开关</span>
-            <label className="toggle-row">
-              <input
-                type="checkbox"
-                checked={debugEnabled}
-                onChange={(event) => onDebugEnabledChange(event.target.checked)}
-              />
-              <span>开启调试日志</span>
-            </label>
-          </label>
         </div>
+
+        {modelAccessMode === "server_proxy" ? (
+          <>
+            <div className="grid-two">
+              <label className="field">
+                <span>API Key 覆盖</span>
+                <input
+                  autoComplete="new-password"
+                  className="text-input"
+                  type="password"
+                  placeholder="留空则读取本地 .env"
+                  value={runtimeModelConfig.apiKey ?? ""}
+                  onChange={(event) =>
+                    onRuntimeModelConfigChange({
+                      ...runtimeModelConfig,
+                      apiKey: event.target.value
+                    })
+                  }
+                />
+              </label>
+
+              <label className="field">
+                <span>模型名覆盖</span>
+                <input
+                  className="text-input"
+                  type="text"
+                  placeholder={selectedProfile?.baseModel ?? "留空则使用档案默认模型"}
+                  value={runtimeModelConfig.model ?? ""}
+                  onChange={(event) =>
+                    onRuntimeModelConfigChange({
+                      ...runtimeModelConfig,
+                      model: event.target.value
+                    })
+                  }
+                />
+              </label>
+            </div>
+
+            <label className="field">
+              <span>Base URL 覆盖</span>
+              <input
+                className="text-input"
+                type="text"
+                placeholder={selectedProfile?.baseUrl ?? "留空则使用档案默认 base url"}
+                value={runtimeModelConfig.baseUrl ?? ""}
+                onChange={(event) =>
+                  onRuntimeModelConfigChange({
+                    ...runtimeModelConfig,
+                    baseUrl: event.target.value
+                  })
+                }
+              />
+            </label>
+
+            <div className="hint-text">
+              这些覆盖值仅保存在当前浏览器本地。提交创建会话时会发送给本地 Node 服务，
+              不会显示在普通回放日志里。
+            </div>
+          </>
+        ) : null}
+
+        <label className="field checkbox-field">
+          <span>调试开关</span>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={debugEnabled}
+              onChange={(event) => onDebugEnabledChange(event.target.checked)}
+            />
+            <span>开启调试日志</span>
+          </label>
+        </label>
 
         <button
           className="primary-button"
@@ -210,7 +337,7 @@ export function NewGameScreen(props: NewGameScreenProps) {
           type="submit"
         >
           {isSelectedModeUnavailable
-            ? "当前模型模式不可用"
+            ? "当前模型配置还不完整"
             : isCreating
               ? "创建中..."
               : "创建会话"}

@@ -10,6 +10,7 @@ type MainMenuScreenProps = {
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
+  modelProfileId: string;
   onOpenNewGame: () => void;
   onOpenContinue: () => void;
   onOpenRecords: () => void;
@@ -24,6 +25,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
     playMode,
     gmArchitecture,
     modelAccessMode,
+    modelProfileId,
     onOpenNewGame,
     onOpenContinue,
     onOpenRecords,
@@ -37,8 +39,8 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
         <div className="eyebrow">Main Menu</div>
         <h1>AI TRPG 3.0</h1>
         <p className="lead">
-          当前版本已经具备 React 前端、Node 会话服务和可运行的 mock
-          假闭环。现在先用主菜单把结构立起来，后面再继续接真实模型和正式系统页。
+          当前版本已经具备 React 前端、Node 会话服务、mock 假闭环，以及可切换的
+          `server_proxy` 多模型入口。现在可以从主菜单进入新游戏、继续游戏、战绩和设置页面。
         </p>
 
         <div className="menu-button-list">
@@ -85,13 +87,14 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
           <div className="summary-text">游戏模式：{playMode}</div>
           <div className="summary-text">主持架构：{gmArchitecture}</div>
           <div className="summary-text">模型模式：{modelAccessMode}</div>
+          <div className="summary-text">模型档案：{modelProfileId}</div>
         </div>
 
         <div className="summary-card">
-          <div className="meta-label">开发进度</div>
+          <div className="meta-label">当前进度</div>
           <div className="summary-text">Phase 2 进行中</div>
           <div className="summary-text">
-            已完成 React 迁移、状态化 mock 闭环和主菜单骨架。
+            已完成 React 前端迁移、状态化 mock 闭环，以及 `server_proxy` 多模型配置入口。
           </div>
         </div>
       </section>

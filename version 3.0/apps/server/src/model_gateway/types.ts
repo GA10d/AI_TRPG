@@ -1,7 +1,13 @@
-import type { LocaleCode, ModelAccessMode } from "../../../../packages/shared-types/src/index.ts";
+import type {
+  LocaleCode,
+  ModelAccessMode,
+  RuntimeModelConfigInput
+} from "../../../../packages/shared-types/src/index.ts";
 
 export type OpeningGenerationInput = {
   accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
   storyTitle: string;
   storyIntro: string;
@@ -16,6 +22,8 @@ export type OpeningGenerationOutput = {
 
 export type TurnNarrationInput = {
   accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
   playerInput: string;
   sceneId: string;

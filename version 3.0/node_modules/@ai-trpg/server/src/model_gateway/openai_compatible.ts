@@ -158,7 +158,10 @@ async function callChatCompletion(
 export async function generateOpeningViaServerProxy(
   input: OpeningGenerationInput
 ): Promise<OpeningGenerationOutput> {
-  const config = getServerProxyConfig();
+  const config = getServerProxyConfig({
+    modelProfileId: input.modelProfileId,
+    runtimeModelConfig: input.runtimeModelConfig
+  });
   return {
     text: await callChatCompletion(config, buildOpeningMessages(input)),
     provider: `${config.providerLabel}:${config.model}`,
@@ -169,7 +172,10 @@ export async function generateOpeningViaServerProxy(
 export async function generateTurnNarrationViaServerProxy(
   input: TurnNarrationInput
 ): Promise<TurnNarrationOutput> {
-  const config = getServerProxyConfig();
+  const config = getServerProxyConfig({
+    modelProfileId: input.modelProfileId,
+    runtimeModelConfig: input.runtimeModelConfig
+  });
   return {
     text: await callChatCompletion(config, buildTurnMessages(input)),
     provider: `${config.providerLabel}:${config.model}`,

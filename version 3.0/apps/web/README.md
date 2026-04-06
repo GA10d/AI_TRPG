@@ -10,6 +10,7 @@
 - mock turn 提交
 - 消息流与回放显示
 - 本地继续进度、战绩摘要、默认设置保存
+- `server_proxy` 配置状态提示
 
 开发命令：
 
@@ -20,4 +21,5 @@
 
 - 开发模式下由 Vite 代理 `/api` 到本地 Node 服务
 - 构建后输出到 `apps/web/dist`
-- 当前页面虽然已经拆成独立组件，但还没有正式接入路由系统，后面可以继续往 `pages + hooks + api client` 方向演进
+- 当前前端目录已经拆成 `components + pages + hooks + lib/api client`
+- 还没有正式接入路由系统，后面可以继续往 `pages + router + hooks + api client` 方向演进

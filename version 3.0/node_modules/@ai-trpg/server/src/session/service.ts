@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import {
   DEFAULT_LOG_VIEW_MODE,
-  PHASE1_DEFAULTS
+  PHASE1_DEFAULTS,
+  getDefaultModelProfileId
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
   CreateSessionRequest,
@@ -46,9 +47,13 @@ export async function createSessionSnapshot(
   const storyTitle =
     bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ?? bundle.story.manifest.id;
   const storyIntro = bundle.story.intro?.content ?? bundle.story.story.content;
+  const modelProfileId =
+    request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
   const modelGateway = getModelGateway(request.modelAccessMode);
   const openingResult = await modelGateway.generateOpening({
     accessMode: request.modelAccessMode,
+    modelProfileId,
+    runtimeModelConfig: request.runtimeModelConfig,
     locale: bundle.resolvedLocale,
     storyTitle,
     storyIntro,
@@ -91,10 +96,7 @@ export async function createSessionSnapshot(
       logViewMode: request.logViewMode ?? DEFAULT_LOG_VIEW_MODE,
       debugEnabled: request.debugEnabled ?? true,
       promptDebugEnabled: request.promptDebugEnabled ?? false,
-      modelProfileId:
-        request.modelAccessMode === "mock"
-          ? "mock-local"
-          : "openai-compatible-proxy"
+      modelProfileId
     },
     gameState: {
       schemaVersion: "0.1.0",
@@ -192,7 +194,10 @@ export async function createSessionSnapshot(
     }
   };
 
-  store.save(snapshot);
+  store.save(snapshot, {
+    modelProfileId,
+    runtimeModelConfig: request.runtimeModelConfig
+  });
   return snapshot;
 }
 
@@ -204,6 +209,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     playMode: PHASE1_DEFAULTS.playMode,
     gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
     modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
+    modelProfileId: PHASE1_DEFAULTS.modelProfileId,
     debugEnabled: true,
     promptDebugEnabled: false,
     logViewMode: PHASE1_DEFAULTS.logViewMode
@@ -258,10 +264,14 @@ export async function submitMockTurn(
     current.session.locale,
     nextRound
   );
+  const runtimeConfig = store.getRuntimeConfig(sessionId);
 
   const modelGateway = getModelGateway(current.session.modelAccessMode);
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
+    modelProfileId:
+      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
+    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
     locale: current.session.locale,
     playerInput: trimmedInput,
     sceneId: progression.nextGameState.sceneId,

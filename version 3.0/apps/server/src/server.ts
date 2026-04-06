@@ -21,7 +21,10 @@ import {
   submitMockTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
-import { getServerProxyStatus } from "./model_gateway/config.ts";
+import {
+  getServerProxyStatus,
+  listModelProfileSummaries
+} from "./model_gateway/config.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -117,6 +120,7 @@ function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): Bootstra
       playMode: PHASE1_DEFAULTS.playMode,
       gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
       modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
+      modelProfileId: PHASE1_DEFAULTS.modelProfileId,
       logViewMode: PHASE1_DEFAULTS.logViewMode
     },
     languages: listEnabledLanguages().map((item) => toLanguageOptionPayload(item.code)),
@@ -124,13 +128,14 @@ function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): Bootstra
       code: item.code,
       label: item.label,
       description: item.description,
-      available: item.code === "server_proxy" ? serverProxyStatus.available : true,
+      available: true,
       configured: item.code === "server_proxy" ? serverProxyStatus.configured : true,
       message:
         item.code === "server_proxy"
           ? serverProxyStatus.message
           : "mock 模式始终可用。"
     })),
+    modelProfiles: listModelProfileSummaries(),
     serverProxyStatus,
     catalog
   };

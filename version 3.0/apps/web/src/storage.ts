@@ -1,5 +1,6 @@
 import type {
   CreateSessionRequest,
+  RuntimeModelConfigInput,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 
@@ -13,6 +14,8 @@ export type StoredWebDefaults = {
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
 };

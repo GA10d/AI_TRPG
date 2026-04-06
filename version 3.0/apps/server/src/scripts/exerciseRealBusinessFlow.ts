@@ -14,7 +14,7 @@ type HealthResponse = {
 };
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(currentDir, "../../..");
+const projectRoot = resolve(currentDir, "../../../..");
 const serverEntryPath = resolve(projectRoot, "apps/server/src/server.ts");
 const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "4316"}`;
 
@@ -31,10 +31,15 @@ function getRequestedMode(): CreateSessionRequest["modelAccessMode"] {
   return "server_proxy";
 }
 
+function getRequestedProfileId(): string | undefined {
+  const rawArg = process.argv.find((item) => item.startsWith("--profile="));
+  const cliValue = rawArg?.split("=", 2)[1]?.trim();
+  const envValue = process.env.TRPG_REAL_FLOW_PROFILE_ID?.trim();
+  return cliValue || envValue || undefined;
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T & {
-    message?: string;
-  };
+  const data = (await response.json()) as T & { message?: string };
 
   if (!response.ok) {
     throw new Error(data.message ?? `HTTP ${response.status}`);
@@ -68,16 +73,19 @@ async function isServerAlreadyRunning(): Promise<boolean> {
 }
 
 function startLocalServer(): ChildProcess {
-  return spawn(
-    process.execPath,
-    ["--experimental-strip-types", serverEntryPath],
-    {
+  try {
+    return spawn(process.execPath, ["--experimental-strip-types", serverEntryPath], {
       cwd: projectRoot,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
-    }
-  );
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `自动拉起本地服务失败：${message}\n如果你是在受限环境里运行，请先手动启动 dev:server，或者直接在本机双击 scripts/test_real_business.cmd。`
+    );
+  }
 }
 
 async function ensureServer(): Promise<{
@@ -94,6 +102,7 @@ async function ensureServer(): Promise<{
   const child = startLocalServer();
   let stdoutBuffer = "";
   let stderrBuffer = "";
+
   child.stdout?.on("data", (chunk) => {
     stdoutBuffer += String(chunk);
   });
@@ -119,6 +128,22 @@ async function ensureServer(): Promise<{
     child,
     startedByScript: true
   };
+}
+
+async function stopChildProcess(child: ChildProcess | null): Promise<void> {
+  if (!child) {
+    return;
+  }
+
+  if (child.exitCode !== null || child.killed) {
+    return;
+  }
+
+  await new Promise<void>((resolveStop) => {
+    child.once("exit", () => resolveStop());
+    child.kill();
+    setTimeout(() => resolveStop(), 2_000);
+  });
 }
 
 async function fetchBootstrapData(): Promise<BootstrapResponse> {
@@ -149,12 +174,48 @@ async function submitTurnForSession(
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      playerInput
-    })
+    body: JSON.stringify({ playerInput })
   });
 
   return parseJson<SessionSnapshot>(response);
+}
+
+function pickProfileId(
+  bootstrap: BootstrapResponse,
+  mode: CreateSessionRequest["modelAccessMode"]
+): string {
+  const requestedProfileId = getRequestedProfileId();
+  const matchingProfiles = bootstrap.modelProfiles.filter((item) => item.accessMode === mode);
+
+  if (requestedProfileId) {
+    const requestedProfile = matchingProfiles.find((item) => item.id === requestedProfileId);
+    if (!requestedProfile) {
+      throw new Error(`未找到模型档案：${requestedProfileId}`);
+    }
+
+    return requestedProfile.id;
+  }
+
+  if (mode === "mock") {
+    return matchingProfiles[0]?.id ?? bootstrap.defaults.modelProfileId;
+  }
+
+  const defaultConfigured = matchingProfiles.find(
+    (item) =>
+      item.id === bootstrap.serverProxyStatus.defaultProfileId && item.configured
+  );
+  if (defaultConfigured) {
+    return defaultConfigured.id;
+  }
+
+  const firstConfigured = matchingProfiles.find((item) => item.configured);
+  if (firstConfigured) {
+    return firstConfigured.id;
+  }
+
+  throw new Error(
+    `${bootstrap.serverProxyStatus.message}\n请先参考 version 3.0/.env.example 配置真实模型，或者在前端设置页里手动填写 API key / base url / 模型名。`
+  );
 }
 
 function buildRequestFromBootstrap(
@@ -168,11 +229,7 @@ function buildRequestFromBootstrap(
     throw new Error("当前 catalog 里没有可用的 rule/story。");
   }
 
-  if (mode === "server_proxy" && !bootstrap.serverProxyStatus.available) {
-    throw new Error(
-      `${bootstrap.serverProxyStatus.message}\n请先参考 version 3.0/.env.example 配置真实模型。`
-    );
-  }
+  const modelProfileId = pickProfileId(bootstrap, mode);
 
   return {
     ruleDirectoryName: firstRule.directoryName,
@@ -181,6 +238,7 @@ function buildRequestFromBootstrap(
     playMode: bootstrap.defaults.playMode,
     gmArchitecture: bootstrap.defaults.gmArchitecture,
     modelAccessMode: mode,
+    modelProfileId,
     debugEnabled: true,
     promptDebugEnabled: false,
     logViewMode: bootstrap.defaults.logViewMode
@@ -200,6 +258,8 @@ async function main(): Promise<void> {
 
     const bootstrap = await fetchBootstrapData();
     const request = buildRequestFromBootstrap(bootstrap, mode);
+    console.log(`[flow] model profile: ${request.modelProfileId ?? "unknown"}`);
+
     const created = await createNewSession(request);
     const progressed = await submitTurnForSession(
       created.session.id,
@@ -208,7 +268,9 @@ async function main(): Promise<void> {
 
     console.log(`[flow] created session: ${created.session.id}`);
     console.log(`[flow] story: ${created.contentSummary.storyTitle}`);
-    console.log(`[flow] opening provider: ${created.messages[1]?.tags?.join(", ") ?? "unknown"}`);
+    console.log(
+      `[flow] opening provider: ${created.messages[1]?.tags?.join(", ") ?? "unknown"}`
+    );
     console.log(`[flow] round after turn: ${progressed.session.currentRound}`);
     console.log(`[flow] current scene: ${progressed.session.gameState.sceneId}`);
     console.log(
@@ -216,10 +278,12 @@ async function main(): Promise<void> {
     );
     console.log("[flow] real business flow passed.");
   } finally {
-    if (serverHandle.child) {
-      serverHandle.child.kill();
-    }
+    await stopChildProcess(serverHandle.child);
   }
 }
 
-void main();
+void main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(message);
+  process.exitCode = 1;
+});

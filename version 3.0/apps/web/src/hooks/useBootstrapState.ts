@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 
 import type {
   BootstrapResponse,
-  CreateSessionRequest
+  CreateSessionRequest,
+  RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchBootstrap } from "../lib/trpgApiClient.ts";
 import { loadStoredWebDefaults } from "../storage.ts";
@@ -18,6 +19,32 @@ type UseBootstrapStateArgs = {
   onStatusChange: (status: StatusState) => void;
 };
 
+function sanitizeRuntimeModelConfig(
+  runtimeModelConfig: RuntimeModelConfigInput | undefined
+): RuntimeModelConfigInput {
+  return {
+    apiKey: runtimeModelConfig?.apiKey?.trim() || "",
+    baseUrl: runtimeModelConfig?.baseUrl?.trim() || "",
+    model: runtimeModelConfig?.model?.trim() || ""
+  };
+}
+
+function resolveModelProfileId(
+  bootstrap: BootstrapResponse,
+  accessMode: CreateSessionRequest["modelAccessMode"],
+  preferredProfileId: string | undefined
+): string {
+  const matchingProfiles = bootstrap.modelProfiles.filter(
+    (item) => item.accessMode === accessMode
+  );
+
+  if (preferredProfileId && matchingProfiles.some((item) => item.id === preferredProfileId)) {
+    return preferredProfileId;
+  }
+
+  return matchingProfiles[0]?.id ?? bootstrap.defaults.modelProfileId;
+}
+
 export function useBootstrapState(args: UseBootstrapStateArgs) {
   const { onStatusChange } = args;
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
@@ -29,6 +56,12 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     useState<CreateSessionRequest["gmArchitecture"]>("single_agent");
   const [modelAccessMode, setModelAccessMode] =
     useState<CreateSessionRequest["modelAccessMode"]>("mock");
+  const [modelProfileId, setModelProfileId] = useState("mock-local");
+  const [runtimeModelConfig, setRuntimeModelConfig] = useState<RuntimeModelConfigInput>({
+    apiKey: "",
+    baseUrl: "",
+    model: ""
+  });
   const [debugEnabled, setDebugEnabled] = useState(true);
   const [logViewMode, setLogViewMode] =
     useState<NonNullable<CreateSessionRequest["logViewMode"]>>("compact");
@@ -44,6 +77,17 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         }
 
         const storedDefaults = loadStoredWebDefaults();
+        const resolvedAccessMode = pickOption(
+          storedDefaults?.modelAccessMode,
+          data.modelAccessModes.map((item) => item.code),
+          data.defaults.modelAccessMode
+        );
+        const resolvedProfileId = resolveModelProfileId(
+          data,
+          resolvedAccessMode,
+          storedDefaults?.modelProfileId ?? data.defaults.modelProfileId
+        );
+
         setBootstrap(data);
         setRuleDirectoryName(data.catalog[0]?.directoryName ?? "");
         setStoryDirectoryName(data.catalog[0]?.stories[0]?.directoryName ?? "");
@@ -68,12 +112,10 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             data.defaults.gmArchitecture
           )
         );
-        setModelAccessMode(
-          pickOption(
-            storedDefaults?.modelAccessMode,
-            data.modelAccessModes.map((item) => item.code),
-            data.defaults.modelAccessMode
-          )
+        setModelAccessMode(resolvedAccessMode);
+        setModelProfileId(resolvedProfileId);
+        setRuntimeModelConfig(
+          sanitizeRuntimeModelConfig(storedDefaults?.runtimeModelConfig)
         );
         setDebugEnabled(storedDefaults?.debugEnabled ?? true);
         setLogViewMode(
@@ -119,6 +161,22 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     }
   }, [bootstrap, ruleDirectoryName, storyDirectoryName]);
 
+  useEffect(() => {
+    if (!bootstrap) {
+      return;
+    }
+
+    const resolvedProfileId = resolveModelProfileId(
+      bootstrap,
+      modelAccessMode,
+      modelProfileId
+    );
+
+    if (resolvedProfileId !== modelProfileId) {
+      setModelProfileId(resolvedProfileId);
+    }
+  }, [bootstrap, modelAccessMode, modelProfileId]);
+
   return {
     bootstrap,
     ruleDirectoryName,
@@ -127,6 +185,8 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     playMode,
     gmArchitecture,
     modelAccessMode,
+    modelProfileId,
+    runtimeModelConfig,
     debugEnabled,
     logViewMode,
     setRuleDirectoryName,
@@ -135,6 +195,8 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setPlayMode,
     setGmArchitecture,
     setModelAccessMode,
+    setModelProfileId,
+    setRuntimeModelConfig,
     setDebugEnabled,
     setLogViewMode
   };

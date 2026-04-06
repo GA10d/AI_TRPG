@@ -6,6 +6,12 @@ import type {
   Session
 } from "./runtime.ts";
 
+export type RuntimeModelConfigInput = {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+};
+
 export type CreateSessionRequest = {
   ruleDirectoryName: string;
   storyDirectoryName: string;
@@ -13,6 +19,8 @@ export type CreateSessionRequest = {
   playMode: PlayMode;
   gmArchitecture: GmArchitecture;
   modelAccessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
   logViewMode?: "all" | "compact" | "hidden";
@@ -34,14 +42,35 @@ export type SessionSnapshot = {
   };
 };
 
+export type ModelProfileSummary = {
+  id: string;
+  name: string;
+  code: string;
+  accessMode: ModelAccessMode;
+  providerFamily: string;
+  dependence: "Mock" | "OpenAI" | "Google";
+  description: string;
+  urlRequirements: boolean;
+  baseUrl: string | null;
+  baseModel: string | null;
+  chargeUrl: string;
+  docsUrl: string;
+  envKeyCandidates: string[];
+  supportsFeatures: string[];
+  allowsCustomApiKey: boolean;
+  allowsCustomBaseUrl: boolean;
+  allowsCustomModel: boolean;
+  configured: boolean;
+  available: boolean;
+  missingEnvKeys: string[];
+  message: string;
+};
+
 export type ServerProxyStatus = {
   available: boolean;
   configured: boolean;
-  dependence: "OpenAI" | "Google";
-  model: string | null;
-  baseUrl: string | null;
-  providerLabel: string | null;
-  missingEnvKeys: string[];
+  configuredProfileIds: string[];
+  defaultProfileId: string;
   message: string;
 };
 
@@ -51,6 +80,7 @@ export type BootstrapResponse = {
     playMode: PlayMode;
     gmArchitecture: GmArchitecture;
     modelAccessMode: ModelAccessMode;
+    modelProfileId: string;
     logViewMode: "all" | "compact" | "hidden";
   };
   languages: Array<{
@@ -67,6 +97,7 @@ export type BootstrapResponse = {
     configured: boolean;
     message: string;
   }>;
+  modelProfiles: ModelProfileSummary[];
   serverProxyStatus: ServerProxyStatus;
   catalog: Array<{
     ruleId: string;

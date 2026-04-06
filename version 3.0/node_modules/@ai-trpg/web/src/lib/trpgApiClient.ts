@@ -17,41 +17,67 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data;
 }
 
+function normalizeNetworkError(error: unknown): Error {
+  if (error instanceof TypeError) {
+    return new Error(
+      "无法连接到本地 API 服务。请确认 gameplay server 正在运行，并访问 http://127.0.0.1:4316/ 。"
+    );
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export async function fetchBootstrap(): Promise<BootstrapResponse> {
-  const response = await fetch("/api/bootstrap");
-  return parseJson<BootstrapResponse>(response);
+  try {
+    const response = await fetch("/api/bootstrap");
+    return parseJson<BootstrapResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
 }
 
 export async function createSession(
   payload: CreateSessionRequest
 ): Promise<SessionSnapshot> {
-  const response = await fetch("/api/sessions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-  return parseJson<SessionSnapshot>(response);
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
 }
 
 export async function fetchSession(sessionId: string): Promise<SessionSnapshot> {
-  const response = await fetch(`/api/sessions/${sessionId}`);
-  return parseJson<SessionSnapshot>(response);
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}`);
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
 }
 
 export async function submitTurn(
   sessionId: string,
   payload: SubmitTurnRequest
 ): Promise<SessionSnapshot> {
-  const response = await fetch(`/api/sessions/${sessionId}/turns`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/turns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-  return parseJson<SessionSnapshot>(response);
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
 }

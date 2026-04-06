@@ -10,6 +10,7 @@
 - mock turn 接口
 - Model Gateway 基线
 - `server_proxy` 第一版真实文本调用
+- 一键业务流自测脚本
 - 如果存在 `apps/web/dist`，可直接托管前端构建产物
 
 `server_proxy` 使用方式：
@@ -23,6 +24,12 @@
 
 - 运行 `node --experimental-strip-types ./apps/server/src/scripts/validateServerProxy.ts`
 - 这个脚本会起一个本地假的 OpenAI-compatible 服务，验证 `server_proxy` 调用链是否正常
+
+业务流自测：
+
+- 根目录运行 `npm.cmd run test:real -- --mode=mock`
+- 或直接双击 [test_real_business.cmd](/f:/Documents/GitHub/AI_TRPG_616/version%203.0/scripts/test_real_business.cmd)
+- bash 环境可运行 [test_real_business.sh](/f:/Documents/GitHub/AI_TRPG_616/version%203.0/scripts/test_real_business.sh)
 
 后续阶段会继续补：
 

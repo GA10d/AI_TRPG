@@ -1,6 +1,8 @@
 import { DEFAULT_LOCALE } from "./languages.ts";
+import { getDefaultModelProfileId } from "./model_profiles.ts";
 
 export * from "./languages.ts";
+export * from "./model_profiles.ts";
 
 export const DEFAULT_LOG_VIEW_MODE = "compact";
 
@@ -18,8 +20,26 @@ export const DEFAULT_MODEL_PROFILES = [
     providerFamily: "mock"
   },
   {
-    id: "openai-compatible-proxy",
-    label: "OpenAI Compatible Proxy",
+    id: "chatgpt",
+    label: "ChatGPT",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible"
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible"
+  },
+  {
+    id: "gemini",
+    label: "Gemini",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible"
+  },
+  {
+    id: "custom-openai-compatible",
+    label: "Custom OpenAI-Compatible",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible"
   }
@@ -34,7 +54,7 @@ export const PHASE1_MODEL_ACCESS_MODE_OPTIONS = [
   {
     code: "server_proxy",
     label: "Server Proxy",
-    description: "通过 Node 服务端代理调用真实模型，当前支持 OpenAI-compatible 文本接口"
+    description: "通过 Node 服务端代理调用真实模型，支持多模型档案和 API key 覆盖"
   }
 ] as const;
 
@@ -42,6 +62,7 @@ export const PHASE1_DEFAULTS = {
   playMode: "single_player",
   gmArchitecture: "single_agent",
   modelAccessMode: "mock",
+  modelProfileId: getDefaultModelProfileId("mock"),
   locale: DEFAULT_LOCALE,
   logViewMode: DEFAULT_LOG_VIEW_MODE
 } as const;

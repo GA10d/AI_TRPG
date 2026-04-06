@@ -1,14 +1,8 @@
 import { useState } from "react";
 
-import type { CreateSessionRequest, SessionSnapshot } from "../../../packages/shared-types/src/index.ts";
-import {
-  createSession,
-  fetchSession,
-  submitTurn
-} from "./lib/trpgApiClient.ts";
-import {
-  useBootstrapState
-} from "./hooks/useBootstrapState.ts";
+import type { SessionSnapshot } from "../../../packages/shared-types/src/index.ts";
+import { createSession, fetchSession, submitTurn } from "./lib/trpgApiClient.ts";
+import { useBootstrapState } from "./hooks/useBootstrapState.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
@@ -17,14 +11,8 @@ import { MenuPage } from "./pages/MenuPage.tsx";
 import { NewGamePage } from "./pages/NewGamePage.tsx";
 import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
-import {
-  storeWebDefaults,
-  type SessionRecord
-} from "./storage.ts";
-import {
-  type AppView,
-  type StatusState,
-} from "./ui.ts";
+import { storeWebDefaults, type SessionRecord } from "./storage.ts";
+import { type AppView, type StatusState } from "./ui.ts";
 
 const initialStatus: StatusState = {
   message: "正在加载启动信息...",
@@ -39,6 +27,7 @@ export function App() {
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [turnInput, setTurnInput] = useState("");
+
   const {
     bootstrap,
     ruleDirectoryName,
@@ -47,6 +36,8 @@ export function App() {
     playMode,
     gmArchitecture,
     modelAccessMode,
+    modelProfileId,
+    runtimeModelConfig,
     debugEnabled,
     logViewMode,
     setRuleDirectoryName,
@@ -55,11 +46,14 @@ export function App() {
     setPlayMode,
     setGmArchitecture,
     setModelAccessMode,
+    setModelProfileId,
+    setRuntimeModelConfig,
     setDebugEnabled,
     setLogViewMode
   } = useBootstrapState({
     onStatusChange: setStatus
   });
+
   const {
     recentSnapshot,
     records,
@@ -74,6 +68,8 @@ export function App() {
       playMode,
       gmArchitecture,
       modelAccessMode,
+      modelProfileId,
+      runtimeModelConfig,
       debugEnabled,
       logViewMode
     });
@@ -115,6 +111,8 @@ export function App() {
         playMode,
         gmArchitecture,
         modelAccessMode,
+        modelProfileId,
+        runtimeModelConfig,
         debugEnabled,
         promptDebugEnabled: false,
         logViewMode
@@ -187,7 +185,7 @@ export function App() {
   async function handleContinueRecent(): Promise<void> {
     if (!recentSnapshot) {
       setStatus({
-        message: "本地还没有最近会话。",
+        message: "本地还没有最近进度。",
         tone: "error"
       });
       return;
@@ -208,10 +206,10 @@ export function App() {
         tone: "neutral"
       });
     } catch {
-      setSnapshot(recentSnapshot);
+      commitSnapshot(recentSnapshot);
       setView("game");
       setStatus({
-        message: "服务端未找到会话，已使用本地快照打开。",
+        message: "服务端未找到会话，已改用本地快照打开。",
         tone: "neutral"
       });
     } finally {
@@ -262,6 +260,12 @@ export function App() {
     setPlayMode(bootstrap.defaults.playMode);
     setGmArchitecture(bootstrap.defaults.gmArchitecture);
     setModelAccessMode(bootstrap.defaults.modelAccessMode);
+    setModelProfileId(bootstrap.defaults.modelProfileId);
+    setRuntimeModelConfig({
+      apiKey: "",
+      baseUrl: "",
+      model: ""
+    });
     setLogViewMode(bootstrap.defaults.logViewMode);
     setDebugEnabled(true);
     setStatus({
@@ -295,6 +299,7 @@ export function App() {
   }
 
   let content: React.ReactNode;
+
   switch (view) {
     case "new":
       content = (
@@ -306,6 +311,8 @@ export function App() {
           playMode={playMode}
           gmArchitecture={gmArchitecture}
           modelAccessMode={modelAccessMode}
+          modelProfileId={modelProfileId}
+          runtimeModelConfig={runtimeModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           isCreating={isCreating}
@@ -317,6 +324,8 @@ export function App() {
           onPlayModeChange={setPlayMode}
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
+          onModelProfileIdChange={setModelProfileId}
+          onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
         />
@@ -352,6 +361,8 @@ export function App() {
           playMode={playMode}
           gmArchitecture={gmArchitecture}
           modelAccessMode={modelAccessMode}
+          modelProfileId={modelProfileId}
+          runtimeModelConfig={runtimeModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           onBack={() => setView("menu")}
@@ -361,6 +372,8 @@ export function App() {
           onPlayModeChange={setPlayMode}
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
+          onModelProfileIdChange={setModelProfileId}
+          onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
         />
@@ -397,6 +410,7 @@ export function App() {
           playMode={playMode}
           gmArchitecture={gmArchitecture}
           modelAccessMode={modelAccessMode}
+          modelProfileId={modelProfileId}
           onOpenNewGame={() => setView("new")}
           onOpenContinue={() => setView("continue")}
           onOpenRecords={() => setView("records")}
