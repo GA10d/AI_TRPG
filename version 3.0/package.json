@@ -1,0 +1,13 @@
+{
+  "name": "ai-trpg-v3",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "content:catalog": "node --experimental-strip-types ./apps/server/src/scripts/validateContent.ts",
+    "content:catalog:en": "node --experimental-strip-types ./apps/server/src/scripts/validateContent.ts --locale en-US"
+  }
+}
