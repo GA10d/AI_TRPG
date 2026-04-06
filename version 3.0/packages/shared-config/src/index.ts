@@ -1,4 +1,4 @@
-export const DEFAULT_LOCALE = "zh-CN";
+export * from "./languages.ts";
 
 export const DEFAULT_LOG_VIEW_MODE = "compact";
 

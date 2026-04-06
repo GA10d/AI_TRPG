@@ -1,7 +1,12 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { DEFAULT_LOCALE } from "../../../../packages/shared-config/src/index.ts";
+import {
+  buildLocaleFallbackChain,
+  DEFAULT_LOCALE,
+  isKnownLocale,
+  normalizeLocaleCode
+} from "../../../../packages/shared-config/src/index.ts";
 import type {
   ContentCatalogEntry,
   LoadedContentBundle,
@@ -31,6 +36,29 @@ function assertStringArray(value: unknown, fieldName: string): string[] {
     throw new Error(`字段 ${fieldName} 必须是非空字符串数组`);
   }
   return value;
+}
+
+function assertKnownLocale(value: unknown, fieldName: string): LocaleCode {
+  const locale = assertString(value, fieldName);
+  const normalizedLocale = normalizeLocaleCode(locale);
+
+  if (!isKnownLocale(normalizedLocale)) {
+    throw new Error(`字段 ${fieldName} 使用了未注册的语言代码：${locale}`);
+  }
+
+  return normalizedLocale;
+}
+
+function assertKnownLocaleArray(value: unknown, fieldName: string): LocaleCode[] {
+  const locales = assertStringArray(value, fieldName).map((locale) => normalizeLocaleCode(locale));
+
+  for (const locale of locales) {
+    if (!isKnownLocale(locale)) {
+      throw new Error(`字段 ${fieldName} 使用了未注册的语言代码：${locale}`);
+    }
+  }
+
+  return Array.from(new Set(locales));
 }
 
 function assertNumber(value: unknown, fieldName: string): number {
@@ -87,8 +115,8 @@ function validateRuleManifest(raw: unknown, manifestPath: string): RuleManifest 
     schemaVersion: assertString(data.schemaVersion, "schemaVersion"),
     id: assertString(data.id, "id"),
     version: assertString(data.version, "version"),
-    defaultLocale: assertString(data.defaultLocale, "defaultLocale"),
-    availableLocales: assertStringArray(data.availableLocales, "availableLocales"),
+    defaultLocale: assertKnownLocale(data.defaultLocale, "defaultLocale"),
+    availableLocales: assertKnownLocaleArray(data.availableLocales, "availableLocales"),
     title: assertStringRecord(data.title, "title"),
     themes: assertStringArray(data.themes, "themes"),
     tones: assertStringArray(data.tones, "tones"),
@@ -113,13 +141,16 @@ function validateStoryManifest(raw: unknown, manifestPath: string): StoryManifes
 
   const playerCountObject = playerCount as Record<string, unknown>;
 
+  const defaultLocale = assertKnownLocale(data.defaultLocale, "defaultLocale");
+  const availableLocales = assertKnownLocaleArray(data.availableLocales, "availableLocales");
+
   return {
     schemaVersion: assertString(data.schemaVersion, "schemaVersion"),
     id: assertString(data.id, "id"),
     version: assertString(data.version, "version"),
     ruleId: assertString(data.ruleId, "ruleId"),
-    defaultLocale: assertString(data.defaultLocale, "defaultLocale"),
-    availableLocales: assertStringArray(data.availableLocales, "availableLocales"),
+    defaultLocale,
+    availableLocales,
     title: assertStringRecord(data.title, "title"),
     playerCount: {
       min: assertNumber(playerCountObject.min, "playerCount.min"),
@@ -136,24 +167,30 @@ function validateStoryManifest(raw: unknown, manifestPath: string): StoryManifes
   };
 }
 
+function assertManifestLocaleConsistency(
+  defaultLocale: LocaleCode,
+  availableLocales: readonly LocaleCode[],
+  manifestPath: string
+): void {
+  if (!availableLocales.includes(defaultLocale)) {
+    throw new Error(`清单默认语言必须包含在 availableLocales 中：${manifestPath}`);
+  }
+}
+
 function buildAssetCandidates(
   requestedLocale: LocaleCode,
   defaultLocale: LocaleCode,
+  availableLocales: readonly LocaleCode[],
   localizedFilename: string,
   rootFallbackFilenames: string[]
 ): AssetSelection[] {
-  const candidates: AssetSelection[] = [
-    {
-      locale: requestedLocale,
-      relativePath: join("locales", requestedLocale, localizedFilename),
-      source: "localized"
-    }
-  ];
+  const localeChain = buildLocaleFallbackChain(requestedLocale, defaultLocale, availableLocales);
+  const candidates: AssetSelection[] = [];
 
-  if (requestedLocale !== defaultLocale) {
+  for (const locale of localeChain) {
     candidates.push({
-      locale: defaultLocale,
-      relativePath: join("locales", defaultLocale, localizedFilename),
+      locale,
+      relativePath: join("locales", locale, localizedFilename),
       source: "localized"
     });
   }
@@ -173,12 +210,14 @@ async function readLocalizedAsset(
   packageDir: string,
   requestedLocale: LocaleCode,
   defaultLocale: LocaleCode,
+  availableLocales: readonly LocaleCode[],
   localizedFilename: string,
   rootFallbackFilenames: string[]
 ): Promise<LocalizedTextAsset | null> {
   const candidates = buildAssetCandidates(
     requestedLocale,
     defaultLocale,
+    availableLocales,
     localizedFilename,
     rootFallbackFilenames
   );
@@ -217,11 +256,13 @@ export async function loadRulePackage(
   }
 
   const manifest = validateRuleManifest(await readJsonFile(manifestPath), manifestPath);
-  const intro = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, "intro.md", [
+  assertManifestLocaleConsistency(manifest.defaultLocale, manifest.availableLocales, manifestPath);
+
+  const intro = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, manifest.availableLocales, "intro.md", [
     "intro.md",
     "intro.txt"
   ]);
-  const rule = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, "rule.md", [
+  const rule = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, manifest.availableLocales, "rule.md", [
     "rule.md",
     "rule.txt"
   ]);
@@ -255,11 +296,13 @@ export async function loadStoryPackage(
   }
 
   const manifest = validateStoryManifest(await readJsonFile(manifestPath), manifestPath);
-  const intro = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, "intro.md", [
+  assertManifestLocaleConsistency(manifest.defaultLocale, manifest.availableLocales, manifestPath);
+
+  const intro = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, manifest.availableLocales, "intro.md", [
     "intro.md",
     "intro.txt"
   ]);
-  const story = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, "story.md", [
+  const story = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, manifest.availableLocales, "story.md", [
     "story.md",
     "story.txt"
   ]);
