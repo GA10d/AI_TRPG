@@ -106,6 +106,7 @@ export type ReplayEvent = {
   createdAt: string;
   actorId: string;
   type:
+    | "session_created"
     | "message_created"
     | "submission_locked"
     | "gm_response_received"

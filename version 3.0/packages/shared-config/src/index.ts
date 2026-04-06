@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from "./languages.ts";
+
 export * from "./languages.ts";
 
 export const DEFAULT_LOG_VIEW_MODE = "compact";
@@ -22,3 +24,24 @@ export const DEFAULT_MODEL_PROFILES = [
     providerFamily: "openai-compatible"
   }
 ] as const;
+
+export const PHASE1_MODEL_ACCESS_MODE_OPTIONS = [
+  {
+    code: "mock",
+    label: "Mock",
+    description: "使用本地假数据生成开场和会话骨架"
+  },
+  {
+    code: "server_proxy",
+    label: "Server Proxy",
+    description: "预留真实模型代理模式，Phase 1 暂不实际调用模型"
+  }
+] as const;
+
+export const PHASE1_DEFAULTS = {
+  playMode: "single_player",
+  gmArchitecture: "single_agent",
+  modelAccessMode: "mock",
+  locale: DEFAULT_LOCALE,
+  logViewMode: DEFAULT_LOG_VIEW_MODE
+} as const;

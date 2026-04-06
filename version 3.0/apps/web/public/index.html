@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI TRPG 3.0 Phase 1</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="panel panel-form">
+        <div class="eyebrow">Phase 1</div>
+        <h1>最小会话创建页</h1>
+        <p class="lead">
+          这一步只验证三件事：内容目录可读、Session 骨架可创建、mock 模式能生成一段开场文本。
+        </p>
+
+        <form id="create-session-form" class="form-grid">
+          <label class="field">
+            <span>规则</span>
+            <select id="rule-select" name="ruleDirectoryName"></select>
+          </label>
+
+          <label class="field">
+            <span>剧本</span>
+            <select id="story-select" name="storyDirectoryName"></select>
+          </label>
+
+          <label class="field">
+            <span>语言</span>
+            <select id="locale-select" name="locale"></select>
+          </label>
+
+          <label class="field">
+            <span>模型模式</span>
+            <select id="model-mode-select" name="modelAccessMode"></select>
+          </label>
+
+          <label class="field">
+            <span>游玩模式</span>
+            <select id="play-mode-select" name="playMode">
+              <option value="single_player">single_player</option>
+              <option value="single_player_with_npc">single_player_with_npc</option>
+              <option value="multiplayer">multiplayer</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>主持架构</span>
+            <select id="gm-architecture-select" name="gmArchitecture">
+              <option value="single_agent">single_agent</option>
+              <option value="multi_agent">multi_agent</option>
+            </select>
+          </label>
+
+          <label class="field field-inline">
+            <input id="debug-enabled" type="checkbox" checked />
+            <span>开启 debug 日志</span>
+          </label>
+
+          <button id="submit-button" class="primary-button" type="submit">
+            创建 Session
+          </button>
+        </form>
+
+        <p id="status-line" class="status-line">正在加载 bootstrap 数据...</p>
+      </section>
+
+      <section class="panel panel-result">
+        <div class="result-header">
+          <h2>创建结果</h2>
+          <span id="result-badge" class="badge">尚未创建</span>
+        </div>
+
+        <div id="result-empty" class="empty-state">
+          创建成功后，这里会显示 Session 基本信息、语言解析结果和 mock 开场文本。
+        </div>
+
+        <div id="result-content" class="result-content hidden">
+          <div class="meta-grid">
+            <div class="meta-card">
+              <span class="meta-label">Session ID</span>
+              <code id="session-id"></code>
+            </div>
+
+            <div class="meta-card">
+              <span class="meta-label">内容</span>
+              <div id="content-summary"></div>
+            </div>
+
+            <div class="meta-card">
+              <span class="meta-label">语言解析</span>
+              <div id="locale-summary"></div>
+            </div>
+
+            <div class="meta-card">
+              <span class="meta-label">消息 / 回放</span>
+              <div id="count-summary"></div>
+            </div>
+          </div>
+
+          <div class="opening-block">
+            <div class="meta-label">Mock 开场文本</div>
+            <pre id="opening-text"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
