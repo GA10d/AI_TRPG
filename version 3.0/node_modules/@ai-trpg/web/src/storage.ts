@@ -1,13 +1,16 @@
 import type {
   CreateSessionRequest,
   RuntimeModelConfigInput,
+  SaveBundle,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 
 const RECENT_SNAPSHOT_STORAGE_KEY = "trpg3.recentSnapshot";
 const SESSION_RECORDS_STORAGE_KEY = "trpg3.sessionRecords";
+const SAVED_GAMES_STORAGE_KEY = "trpg3.savedGames";
 const WEB_DEFAULTS_STORAGE_KEY = "trpg3.webDefaults";
 const MAX_SESSION_RECORDS = 20;
+const MAX_SAVED_GAMES = 12;
 
 export type StoredWebDefaults = {
   locale: CreateSessionRequest["locale"];
@@ -30,6 +33,22 @@ export type SessionRecord = {
   sceneId: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SavedGameRecord = {
+  saveId: string;
+  savedAt: string;
+  sessionId: string;
+  ruleTitle: string;
+  storyTitle: string;
+  locale: string;
+  status: string;
+  round: number;
+  sceneId: string;
+  updatedAt: string;
+  modelAccessMode: string;
+  modelProfileId: string;
+  bundle: SaveBundle;
 };
 
 function canUseStorage(): boolean {
@@ -83,6 +102,27 @@ function buildRecord(snapshot: SessionSnapshot): SessionRecord {
   };
 }
 
+function buildSavedGameRecord(saveBundle: SaveBundle): SavedGameRecord {
+  return {
+    saveId: `${saveBundle.session.id}:${saveBundle.savedAt}`,
+    savedAt: saveBundle.savedAt,
+    sessionId: saveBundle.session.id,
+    ruleTitle: saveBundle.contentSummary.ruleTitle,
+    storyTitle: saveBundle.contentSummary.storyTitle,
+    locale: saveBundle.contentSummary.resolvedLocale,
+    status: saveBundle.session.status,
+    round: saveBundle.session.currentRound,
+    sceneId: saveBundle.session.gameState.sceneId,
+    updatedAt: saveBundle.session.updatedAt,
+    modelAccessMode: saveBundle.session.modelAccessMode,
+    modelProfileId:
+      saveBundle.runtimeConfig?.modelProfileId ??
+      saveBundle.session.settings.modelProfileId ??
+      "unknown",
+    bundle: saveBundle
+  };
+}
+
 export function loadRecentSessionSnapshot(): SessionSnapshot | null {
   return readJson<SessionSnapshot>(RECENT_SNAPSHOT_STORAGE_KEY);
 }
@@ -109,6 +149,31 @@ export function storeSessionSnapshot(snapshot: SessionSnapshot): SessionRecord[]
     .slice(0, MAX_SESSION_RECORDS);
 
   writeJson(SESSION_RECORDS_STORAGE_KEY, nextRecords);
+  return nextRecords;
+}
+
+export function loadSavedGames(): SavedGameRecord[] {
+  return readJson<SavedGameRecord[]>(SAVED_GAMES_STORAGE_KEY) ?? [];
+}
+
+export function clearSavedGames(): void {
+  removeItem(SAVED_GAMES_STORAGE_KEY);
+}
+
+export function removeSavedGame(saveId: string): SavedGameRecord[] {
+  const nextRecords = loadSavedGames().filter((item) => item.saveId !== saveId);
+  writeJson(SAVED_GAMES_STORAGE_KEY, nextRecords);
+  return nextRecords;
+}
+
+export function storeSaveBundle(saveBundle: SaveBundle): SavedGameRecord[] {
+  const nextRecord = buildSavedGameRecord(saveBundle);
+  const previous = loadSavedGames().filter((item) => item.saveId !== nextRecord.saveId);
+  const nextRecords = [nextRecord, ...previous]
+    .sort((left, right) => right.savedAt.localeCompare(left.savedAt))
+    .slice(0, MAX_SAVED_GAMES);
+
+  writeJson(SAVED_GAMES_STORAGE_KEY, nextRecords);
   return nextRecords;
 }
 

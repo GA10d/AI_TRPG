@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import type {
   CreateSessionRequest,
   SessionSnapshot
@@ -18,6 +20,28 @@ type MainMenuScreenProps = {
   onOpenExit: () => void;
 };
 
+const MENU_SPLIT_RATIO_STORAGE_KEY = "trpg3.menuSplitRatio";
+const DEFAULT_LEFT_RATIO = 50;
+const MIN_LEFT_RATIO = 30;
+const MAX_LEFT_RATIO = 70;
+
+function clampRatio(rawValue: number): number {
+  if (!Number.isFinite(rawValue)) {
+    return DEFAULT_LEFT_RATIO;
+  }
+
+  return Math.min(MAX_LEFT_RATIO, Math.max(MIN_LEFT_RATIO, rawValue));
+}
+
+function loadStoredRatio(): number {
+  if (typeof window === "undefined") {
+    return DEFAULT_LEFT_RATIO;
+  }
+
+  const rawValue = window.localStorage.getItem(MENU_SPLIT_RATIO_STORAGE_KEY);
+  return clampRatio(Number(rawValue));
+}
+
 export function MainMenuScreen(props: MainMenuScreenProps) {
   const {
     recentSnapshot,
@@ -33,9 +57,81 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
     onOpenExit
   } = props;
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [leftRatio, setLeftRatio] = useState<number>(() => loadStoredRatio());
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      MENU_SPLIT_RATIO_STORAGE_KEY,
+      String(clampRatio(leftRatio))
+    );
+  }, [leftRatio]);
+
+  useEffect(() => {
+    if (!isDragging) {
+      return;
+    }
+
+    function updateRatio(clientX: number): void {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0) {
+        return;
+      }
+
+      const nextRatio = ((clientX - rect.left) / rect.width) * 100;
+      setLeftRatio(clampRatio(nextRatio));
+    }
+
+    function handlePointerMove(event: PointerEvent): void {
+      updateRatio(event.clientX);
+    }
+
+    function handlePointerUp(): void {
+      setIsDragging(false);
+    }
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isDragging]);
+
+  function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>): void {
+    event.preventDefault();
+    setIsDragging(true);
+  }
+
   return (
-    <div className="menu-grid">
-      <section className="panel hero-panel">
+    <div
+      className={`menu-grid ${isDragging ? "menu-grid-dragging" : ""}`}
+      ref={containerRef}
+      style={
+        {
+          "--menu-left-ratio": `${leftRatio}%`
+        } as React.CSSProperties
+      }
+    >
+      <section className="panel hero-panel menu-panel-left">
         <div className="eyebrow">Main Menu</div>
         <h1>AI TRPG 3.0</h1>
         <p className="lead">
@@ -62,7 +158,16 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
         </div>
       </section>
 
-      <section className="panel summary-panel">
+      <button
+        aria-label="拖拽调整主菜单左右宽度"
+        className="menu-splitter"
+        onPointerDown={handlePointerDown}
+        type="button"
+      >
+        <span className="menu-splitter-line" />
+      </button>
+
+      <section className="panel summary-panel menu-panel-right">
         <div className="summary-card">
           <div className="meta-label">最近进度</div>
           {recentSnapshot ? (

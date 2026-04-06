@@ -160,16 +160,34 @@ export type AdjudicationResult = {
   followUpHooks: string[];
 };
 
+export type SessionContentSummary = {
+  ruleTitle: string;
+  storyTitle: string;
+  requestedLocale: LocaleCode;
+  resolvedLocale: LocaleCode;
+};
+
+export type SaveRuntimeConfig = {
+  modelProfileId?: string;
+  runtimeModelConfig?: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  };
+};
+
 export type SaveBundle = {
   schemaVersion: string;
   savedAt: string;
   session: Session;
   messages: Message[];
   replay: ReplayEvent[];
+  contentSummary: SessionContentSummary;
   agentContexts: Record<string, Message[]>;
   derivedMemory?: {
     sceneSummary?: string;
     objectiveSummary?: string;
     actorSummaries?: Record<string, string>;
   };
+  runtimeConfig?: SaveRuntimeConfig;
 };

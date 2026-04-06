@@ -51,7 +51,78 @@ input {
 }
 
 .menu-grid {
-  grid-template-columns: minmax(320px, 460px) minmax(360px, 1fr);
+  --menu-left-ratio: 50%;
+  grid-template-columns:
+    minmax(0, var(--menu-left-ratio))
+    14px
+    minmax(0, calc(100% - var(--menu-left-ratio) - 14px));
+  align-items: stretch;
+}
+
+.menu-panel-left {
+  grid-column: 1;
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+  text-align: center;
+}
+
+.menu-panel-right {
+  grid-column: 3;
+}
+
+.menu-panel-left .eyebrow,
+.menu-panel-left h1,
+.menu-panel-left .lead {
+  width: 100%;
+  text-align: center;
+}
+
+.menu-panel-left .lead {
+  max-width: 44ch;
+}
+
+.menu-panel-left .menu-button-list {
+  width: 100%;
+}
+
+.menu-panel-left .menu-button {
+  text-align: center;
+}
+
+.menu-splitter {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.menu-splitter-line {
+  width: 4px;
+  height: 100%;
+  min-height: 160px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(122, 50, 32, 0.12) 0%,
+    rgba(122, 50, 32, 0.4) 50%,
+    rgba(122, 50, 32, 0.12) 100%
+  );
+}
+
+.menu-grid-dragging .menu-splitter-line,
+.menu-splitter:hover .menu-splitter-line {
+  background: linear-gradient(
+    180deg,
+    rgba(122, 50, 32, 0.22) 0%,
+    rgba(122, 50, 32, 0.68) 50%,
+    rgba(122, 50, 32, 0.22) 100%
+  );
 }
 
 .grid-two,
@@ -362,6 +433,20 @@ pre {
   .game-topbar,
   .records-grid {
     grid-template-columns: 1fr;
+  }
+
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-panel-left,
+  .menu-panel-right,
+  .menu-splitter {
+    grid-column: auto;
+  }
+
+  .menu-splitter {
+    display: none;
   }
 
   .screen-header,

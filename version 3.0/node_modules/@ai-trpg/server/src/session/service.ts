@@ -9,6 +9,7 @@ import type {
   CreateSessionRequest,
   Message,
   ReplayEvent,
+  SaveBundle,
   Session,
   SessionSnapshot,
   SubmitTurnRequest
@@ -20,10 +21,99 @@ import {
 } from "../mock/index.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
-import type { InMemorySessionStore } from "./store.ts";
+import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function buildAgentContexts(snapshot: SessionSnapshot): Record<string, Message[]> {
+  const contexts: Record<string, Message[]> = {};
+
+  for (const participant of snapshot.session.participants) {
+    contexts[participant.id] = snapshot.messages.filter((message) => {
+      if (message.visibility === "public" || message.visibility === "system") {
+        return true;
+      }
+
+      return (
+        message.senderId === participant.id ||
+        message.recipientIds.includes(participant.id)
+      );
+    });
+  }
+
+  contexts.system = snapshot.messages;
+  return contexts;
+}
+
+function buildDerivedMemory(snapshot: SessionSnapshot): SaveBundle["derivedMemory"] {
+  const activeObjectives = snapshot.session.gameState.objectiveState.active;
+  const sceneSummary =
+    typeof snapshot.session.gameState.sceneState.lastSceneSummary === "string"
+      ? snapshot.session.gameState.sceneState.lastSceneSummary
+      : undefined;
+
+  return {
+    sceneSummary,
+    objectiveSummary:
+      activeObjectives.length > 0 ? activeObjectives.join(" / ") : undefined,
+    actorSummaries: Object.fromEntries(
+      snapshot.session.participants.map((participant) => [
+        participant.id,
+        `${participant.displayName} / ${participant.role}`
+      ])
+    )
+  };
+}
+
+function buildSaveReplayEvent(sessionId: string, savedAt: string): ReplayEvent {
+  return {
+    id: `evt_${randomUUID()}`,
+    round: 0,
+    createdAt: savedAt,
+    actorId: "system",
+    type: "save_created",
+    displayLevel: "core",
+    summary: `Save created for session ${sessionId}`,
+    payload: {
+      savedAt
+    }
+  };
+}
+
+function buildLoadReplayEvent(sessionId: string, savedAt: string, loadedAt: string): ReplayEvent {
+  return {
+    id: `evt_${randomUUID()}`,
+    round: 0,
+    createdAt: loadedAt,
+    actorId: "system",
+    type: "save_loaded",
+    displayLevel: "core",
+    summary: `Save loaded for session ${sessionId}`,
+    payload: {
+      savedAt,
+      loadedAt
+    }
+  };
+}
+
+function buildSaveBundle(
+  snapshot: SessionSnapshot,
+  runtimeConfig: SessionRuntimeConfig | null,
+  savedAt: string
+): SaveBundle {
+  return {
+    schemaVersion: snapshot.session.schemaVersion,
+    savedAt,
+    session: snapshot.session,
+    messages: snapshot.messages,
+    replay: snapshot.replay,
+    contentSummary: snapshot.contentSummary,
+    agentContexts: buildAgentContexts(snapshot),
+    derivedMemory: buildDerivedMemory(snapshot),
+    runtimeConfig: runtimeConfig ?? undefined
+  };
 }
 
 export async function createSessionSnapshot(
@@ -122,7 +212,12 @@ export async function createSessionSnapshot(
   session.gameState = createInitialMockGameState(session.gameState, session.locale);
 
   const messages: Message[] = [
-    buildSystemCreatedMessage(playerParticipantId, storyTitle, String(bundle.resolvedLocale), timestamp),
+    buildSystemCreatedMessage(
+      playerParticipantId,
+      storyTitle,
+      String(bundle.resolvedLocale),
+      timestamp
+    ),
     {
       id: `msg_${randomUUID()}`,
       round: 0,
@@ -173,7 +268,7 @@ export async function createSessionSnapshot(
       actorId: gmParticipantId,
       type: "gm_response_received",
       displayLevel: "core",
-      summary: "Mock opening generated",
+      summary: "Opening narration generated",
       payload: {
         messageId: messages[1]?.id ?? null,
         mode: request.modelAccessMode,
@@ -223,7 +318,7 @@ export async function submitMockTurn(
 ): Promise<SessionSnapshot | null> {
   const trimmedInput = request.playerInput.trim();
   if (trimmedInput.length === 0) {
-    throw new Error("玩家输入不能为空");
+    throw new Error("玩家输入不能为空。");
   }
 
   const current = store.get(sessionId);
@@ -236,10 +331,12 @@ export async function submitMockTurn(
   const playerParticipant = current.session.participants.find(
     (participant) => participant.id === current.session.playerParticipantId
   );
-  const gmParticipant = current.session.participants.find((participant) => participant.role === "gm");
+  const gmParticipant = current.session.participants.find(
+    (participant) => participant.role === "gm"
+  );
 
   if (!playerParticipant || !gmParticipant) {
-    throw new Error("Session participants 不完整，无法提交 turn");
+    throw new Error("Session participants 不完整，无法提交 turn。");
   }
 
   const playerMessage: Message = {
@@ -247,9 +344,7 @@ export async function submitMockTurn(
     round: nextRound,
     createdAt: timestamp,
     senderId: playerParticipant.id,
-    recipientIds: [
-      gmParticipant.id
-    ],
+    recipientIds: [gmParticipant.id],
     visibility: "public",
     kind: "player_input",
     content: trimmedInput,
@@ -285,9 +380,7 @@ export async function submitMockTurn(
     round: nextRound,
     createdAt: timestamp,
     senderId: gmParticipant.id,
-    recipientIds: [
-      playerParticipant.id
-    ],
+    recipientIds: [playerParticipant.id],
     visibility: "public",
     kind: "gm_narration",
     content: turnNarration.text,
@@ -374,4 +467,75 @@ export async function submitMockTurn(
       ...replayEntries
     ]
   }));
+}
+
+export function createSaveBundleForSession(
+  sessionId: string,
+  store: InMemorySessionStore
+): {
+  snapshot: SessionSnapshot;
+  saveBundle: SaveBundle;
+} | null {
+  const current = store.get(sessionId);
+  if (!current) {
+    return null;
+  }
+
+  const savedAt = nowIso();
+  const saveEvent = buildSaveReplayEvent(sessionId, savedAt);
+  const runtimeConfig = store.getRuntimeConfig(sessionId);
+
+  const nextSnapshot = store.update(sessionId, (snapshot) => ({
+    ...snapshot,
+    session: {
+      ...snapshot.session,
+      updatedAt: savedAt
+    },
+    replay: [
+      ...snapshot.replay,
+      saveEvent
+    ]
+  }));
+
+  if (!nextSnapshot) {
+    return null;
+  }
+
+  return {
+    snapshot: nextSnapshot,
+    saveBundle: buildSaveBundle(nextSnapshot, runtimeConfig, savedAt)
+  };
+}
+
+export function loadSessionFromSaveBundle(
+  saveBundle: SaveBundle,
+  store: InMemorySessionStore
+): SessionSnapshot {
+  const loadedAt = nowIso();
+  const loadEvent = buildLoadReplayEvent(
+    saveBundle.session.id,
+    saveBundle.savedAt,
+    loadedAt
+  );
+
+  const snapshot: SessionSnapshot = {
+    session: {
+      ...saveBundle.session,
+      updatedAt: loadedAt
+    },
+    messages: saveBundle.messages,
+    replay: [
+      ...saveBundle.replay,
+      loadEvent
+    ],
+    contentSummary: saveBundle.contentSummary
+  };
+
+  store.save(snapshot, {
+    modelProfileId:
+      saveBundle.runtimeConfig?.modelProfileId ?? saveBundle.session.settings.modelProfileId,
+    runtimeModelConfig: saveBundle.runtimeConfig?.runtimeModelConfig
+  });
+
+  return snapshot;
 }

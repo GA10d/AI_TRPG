@@ -1,7 +1,16 @@
 import { useState } from "react";
 
-import type { SessionSnapshot } from "../../../packages/shared-types/src/index.ts";
-import { createSession, fetchSession, submitTurn } from "./lib/trpgApiClient.ts";
+import type {
+  SaveBundle,
+  SessionSnapshot
+} from "../../../packages/shared-types/src/index.ts";
+import {
+  createSave,
+  createSession,
+  fetchSession,
+  loadSaveBundle,
+  submitTurn
+} from "./lib/trpgApiClient.ts";
 import { useBootstrapState } from "./hooks/useBootstrapState.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
@@ -11,7 +20,7 @@ import { MenuPage } from "./pages/MenuPage.tsx";
 import { NewGamePage } from "./pages/NewGamePage.tsx";
 import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
-import { storeWebDefaults, type SessionRecord } from "./storage.ts";
+import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
 import { type AppView, type StatusState } from "./ui.ts";
 
 const initialStatus: StatusState = {
@@ -26,6 +35,7 @@ export function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
 
   const {
@@ -56,11 +66,15 @@ export function App() {
 
   const {
     recentSnapshot,
-    records,
+    savedGames,
     commitSnapshot: persistStoredSnapshot,
+    commitSaveBundle,
     clearRecent,
-    clearRecordsList
+    clearSavedGamesList,
+    removeSavedGameById
   } = useStoredProgress();
+
+  const recentSave = savedGames[0] ?? null;
 
   function saveDefaults(): void {
     storeWebDefaults({
@@ -182,7 +196,80 @@ export function App() {
     }
   }
 
-  async function handleContinueRecent(): Promise<void> {
+  async function handleSaveGame(): Promise<void> {
+    if (!snapshot) {
+      setStatus({
+        message: "当前没有可保存的会话。",
+        tone: "error"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setStatus({
+      message: "正在创建本地存档...",
+      tone: "neutral"
+    });
+
+    try {
+      const result = await createSave(snapshot.session.id);
+      commitSnapshot(result.snapshot);
+      commitSaveBundle(result.saveBundle);
+      setStatus({
+        message: "手动存档已保存到本地。",
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function restoreFromSaveBundle(
+    saveBundle: SaveBundle,
+    successMessage: string
+  ): Promise<void> {
+    setIsRestoring(true);
+    setStatus({
+      message: "正在恢复存档...",
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await loadSaveBundle(saveBundle);
+      commitSnapshot(nextSnapshot);
+      setView("game");
+      setStatus({
+        message: successMessage,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  }
+
+  async function handleContinueRecentSave(): Promise<void> {
+    if (!recentSave) {
+      setStatus({
+        message: "当前没有最近存档。",
+        tone: "error"
+      });
+      return;
+    }
+
+    return restoreFromSaveBundle(recentSave.bundle, "已从最近存档恢复会话。");
+  }
+
+  async function handleContinueRecentSnapshot(): Promise<void> {
     if (!recentSnapshot) {
       setStatus({
         message: "本地还没有最近进度。",
@@ -193,7 +280,7 @@ export function App() {
 
     setIsRestoring(true);
     setStatus({
-      message: "正在恢复最近进度...",
+      message: "正在恢复最近快照...",
       tone: "neutral"
     });
 
@@ -217,28 +304,8 @@ export function App() {
     }
   }
 
-  async function handleOpenRecord(record: SessionRecord): Promise<void> {
-    setIsRestoring(true);
-
-    try {
-      const nextSnapshot = await fetchSession(record.sessionId);
-      commitSnapshot(nextSnapshot);
-      setView("game");
-      setStatus({
-        message: `已载入会话 ${record.sessionId}。`,
-        tone: "neutral"
-      });
-    } catch (error) {
-      setStatus({
-        message:
-          error instanceof Error
-            ? `无法载入记录：${error.message}`
-            : String(error),
-        tone: "error"
-      });
-    } finally {
-      setIsRestoring(false);
-    }
+  async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
+    return restoreFromSaveBundle(record.bundle, `已载入存档 ${record.storyTitle}。`);
   }
 
   function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): void {
@@ -277,15 +344,35 @@ export function App() {
   function handleClearRecent(): void {
     clearRecent();
     setStatus({
-      message: "最近进度已清除。",
+      message: "最近快照已清除。",
       tone: "neutral"
     });
   }
 
-  function handleClearRecords(): void {
-    clearRecordsList();
+  function handleClearSavedGames(): void {
+    clearSavedGamesList();
     setStatus({
-      message: "本地战绩摘要已清空。",
+      message: "本地存档已清空。",
+      tone: "neutral"
+    });
+  }
+
+  function handleRemoveRecentSave(): void {
+    if (!recentSave) {
+      return;
+    }
+
+    removeSavedGameById(recentSave.saveId);
+    setStatus({
+      message: "最近存档已删除。",
+      tone: "neutral"
+    });
+  }
+
+  function handleDeleteSavedGame(saveId: string): void {
+    removeSavedGameById(saveId);
+    setStatus({
+      message: "该存档已删除。",
       tone: "neutral"
     });
   }
@@ -334,22 +421,26 @@ export function App() {
     case "continue":
       content = (
         <ContinuePage
+          recentSave={recentSave}
           recentSnapshot={recentSnapshot}
           isRestoring={isRestoring}
           onBack={() => setView("menu")}
-          onContinue={handleContinueRecent}
+          onContinueSavedGame={handleContinueRecentSave}
+          onContinueSnapshot={handleContinueRecentSnapshot}
           onClearRecent={handleClearRecent}
+          onRemoveRecentSave={handleRemoveRecentSave}
         />
       );
       break;
     case "records":
       content = (
         <RecordsPage
-          records={records}
+          savedGames={savedGames}
           isRestoring={isRestoring}
           onBack={() => setView("menu")}
-          onClearRecords={handleClearRecords}
-          onOpenRecord={handleOpenRecord}
+          onClearSavedGames={handleClearSavedGames}
+          onDeleteSavedGame={handleDeleteSavedGame}
+          onLoadSavedGame={handleLoadSavedGame}
         />
       );
       break;
@@ -385,7 +476,7 @@ export function App() {
           onBack={() => setView("menu")}
           onExit={handleExit}
           onClearRecent={handleClearRecent}
-          onClearRecords={handleClearRecords}
+          onClearRecords={handleClearSavedGames}
         />
       );
       break;
@@ -395,7 +486,9 @@ export function App() {
           snapshot={snapshot}
           turnInput={turnInput}
           isSubmittingTurn={isSubmittingTurn}
+          isSaving={isSaving}
           onBack={() => setView("menu")}
+          onSaveGame={handleSaveGame}
           onTurnInputChange={setTurnInput}
           onSubmitTurn={handleSubmitTurn}
         />

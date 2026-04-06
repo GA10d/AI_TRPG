@@ -3,7 +3,9 @@ import type {
   Message,
   ModelAccessMode,
   ReplayEvent,
-  Session
+  SaveBundle,
+  Session,
+  SessionContentSummary
 } from "./runtime.ts";
 
 export type RuntimeModelConfigInput = {
@@ -30,16 +32,20 @@ export type SubmitTurnRequest = {
   playerInput: string;
 };
 
+export type LoadSaveRequest = {
+  saveBundle: SaveBundle;
+};
+
 export type SessionSnapshot = {
   session: Session;
   messages: Message[];
   replay: ReplayEvent[];
-  contentSummary: {
-    ruleTitle: string;
-    storyTitle: string;
-    requestedLocale: LocaleCode;
-    resolvedLocale: LocaleCode;
-  };
+  contentSummary: SessionContentSummary;
+};
+
+export type CreateSaveResponse = {
+  snapshot: SessionSnapshot;
+  saveBundle: SaveBundle;
 };
 
 export type ModelProfileSummary = {

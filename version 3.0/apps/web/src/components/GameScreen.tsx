@@ -6,7 +6,9 @@ type GameScreenProps = {
   snapshot: SessionSnapshot | null;
   turnInput: string;
   isSubmittingTurn: boolean;
+  isSaving: boolean;
   onBack: () => void;
+  onSaveGame: () => Promise<void>;
   onTurnInputChange: (value: string) => void;
   onSubmitTurn: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -16,7 +18,9 @@ export function GameScreen(props: GameScreenProps) {
     snapshot,
     turnInput,
     isSubmittingTurn,
+    isSaving,
     onBack,
+    onSaveGame,
     onTurnInputChange,
     onSubmitTurn
   } = props;
@@ -43,7 +47,7 @@ export function GameScreen(props: GameScreenProps) {
     <section className="panel page-panel">
       <ScreenHeader
         title="游戏中"
-        description="当前是单人假闭环页面，后面会继续接真实模型和更多交互。"
+        description="当前是可运行的单人假闭环页面，已经支持手动存档和从存档恢复。"
         onBack={onBack}
       />
 
@@ -96,6 +100,17 @@ export function GameScreen(props: GameScreenProps) {
             </div>
           </div>
 
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              disabled={isSaving}
+              onClick={() => void onSaveGame()}
+              type="button"
+            >
+              {isSaving ? "正在保存..." : "手动存档"}
+            </button>
+          </div>
+
           <div className="state-grid">
             <div className="state-card">
               <div className="meta-label">场景推进</div>
@@ -118,8 +133,7 @@ export function GameScreen(props: GameScreenProps) {
                 当前目标：{renderJoinedList(snapshot.session.gameState.objectiveState.active)}
               </div>
               <div className="state-secondary">
-                已完成：
-                {renderJoinedList(snapshot.session.gameState.objectiveState.completed)}
+                已完成：{renderJoinedList(snapshot.session.gameState.objectiveState.completed)}
               </div>
               <div className="state-secondary">
                 已失败：{renderJoinedList(snapshot.session.gameState.objectiveState.failed)}

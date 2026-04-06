@@ -1,6 +1,8 @@
 import type {
   BootstrapResponse,
+  CreateSaveResponse,
   CreateSessionRequest,
+  SaveBundle,
   SessionSnapshot,
   SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
@@ -57,6 +59,34 @@ export async function createSession(
 export async function fetchSession(sessionId: string): Promise<SessionSnapshot> {
   try {
     const response = await fetch(`/api/sessions/${sessionId}`);
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function createSave(sessionId: string): Promise<CreateSaveResponse> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/save`, {
+      method: "POST"
+    });
+    return parseJson<CreateSaveResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function loadSaveBundle(saveBundle: SaveBundle): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch("/api/saves/load", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        saveBundle
+      })
+    });
     return parseJson<SessionSnapshot>(response);
   } catch (error) {
     throw normalizeNetworkError(error);

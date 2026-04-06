@@ -12,12 +12,15 @@ import {
 import type {
   BootstrapResponse,
   CreateSessionRequest,
+  LoadSaveRequest,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
 import { loadContentCatalog } from "./content/index.ts";
 import {
   buildDefaultCreateSessionRequest,
+  createSaveBundleForSession,
   createSessionSnapshot,
+  loadSessionFromSaveBundle,
   submitMockTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
@@ -177,6 +180,13 @@ async function handleApiRequest(
     return true;
   }
 
+  if (url.pathname === "/api/saves/load" && request.method === "POST") {
+    const payload = await readJsonBody<LoadSaveRequest>(request);
+    const snapshot = loadSessionFromSaveBundle(payload.saveBundle, store);
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
   if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/turns") && request.method === "POST") {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns", "");
     const payload = await readJsonBody<SubmitTurnRequest>(request);
@@ -191,6 +201,22 @@ async function handleApiRequest(
     }
 
     sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/save") && request.method === "POST") {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/save", "");
+    const result = createSaveBundleForSession(sessionId, store);
+
+    if (!result) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `未找到 session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, result);
     return true;
   }
 
