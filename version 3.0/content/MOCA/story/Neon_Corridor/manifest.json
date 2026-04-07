@@ -1,6 +1,6 @@
 {
   "schemaVersion": "0.1.0",
-  "id": "MOCA_FOG_PLATFORM",
+  "id": "MOCA_NEON_CORRIDOR",
   "version": "0.1.0",
   "ruleId": "MOCA",
   "defaultLocale": "zh-CN",
@@ -8,7 +8,7 @@
     "zh-CN"
   ],
   "title": {
-    "zh-CN": "雾站月台"
+    "zh-CN": "霓虹走廊"
   },
   "playerCount": {
     "min": 1,
@@ -19,18 +19,18 @@
     "single_player_with_npc"
   ],
   "recommendedLength": "short",
-  "recommendedPacing": "medium",
-  "gmStyle": "guided-investigation",
+  "recommendedPacing": "fast",
+  "gmStyle": "tense-guidance",
   "tags": [
-    "metro",
-    "fog",
-    "urban",
-    "investigation"
+    "office",
+    "loop",
+    "neon",
+    "puzzle"
   ],
   "contentWarnings": [
-    "missing-person",
-    "night-walk"
+    "claustrophobia",
+    "sleep-deprivation"
   ],
   "authoringSpec": "剧本范式(1)",
-  "startSceneId": "platform_gate"
+  "startSceneId": "service_corridor"
 }

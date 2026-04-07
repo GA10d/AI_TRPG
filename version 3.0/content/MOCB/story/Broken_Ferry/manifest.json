@@ -1,36 +1,37 @@
 {
   "schemaVersion": "0.1.0",
-  "id": "MOCA_FOG_PLATFORM",
+  "id": "MOCB_BROKEN_FERRY",
   "version": "0.1.0",
-  "ruleId": "MOCA",
+  "ruleId": "MOCB",
   "defaultLocale": "zh-CN",
   "availableLocales": [
     "zh-CN"
   ],
   "title": {
-    "zh-CN": "雾站月台"
+    "zh-CN": "断桥渡口"
   },
   "playerCount": {
     "min": 1,
-    "max": 2
+    "max": 3
   },
   "supportsModes": [
     "single_player",
-    "single_player_with_npc"
+    "single_player_with_npc",
+    "multiplayer"
   ],
-  "recommendedLength": "short",
+  "recommendedLength": "medium",
   "recommendedPacing": "medium",
-  "gmStyle": "guided-investigation",
+  "gmStyle": "branching",
   "tags": [
-    "metro",
-    "fog",
-    "urban",
-    "investigation"
+    "river",
+    "ferry",
+    "ritual",
+    "folk"
   ],
   "contentWarnings": [
-    "missing-person",
-    "night-walk"
+    "drowning",
+    "ritual-pressure"
   ],
   "authoringSpec": "剧本范式(1)",
-  "startSceneId": "platform_gate"
+  "startSceneId": "broken_pier"
 }

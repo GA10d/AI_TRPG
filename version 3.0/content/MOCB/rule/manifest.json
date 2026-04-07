@@ -1,26 +1,27 @@
 {
   "schemaVersion": "0.1.0",
-  "id": "VHS",
+  "id": "MOCB",
   "version": "0.1.0",
   "defaultLocale": "zh-CN",
   "availableLocales": [
     "zh-CN"
   ],
   "title": {
-    "zh-CN": "VHS复古恐怖录像带"
+    "zh-CN": "Mock B 乡镇怪谈"
   },
   "themes": [
-    "horror",
-    "survival",
-    "investigation"
+    "folk-horror",
+    "small-town",
+    "secrets"
   ],
   "tones": [
-    "immersive",
-    "oppressive",
-    "high-risk"
+    "humid",
+    "uncertain",
+    "slow-burn"
   ],
   "supportsModes": [
     "single_player",
+    "single_player_with_npc",
     "multiplayer"
   ],
   "gmStyles": [
@@ -29,8 +30,7 @@
   ],
   "authoringSpec": "规则范式(1)",
   "contentWarnings": [
-    "violence",
-    "body-harm",
-    "psychological-horror"
+    "folk-horror",
+    "superstition"
   ]
 }

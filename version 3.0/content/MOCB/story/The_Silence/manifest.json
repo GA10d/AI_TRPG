@@ -1,36 +1,36 @@
 {
   "schemaVersion": "0.1.0",
-  "id": "THE_SILENCE",
+  "id": "MOCB_RED_ARCHIVE",
   "version": "0.1.0",
-  "ruleId": "VHS",
+  "ruleId": "MOCB",
   "defaultLocale": "zh-CN",
   "availableLocales": [
     "zh-CN"
   ],
   "title": {
-    "zh-CN": "湖岸录像谜灵"
+    "zh-CN": "赤页档案"
   },
   "playerCount": {
     "min": 1,
-    "max": 1
+    "max": 2
   },
   "supportsModes": [
-    "single_player"
+    "single_player",
+    "single_player_with_npc"
   ],
   "recommendedLength": "medium",
-  "recommendedPacing": "medium",
-  "gmStyle": "strong-guidance",
+  "recommendedPacing": "slow",
+  "gmStyle": "secret-layered",
   "tags": [
-    "horror",
-    "vhs",
-    "investigation",
-    "survival"
+    "archive",
+    "town",
+    "rumor",
+    "investigation"
   ],
   "contentWarnings": [
-    "fire-death",
-    "suffocation",
-    "trauma"
+    "family-secret",
+    "blood-reference"
   ],
   "authoringSpec": "剧本范式(1)",
-  "startSceneId": "entry_plaza"
+  "startSceneId": "town_archive"
 }
