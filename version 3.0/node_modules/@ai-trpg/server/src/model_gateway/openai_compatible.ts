@@ -38,7 +38,6 @@ function buildOpeningMessages(input: OpeningGenerationInput): ChatMessage[] {
       role: "user",
       content: [
         `Story title: ${input.storyTitle}`,
-        `Start scene id: ${input.sceneId}`,
         "Story introduction:",
         input.storyIntro,
         "",
@@ -63,13 +62,12 @@ function buildTurnMessages(input: TurnNarrationInput): ChatMessage[] {
     {
       role: "user",
       content: [
+        `Story title: ${input.storyTitle}`,
         `Round: ${input.round}`,
-        `Current scene id: ${input.sceneId}`,
-        `Scene changed this turn: ${input.sceneChanged ? "yes" : "no"}`,
         `Player action: ${input.playerInput}`,
         "",
-        "Current state summary:",
-        input.stateSummary,
+        "Recent conversation context:",
+        input.conversationContext || "No recent conversation context.",
         "",
         "Task:",
         "Write the next GM narration for the player. Keep it concise, specific, and actionable."

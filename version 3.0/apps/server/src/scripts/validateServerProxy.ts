@@ -55,17 +55,16 @@ async function main(): Promise<void> {
       accessMode: "server_proxy",
       locale: "zh-CN",
       storyTitle: "The Silence",
-      storyIntro: "A summer camp hides a long-buried recording.",
-      sceneId: "entry_plaza"
+      storyIntro: "A summer camp hides a long-buried recording."
     });
     const turn = await gateway.generateTurnNarration({
       accessMode: "server_proxy",
       locale: "zh-CN",
+      storyTitle: "The Silence",
       playerInput: "I inspect the projector room.",
-      sceneId: "stardust_video_hall",
       round: 2,
-      sceneChanged: true,
-      stateSummary: "nightfall=1; unlockedInfo=black_tape_hint"
+      conversationContext:
+        "[GM][gm_narration][R0] The camp feels wrong.\n\n[Player][player_input][R1] I inspect the projector room."
     });
 
     console.log("opening.provider =", opening.provider);

@@ -30,7 +30,6 @@ export type SessionRecord = {
   locale: string;
   status: string;
   round: number;
-  sceneId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,7 +43,6 @@ export type SavedGameRecord = {
   locale: string;
   status: string;
   round: number;
-  sceneId: string;
   updatedAt: string;
   modelAccessMode: string;
   modelProfileId: string;
@@ -96,23 +94,22 @@ function buildRecord(snapshot: SessionSnapshot): SessionRecord {
     locale: snapshot.contentSummary.resolvedLocale,
     status: snapshot.session.status,
     round: snapshot.session.currentRound,
-    sceneId: snapshot.session.gameState.sceneId,
     createdAt: snapshot.session.createdAt,
     updatedAt: snapshot.session.updatedAt
   };
 }
 
 function buildSavedGameRecord(saveBundle: SaveBundle): SavedGameRecord {
+  const contentSummary = saveBundle.contentSummary;
   return {
     saveId: `${saveBundle.session.id}:${saveBundle.savedAt}`,
     savedAt: saveBundle.savedAt,
     sessionId: saveBundle.session.id,
-    ruleTitle: saveBundle.contentSummary.ruleTitle,
-    storyTitle: saveBundle.contentSummary.storyTitle,
-    locale: saveBundle.contentSummary.resolvedLocale,
+    ruleTitle: contentSummary?.ruleTitle ?? saveBundle.session.ruleId,
+    storyTitle: contentSummary?.storyTitle ?? saveBundle.session.storyId,
+    locale: contentSummary?.resolvedLocale ?? saveBundle.session.locale,
     status: saveBundle.session.status,
     round: saveBundle.session.currentRound,
-    sceneId: saveBundle.session.gameState.sceneId,
     updatedAt: saveBundle.session.updatedAt,
     modelAccessMode: saveBundle.session.modelAccessMode,
     modelProfileId:

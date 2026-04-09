@@ -46,7 +46,7 @@ export function ContinueScreen(props: ContinueScreenProps) {
               <div className="meta-label">最近存档</div>
               <div className="summary-title">{recentSave.storyTitle}</div>
               <div className="summary-text">规则：{recentSave.ruleTitle}</div>
-              <div className="summary-text">场景：{recentSave.sceneId}</div>
+              <div className="summary-text">状态：{recentSave.status}</div>
               <div className="summary-text">回合：{recentSave.round}</div>
               <div className="summary-text">模型：{recentSave.modelProfileId}</div>
               <div className="summary-text">
@@ -60,7 +60,7 @@ export function ContinueScreen(props: ContinueScreenProps) {
               <div className="meta-label">最近快照</div>
               <div className="summary-title">{recentSnapshot.contentSummary.storyTitle}</div>
               <div className="summary-text">规则：{recentSnapshot.contentSummary.ruleTitle}</div>
-              <div className="summary-text">场景：{recentSnapshot.session.gameState.sceneId}</div>
+              <div className="summary-text">状态：{recentSnapshot.session.status}</div>
               <div className="summary-text">回合：{recentSnapshot.session.currentRound}</div>
               <div className="summary-text">
                 更新时间：{formatDateTime(recentSnapshot.session.updatedAt)}

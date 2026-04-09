@@ -6,10 +6,26 @@ function isEnglishLocale(locale: string): boolean {
   return locale.toLowerCase().startsWith("en");
 }
 
+function summarizeConversationContext(
+  conversationContext: string,
+  locale: string
+): string {
+  const compact = conversationContext.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return isEnglishLocale(locale)
+      ? "No previous conversation context was supplied."
+      : "当前还没有可引用的上一轮对话上下文。";
+  }
+
+  const preview = compact.slice(0, 180);
+  return isEnglishLocale(locale)
+    ? `Recent context: ${preview}`
+    : `最近对话：${preview}`;
+}
+
 export function buildMockOpeningText(
   storyTitle: string,
   storyIntro: string,
-  sceneId: string,
   locale: string
 ): string {
   const cleanedIntro = storyIntro.replace(/\s+/g, " ").trim();
@@ -19,49 +35,40 @@ export function buildMockOpeningText(
     return [
       `[Mock GM] Welcome to "${storyTitle}".`,
       preview,
-      `Current opening scene: ${sceneId}.`,
-      "This is a Phase 1 mock opening used to validate the session pipeline."
+      "This is a lightweight MVP mock opening used to validate the session pipeline."
     ].join("\n\n");
   }
 
   return [
     `【Mock 主持】欢迎进入《${storyTitle}》。`,
     preview,
-    `当前开场场景：${sceneId}。`,
-    "这是一段 Phase 1 的假开场文本，用来验证会话创建、内容加载和前端链路。"
+    "这是当前 MVP 的轻量 mock 开场，用来验证会话创建、消息流和前端链路。"
   ].join("\n\n");
 }
 
 export function buildMockTurnResponse(
   playerInput: string,
-  sceneId: string,
   locale: string,
   round: number,
-  sceneChanged: boolean
+  conversationContext: string
 ): string {
   const cleanedInput = playerInput.replace(/\s+/g, " ").trim();
-  const sceneLine = isEnglishLocale(locale)
-    ? sceneChanged
-      ? `The scene focus has shifted to ${sceneId}.`
-      : `The current scene remains ${sceneId}.`
-    : sceneChanged
-      ? `当前场景已推进到：${sceneId}。`
-      : `当前场景仍然是：${sceneId}。`;
+  const contextSummary = summarizeConversationContext(conversationContext, locale);
 
   if (isEnglishLocale(locale)) {
     return [
       `[Mock GM] Turn ${round} received.`,
       `You attempted: ${cleanedInput}`,
-      sceneLine,
-      "Phase 1 mock processing: the system records your action, keeps the scene stable, and returns a placeholder narration."
+      contextSummary,
+      "MVP mock processing keeps the experience conversation-first and returns a placeholder narration."
     ].join("\n\n");
   }
 
   return [
     `【Mock 主持】已收到第 ${round} 轮行动。`,
     `你的输入是：${cleanedInput}`,
-    sceneLine,
-    "这是 Phase 1 的假回合处理结果：系统会先记录玩家输入，暂时不推进复杂规则，只返回一段占位叙事。"
+    contextSummary,
+    "当前 MVP 的 mock 处理会优先保留对话链路，只返回一段占位叙事，不再推进复杂状态树。"
   ].join("\n\n");
 }
 

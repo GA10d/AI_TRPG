@@ -272,7 +272,6 @@ async function main(): Promise<void> {
       `[flow] opening provider: ${created.messages[1]?.tags?.join(", ") ?? "unknown"}`
     );
     console.log(`[flow] round after turn: ${progressed.session.currentRound}`);
-    console.log(`[flow] current scene: ${progressed.session.gameState.sceneId}`);
     console.log(
       `[flow] final narration preview: ${progressed.messages.at(-1)?.content.slice(0, 160) ?? "empty"}`
     );

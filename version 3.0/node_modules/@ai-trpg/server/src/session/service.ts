@@ -11,14 +11,11 @@ import type {
   ReplayEvent,
   SaveBundle,
   Session,
+  SessionContentSummary,
   SessionSnapshot,
   SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
-import {
-  advanceMockGameState,
-  buildSystemCreatedMessage,
-  createInitialMockGameState
-} from "../mock/index.ts";
+import { buildSystemCreatedMessage } from "../mock/index.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
 import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
@@ -27,44 +24,30 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function buildAgentContexts(snapshot: SessionSnapshot): Record<string, Message[]> {
-  const contexts: Record<string, Message[]> = {};
-
-  for (const participant of snapshot.session.participants) {
-    contexts[participant.id] = snapshot.messages.filter((message) => {
-      if (message.visibility === "public" || message.visibility === "system") {
-        return true;
-      }
-
-      return (
-        message.senderId === participant.id ||
-        message.recipientIds.includes(participant.id)
-      );
-    });
-  }
-
-  contexts.system = snapshot.messages;
-  return contexts;
+function buildFallbackContentSummary(session: Session): SessionContentSummary {
+  return {
+    ruleTitle: session.ruleId,
+    storyTitle: session.storyId,
+    requestedLocale: session.locale,
+    resolvedLocale: session.locale
+  };
 }
 
-function buildDerivedMemory(snapshot: SessionSnapshot): SaveBundle["derivedMemory"] {
-  const activeObjectives = snapshot.session.gameState.objectiveState.active;
-  const sceneSummary =
-    typeof snapshot.session.gameState.sceneState.lastSceneSummary === "string"
-      ? snapshot.session.gameState.sceneState.lastSceneSummary
-      : undefined;
-
-  return {
-    sceneSummary,
-    objectiveSummary:
-      activeObjectives.length > 0 ? activeObjectives.join(" / ") : undefined,
-    actorSummaries: Object.fromEntries(
-      snapshot.session.participants.map((participant) => [
-        participant.id,
-        `${participant.displayName} / ${participant.role}`
-      ])
-    )
-  };
+function buildConversationContext(messages: Message[], maxMessages = 6): string {
+  return messages
+    .slice(-maxMessages)
+    .map((message) => {
+      const speaker =
+        message.kind === "player_input"
+          ? "Player"
+          : message.kind === "gm_narration" || message.kind === "gm_dialogue"
+            ? "GM"
+            : message.kind === "npc_chat"
+              ? "NPC"
+              : "System";
+      return `[${speaker}][${message.kind}][R${message.round}] ${message.content}`;
+    })
+    .join("\n\n");
 }
 
 function buildSaveReplayEvent(sessionId: string, savedAt: string): ReplayEvent {
@@ -110,8 +93,6 @@ function buildSaveBundle(
     messages: snapshot.messages,
     replay: snapshot.replay,
     contentSummary: snapshot.contentSummary,
-    agentContexts: buildAgentContexts(snapshot),
-    derivedMemory: buildDerivedMemory(snapshot),
     runtimeConfig: runtimeConfig ?? undefined
   };
 }
@@ -146,13 +127,12 @@ export async function createSessionSnapshot(
     runtimeModelConfig: request.runtimeModelConfig,
     locale: bundle.resolvedLocale,
     storyTitle,
-    storyIntro,
-    sceneId: bundle.story.manifest.startSceneId
+    storyIntro
   });
 
   const session: Session = {
     id: sessionId,
-    schemaVersion: "0.1.0",
+    schemaVersion: "0.2.0",
     status: "active",
     playMode: request.playMode,
     gmArchitecture: request.gmArchitecture,
@@ -189,27 +169,10 @@ export async function createSessionSnapshot(
       modelProfileId
     },
     gameState: {
-      schemaVersion: "0.1.0",
       phase: "playing",
-      sceneId: bundle.story.manifest.startSceneId,
-      sceneState: {},
-      actorState: {},
-      storyFlags: {
-        phase1_mock_mode: request.modelAccessMode === "mock"
-      },
-      clocks: {},
-      discoveredInfoIds: [],
-      objectiveState: {
-        active: [],
-        completed: [],
-        failed: []
-      },
-      unresolvedHooks: [],
       endingState: null
     }
   };
-
-  session.gameState = createInitialMockGameState(session.gameState, session.locale);
 
   const messages: Message[] = [
     buildSystemCreatedMessage(
@@ -353,14 +316,7 @@ export async function submitMockTurn(
     ]
   };
 
-  const progression = advanceMockGameState(
-    current.session.gameState,
-    trimmedInput,
-    current.session.locale,
-    nextRound
-  );
   const runtimeConfig = store.getRuntimeConfig(sessionId);
-
   const modelGateway = getModelGateway(current.session.modelAccessMode);
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
@@ -368,11 +324,10 @@ export async function submitMockTurn(
       runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
     runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
     locale: current.session.locale,
+    storyTitle: current.contentSummary.storyTitle,
     playerInput: trimmedInput,
-    sceneId: progression.nextGameState.sceneId,
     round: nextRound,
-    sceneChanged: progression.sceneChanged,
-    stateSummary: progression.stateSummary
+    conversationContext: buildConversationContext(current.messages)
   });
 
   const gmMessage: Message = {
@@ -401,24 +356,6 @@ export async function submitMockTurn(
       summary: `Player submitted turn ${nextRound}`,
       payload: {
         messageId: playerMessage.id
-      }
-    },
-    {
-      id: `evt_${randomUUID()}`,
-      round: nextRound,
-      createdAt: timestamp,
-      actorId: "system",
-      type: "state_patch_applied",
-      displayLevel: "core",
-      summary: progression.sceneChanged
-        ? `Scene moved to ${progression.nextGameState.sceneId}`
-        : `State updated in ${progression.nextGameState.sceneId}`,
-      payload: {
-        sceneId: progression.nextGameState.sceneId,
-        unlockedInfoIds: progression.unlockedInfoIds,
-        completedObjectives: progression.completedObjectives,
-        activeObjectives: progression.activatedObjectives,
-        nightfall: progression.nextGameState.clocks.nightfall
       }
     },
     {
@@ -454,8 +391,7 @@ export async function submitMockTurn(
     session: {
       ...current.session,
       currentRound: nextRound,
-      updatedAt: timestamp,
-      gameState: progression.nextGameState
+      updatedAt: timestamp
     },
     messages: [
       ...current.messages,
@@ -528,7 +464,7 @@ export function loadSessionFromSaveBundle(
       ...saveBundle.replay,
       loadEvent
     ],
-    contentSummary: saveBundle.contentSummary
+    contentSummary: saveBundle.contentSummary ?? buildFallbackContentSummary(saveBundle.session)
   };
 
   store.save(snapshot, {

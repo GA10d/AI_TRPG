@@ -11,7 +11,6 @@ export type OpeningGenerationInput = {
   locale: LocaleCode;
   storyTitle: string;
   storyIntro: string;
-  sceneId: string;
 };
 
 export type OpeningGenerationOutput = {
@@ -25,11 +24,10 @@ export type TurnNarrationInput = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
+  storyTitle: string;
   playerInput: string;
-  sceneId: string;
   round: number;
-  sceneChanged: boolean;
-  stateSummary: string;
+  conversationContext: string;
 };
 
 export type TurnNarrationOutput = {

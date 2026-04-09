@@ -21,7 +21,6 @@ class MockModelGateway implements ModelGateway {
       text: buildMockOpeningText(
         input.storyTitle,
         input.storyIntro,
-        input.sceneId,
         String(input.locale)
       ),
       provider: "mock-local",
@@ -33,11 +32,10 @@ class MockModelGateway implements ModelGateway {
     return {
       text: buildMockTurnResponse(
         input.playerInput,
-        input.sceneId,
         String(input.locale),
         input.round,
-        input.sceneChanged
-      ) + "\n\n" + input.stateSummary,
+        input.conversationContext
+      ),
       provider: "mock-local",
       mode: "mock"
     };

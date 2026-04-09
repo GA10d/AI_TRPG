@@ -1,5 +1,6 @@
+import type { FormEvent } from "react";
+
 import type { SessionSnapshot } from "../../../../packages/shared-types/src/index.ts";
-import { renderJoinedList } from "../ui.ts";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type GameScreenProps = {
@@ -10,7 +11,7 @@ type GameScreenProps = {
   onBack: () => void;
   onSaveGame: () => Promise<void>;
   onTurnInputChange: (value: string) => void;
-  onSubmitTurn: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
 export function GameScreen(props: GameScreenProps) {
@@ -30,7 +31,7 @@ export function GameScreen(props: GameScreenProps) {
       <section className="panel page-panel">
         <ScreenHeader
           title="游戏中"
-          description="当前还没有活动会话。"
+          description="当前还没有活动中的会话。"
           onBack={onBack}
         />
         <div className="empty-state">暂无可展示的会话。</div>
@@ -40,14 +41,13 @@ export function GameScreen(props: GameScreenProps) {
 
   const openingMessage =
     snapshot.messages.find((item) => item.kind === "gm_narration") ?? null;
-  const storyFlags = Object.entries(snapshot.session.gameState.storyFlags);
-  const clocks = Object.entries(snapshot.session.gameState.clocks);
+  const endingState = snapshot.session.gameState.endingState ?? null;
 
   return (
     <section className="panel page-panel">
       <ScreenHeader
         title="游戏中"
-        description="当前是可运行的单人假闭环页面，已经支持手动存档和从存档恢复。"
+        description="当前版本以消息历史和回放日志为核心，不再展示 mock 世界状态树。"
         onBack={onBack}
       />
 
@@ -66,10 +66,9 @@ export function GameScreen(props: GameScreenProps) {
           </div>
 
           <div className="meta-card">
-            <span className="meta-label">语言解析</span>
+            <span className="meta-label">当前进度</span>
             <div>
-              请求: {snapshot.contentSummary.requestedLocale} | 实际:{" "}
-              {snapshot.contentSummary.resolvedLocale}
+              状态：{snapshot.session.status} / Round {snapshot.session.currentRound}
             </div>
           </div>
 
@@ -86,20 +85,15 @@ export function GameScreen(props: GameScreenProps) {
           <pre>{openingMessage?.content ?? "暂未找到开场文本。"}</pre>
         </div>
 
-        <div className="game-area">
-          <div className="game-topbar">
-            <div>
-              <div className="meta-label">当前状态</div>
-              <div>
-                scene={snapshot.session.gameState.sceneId} | status={snapshot.session.status}
-              </div>
-            </div>
-            <div>
-              <div className="meta-label">当前回合</div>
-              <div>Round {snapshot.session.currentRound}</div>
-            </div>
+        {endingState ? (
+          <div className="info-banner info-banner-success">
+            <div className="meta-label">结局状态</div>
+            <div className="summary-title">{endingState.title}</div>
+            <div className="summary-text">{endingState.summary}</div>
           </div>
+        ) : null}
 
+        <div className="game-area">
           <div className="button-row">
             <button
               className="ghost-button"
@@ -109,60 +103,6 @@ export function GameScreen(props: GameScreenProps) {
             >
               {isSaving ? "正在保存..." : "手动存档"}
             </button>
-          </div>
-
-          <div className="state-grid">
-            <div className="state-card">
-              <div className="meta-label">场景推进</div>
-              <div className="state-primary">
-                {String(
-                  snapshot.session.gameState.sceneState.sceneTitle ??
-                    snapshot.session.gameState.sceneId
-                )}
-              </div>
-              <div className="state-secondary">
-                {String(
-                  snapshot.session.gameState.sceneState.lastSceneSummary ?? "暂无场景摘要"
-                )}
-              </div>
-            </div>
-
-            <div className="state-card">
-              <div className="meta-label">目标状态</div>
-              <div className="state-secondary">
-                当前目标：{renderJoinedList(snapshot.session.gameState.objectiveState.active)}
-              </div>
-              <div className="state-secondary">
-                已完成：{renderJoinedList(snapshot.session.gameState.objectiveState.completed)}
-              </div>
-              <div className="state-secondary">
-                已失败：{renderJoinedList(snapshot.session.gameState.objectiveState.failed)}
-              </div>
-            </div>
-
-            <div className="state-card">
-              <div className="meta-label">时钟与线索</div>
-              <div className="state-secondary">
-                时钟：
-                {clocks.length > 0
-                  ? clocks.map(([key, value]) => `${key}=${value}`).join(" / ")
-                  : "暂无"}
-              </div>
-              <div className="state-secondary">
-                已发现信息：{renderJoinedList(snapshot.session.gameState.discoveredInfoIds)}
-              </div>
-            </div>
-
-            <div className="state-card">
-              <div className="meta-label">关键 Flags</div>
-              <div className="flag-list">
-                {storyFlags.map(([key, value]) => (
-                  <span className="flag-chip" key={key}>
-                    {key}={String(value)}
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="log-columns">
@@ -204,7 +144,7 @@ export function GameScreen(props: GameScreenProps) {
               <span>输入本轮行动</span>
               <textarea
                 rows={5}
-                placeholder="例如：我先去录像厅检查投影机和黑色录像带，再询问莉莉她昨晚最后看到了什么。"
+                placeholder="例如：我先检查录像带，再询问主持人现场还剩下哪些值得注意的痕迹。"
                 value={turnInput}
                 onChange={(event) => onTurnInputChange(event.target.value)}
               />

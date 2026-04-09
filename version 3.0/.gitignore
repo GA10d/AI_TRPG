@@ -1,0 +1,5 @@
+logs/*.log
+logs/*.err.log
+logs/*.out.log
+logs/*.txt
+!logs/.gitkeep

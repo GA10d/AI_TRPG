@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 
 import type {
   CreateSessionRequest,
@@ -120,7 +126,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
     };
   }, [isDragging]);
 
-  function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>): void {
+  function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>): void {
     event.preventDefault();
     setIsDragging(true);
   }
@@ -135,14 +141,14 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
       style={
         {
           "--menu-left-ratio": `${leftRatio}%`
-        } as React.CSSProperties
+        } as CSSProperties
       }
     >
       <section className="panel hero-panel menu-panel-left">
         <div className="eyebrow">Main Menu</div>
         <h1>AI TRPG 3.0</h1>
         <p className="lead menu-lead">
-          以文字叙事为核心的 AI TRPG 原型。你可以从这里开始新游戏、继续最近存档，
+          以文字叙事为核心的 AI TRPG 原型。你可以从这里开始新游戏、继续最近进度，
           或调整当前版本的默认模型与语言配置。
         </p>
 
@@ -221,8 +227,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
               <>
                 <div className="summary-title">{recentSnapshot.contentSummary.storyTitle}</div>
                 <div className="summary-text">
-                  回合 {recentSnapshot.session.currentRound} / 场景{" "}
-                  {recentSnapshot.session.gameState.sceneId}
+                  回合 {recentSnapshot.session.currentRound} / 状态 {recentSnapshot.session.status}
                 </div>
                 <div className="summary-text">
                   更新时间：{formatDateTime(recentSnapshot.session.updatedAt)}
