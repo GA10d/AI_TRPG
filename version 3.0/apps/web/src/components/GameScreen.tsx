@@ -1,14 +1,21 @@
 import type { FormEvent } from "react";
 
-import type { SessionSnapshot } from "../../../../packages/shared-types/src/index.ts";
+import type {
+  PlaythroughGraphBundle,
+  SessionSnapshot
+} from "../../../../packages/shared-types/src/index.ts";
+import { PlaythroughGraphPanel } from "./PlaythroughGraphPanel.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type GameScreenProps = {
   snapshot: SessionSnapshot | null;
+  activeGraphBundle: PlaythroughGraphBundle | null;
   turnInput: string;
   isSubmittingTurn: boolean;
   isSaving: boolean;
+  isResumingBranch: boolean;
   onBack: () => void;
+  onContinueFromNode: (nodeId: string) => Promise<void>;
   onSaveGame: () => Promise<void>;
   onTurnInputChange: (value: string) => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -17,10 +24,13 @@ type GameScreenProps = {
 export function GameScreen(props: GameScreenProps) {
   const {
     snapshot,
+    activeGraphBundle,
     turnInput,
     isSubmittingTurn,
     isSaving,
+    isResumingBranch,
     onBack,
+    onContinueFromNode,
     onSaveGame,
     onTurnInputChange,
     onSubmitTurn
@@ -42,12 +52,13 @@ export function GameScreen(props: GameScreenProps) {
   const openingMessage =
     snapshot.messages.find((item) => item.kind === "gm_narration") ?? null;
   const endingState = snapshot.session.gameState.endingState ?? null;
+  const isSessionEnded = snapshot.session.status === "ended";
 
   return (
     <section className="panel page-panel">
       <ScreenHeader
         title="游戏中"
-        description="当前版本以消息历史和回放日志为核心，不再展示 mock 世界状态树。"
+        description="当前版本以消息历史和回放日志为核心，结局后会解锁本地分支回溯树。"
         onBack={onBack}
       />
 
@@ -92,6 +103,12 @@ export function GameScreen(props: GameScreenProps) {
             <div className="summary-text">{endingState.summary}</div>
           </div>
         ) : null}
+
+        <PlaythroughGraphPanel
+          graphBundle={activeGraphBundle}
+          isResuming={isResumingBranch}
+          onContinueFromNode={onContinueFromNode}
+        />
 
         <div className="game-area">
           <div className="button-row">
@@ -139,10 +156,20 @@ export function GameScreen(props: GameScreenProps) {
             </div>
           </div>
 
+          {isSessionEnded ? (
+            <div className="info-banner info-banner-warning">
+              <div className="meta-label">普通剧情已封口</div>
+              <div className="summary-text">
+                这个会话已经进入结局，不能继续往后提交普通剧情。你可以从上方树里的旧节点继续，生成新的分支。
+              </div>
+            </div>
+          ) : null}
+
           <form className="turn-form" onSubmit={onSubmitTurn}>
             <label className="field">
               <span>输入本轮行动</span>
               <textarea
+                disabled={isSessionEnded}
                 rows={5}
                 placeholder="例如：我先检查录像带，再询问主持人现场还剩下哪些值得注意的痕迹。"
                 value={turnInput}
@@ -150,7 +177,11 @@ export function GameScreen(props: GameScreenProps) {
               />
             </label>
 
-            <button className="primary-button" disabled={isSubmittingTurn} type="submit">
+            <button
+              className="primary-button"
+              disabled={isSubmittingTurn || isSessionEnded}
+              type="submit"
+            >
               {isSubmittingTurn ? "提交中..." : "提交本轮行动"}
             </button>
           </form>

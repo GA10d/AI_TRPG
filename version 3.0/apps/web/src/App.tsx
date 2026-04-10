@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type {
   SaveBundle,
+  SaveRuntimeConfig,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 import {
@@ -12,6 +13,7 @@ import {
   submitTurn
 } from "./lib/trpgApiClient.ts";
 import { useBootstrapState } from "./hooks/useBootstrapState.ts";
+import { usePlaythroughGraph } from "./hooks/usePlaythroughGraph.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
@@ -29,6 +31,32 @@ const initialStatus: StatusState = {
   tone: "neutral"
 };
 
+function normalizeRuntimeConfig(
+  input: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  } | undefined
+): SaveRuntimeConfig["runtimeModelConfig"] | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const apiKey = input.apiKey?.trim() ?? "";
+  const baseUrl = input.baseUrl?.trim() ?? "";
+  const model = input.model?.trim() ?? "";
+
+  if (!apiKey && !baseUrl && !model) {
+    return undefined;
+  }
+
+  return {
+    apiKey,
+    baseUrl,
+    model
+  };
+}
+
 export function App() {
   const [view, setView] = useState<AppView>("menu");
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
@@ -36,6 +64,7 @@ export function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
@@ -76,7 +105,26 @@ export function App() {
     removeSavedGameById
   } = useStoredProgress();
 
+  const {
+    activeGraphBundle,
+    beginFromSnapshot,
+    captureTurn,
+    syncSavedBundle,
+    relinkSnapshot,
+    relinkSaveBundle,
+    prepareResume
+  } = usePlaythroughGraph();
+
   const recentSave = savedGames[0] ?? null;
+
+  function buildSaveRuntimeConfig(
+    profileIdOverride?: string
+  ): SaveRuntimeConfig {
+    return {
+      modelProfileId: profileIdOverride ?? modelProfileId,
+      runtimeModelConfig: normalizeRuntimeConfig(runtimeModelConfig)
+    };
+  }
 
   function saveDefaults(): void {
     storeWebDefaults({
@@ -136,12 +184,16 @@ export function App() {
         logViewMode
       });
       commitSnapshot(nextSnapshot);
+      beginFromSnapshot(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+      );
       setTurnInput("");
       setView("game");
       setStatus({
         message:
           characterConcept.trim().length > 0
-            ? "会话创建成功，你的角色概念已经记录在当前开局流程中。"
+            ? "会话创建成功，你的角色概念已记录在本局开场流程中。"
             : "会话创建成功。",
         tone: "neutral"
       });
@@ -188,9 +240,17 @@ export function App() {
         playerInput: trimmedInput
       });
       commitSnapshot(nextSnapshot);
+      captureTurn(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        trimmedInput
+      );
       setTurnInput("");
       setStatus({
-        message: "本轮处理完成。",
+        message:
+          nextSnapshot.session.status === "ended"
+            ? "本轮处理完成，并已进入结局。"
+            : "本轮处理完成。",
         tone: "neutral"
       });
     } catch (error) {
@@ -222,6 +282,7 @@ export function App() {
       const result = await createSave(snapshot.session.id);
       commitSnapshot(result.snapshot);
       commitSaveBundle(result.saveBundle);
+      syncSavedBundle(result.saveBundle);
       setStatus({
         message: "手动存档已保存到本地。",
         tone: "neutral"
@@ -249,6 +310,11 @@ export function App() {
     try {
       const nextSnapshot = await loadSaveBundle(saveBundle);
       commitSnapshot(nextSnapshot);
+      relinkSaveBundle(
+        saveBundle,
+        nextSnapshot,
+        saveBundle.runtimeConfig ?? buildSaveRuntimeConfig(saveBundle.session.settings.modelProfileId)
+      );
       setView("game");
       setStatus({
         message: successMessage,
@@ -294,6 +360,10 @@ export function App() {
     try {
       const nextSnapshot = await fetchSession(recentSnapshot.session.id);
       commitSnapshot(nextSnapshot);
+      relinkSnapshot(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+      );
       setView("game");
       setStatus({
         message: "已从服务端同步最近会话。",
@@ -301,6 +371,10 @@ export function App() {
       });
     } catch {
       commitSnapshot(recentSnapshot);
+      relinkSnapshot(
+        recentSnapshot,
+        buildSaveRuntimeConfig(recentSnapshot.session.settings.modelProfileId)
+      );
       setView("game");
       setStatus({
         message: "服务端未找到该会话，已改用本地快照打开。",
@@ -313,6 +387,41 @@ export function App() {
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
     return restoreFromSaveBundle(record.bundle, `已载入存档：${record.storyTitle}`);
+  }
+
+  async function handleContinueFromNode(nodeId: string): Promise<void> {
+    const prepared = prepareResume(nodeId);
+    if (!prepared) {
+      setStatus({
+        message: "当前节点不可继续，或本地缺少对应快照。",
+        tone: "error"
+      });
+      return;
+    }
+
+    setIsResumingBranch(true);
+    setStatus({
+      message: "正在从历史节点恢复，并准备生成新的分支...",
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await loadSaveBundle(prepared.saveBundle);
+      commitSnapshot(nextSnapshot);
+      setTurnInput("");
+      setView("game");
+      setStatus({
+        message: "已切换到所选节点。下一轮行动将从这里长出新的分支。",
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsResumingBranch(false);
+    }
   }
 
   function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): void {
@@ -528,10 +637,13 @@ export function App() {
       content = (
         <GamePage
           snapshot={snapshot}
+          activeGraphBundle={activeGraphBundle}
           turnInput={turnInput}
           isSubmittingTurn={isSubmittingTurn}
           isSaving={isSaving}
+          isResumingBranch={isResumingBranch}
           onBack={() => setView("menu")}
+          onContinueFromNode={handleContinueFromNode}
           onSaveGame={handleSaveGame}
           onTurnInputChange={setTurnInput}
           onSubmitTurn={handleSubmitTurn}

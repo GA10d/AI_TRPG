@@ -38,6 +38,27 @@ function getRequestedProfileId(): string | undefined {
   return cliValue || envValue || undefined;
 }
 
+function getRequestedTurnInputs(): string[] {
+  const directArg = process.argv.find((item) => item.startsWith("--turn-input="));
+  const secondArg = process.argv.find((item) => item.startsWith("--second-turn-input="));
+  const endingFlag = process.argv.includes("--ending-check");
+
+  const firstInput =
+    directArg?.split("=", 2)[1] ??
+    process.env.TRPG_REAL_FLOW_TURN_INPUT ??
+    "I inspect the video hall and ask what happened last night.";
+
+  const nextInputs = [firstInput];
+  const secondInput = secondArg?.split("=", 2)[1] ?? process.env.TRPG_REAL_FLOW_SECOND_TURN_INPUT;
+  if (secondInput) {
+    nextInputs.push(secondInput);
+  } else if (endingFlag) {
+    nextInputs.push("我掏出手枪自杀");
+  }
+
+  return nextInputs.filter((item) => item.trim().length > 0);
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   const data = (await response.json()) as T & { message?: string };
 
@@ -247,6 +268,7 @@ function buildRequestFromBootstrap(
 
 async function main(): Promise<void> {
   const mode = getRequestedMode();
+  const turnInputs = getRequestedTurnInputs();
   const serverHandle = await ensureServer();
 
   try {
@@ -259,12 +281,13 @@ async function main(): Promise<void> {
     const bootstrap = await fetchBootstrapData();
     const request = buildRequestFromBootstrap(bootstrap, mode);
     console.log(`[flow] model profile: ${request.modelProfileId ?? "unknown"}`);
+    console.log(`[flow] turn count: ${turnInputs.length}`);
 
     const created = await createNewSession(request);
-    const progressed = await submitTurnForSession(
-      created.session.id,
-      "I inspect the video hall and ask what happened last night."
-    );
+    let progressed = created;
+    for (const playerInput of turnInputs) {
+      progressed = await submitTurnForSession(created.session.id, playerInput);
+    }
 
     console.log(`[flow] created session: ${created.session.id}`);
     console.log(`[flow] story: ${created.contentSummary.storyTitle}`);
@@ -272,6 +295,10 @@ async function main(): Promise<void> {
       `[flow] opening provider: ${created.messages[1]?.tags?.join(", ") ?? "unknown"}`
     );
     console.log(`[flow] round after turn: ${progressed.session.currentRound}`);
+    console.log(`[flow] session status: ${progressed.session.status}`);
+    if (progressed.session.gameState.endingState) {
+      console.log(`[flow] ending title: ${progressed.session.gameState.endingState.title}`);
+    }
     console.log(
       `[flow] final narration preview: ${progressed.messages.at(-1)?.content.slice(0, 160) ?? "empty"}`
     );

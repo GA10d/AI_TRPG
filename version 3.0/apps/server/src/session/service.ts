@@ -289,6 +289,10 @@ export async function submitMockTurn(
     return null;
   }
 
+  if (current.session.status === "ended") {
+    throw new Error("当前会话已经进入结局，不能继续普通剧情。请从历史节点继续，或重新开始。");
+  }
+
   const timestamp = nowIso();
   const nextRound = current.session.currentRound + 1;
   const playerParticipant = current.session.participants.find(
@@ -345,6 +349,7 @@ export async function submitMockTurn(
     ]
   };
 
+  const endingAdjudication = turnNarration.adjudication ?? null;
   const replayEntries: ReplayEvent[] = [
     {
       id: `evt_${randomUUID()}`,
@@ -386,12 +391,44 @@ export async function submitMockTurn(
     }
   ];
 
+  if (endingAdjudication?.isGameOver && endingAdjudication.endingState) {
+    replayEntries.push({
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "ending_confirmed",
+      displayLevel: "core",
+      summary: `Ending confirmed: ${endingAdjudication.endingState.title}`,
+      payload: {
+        endingId: endingAdjudication.endingState.endingId,
+        endingType: endingAdjudication.endingState.endingType,
+        adjudicationSource: endingAdjudication.adjudicationSource
+      }
+    });
+  }
+
   return store.update(sessionId, () => ({
     ...current,
     session: {
       ...current.session,
+      status:
+        endingAdjudication?.isGameOver && endingAdjudication.endingState
+          ? "ended"
+          : current.session.status,
       currentRound: nextRound,
-      updatedAt: timestamp
+      updatedAt: timestamp,
+      gameState: {
+        ...current.session.gameState,
+        phase:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? "ended"
+            : "playing",
+        endingState:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? endingAdjudication.endingState
+            : current.session.gameState.endingState ?? null
+      }
     },
     messages: [
       ...current.messages,

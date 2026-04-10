@@ -2,4 +2,7 @@ logs/*.log
 logs/*.err.log
 logs/*.out.log
 logs/*.txt
+/*.log
+/*.err.log
+/*.out.log
 !logs/.gitkeep

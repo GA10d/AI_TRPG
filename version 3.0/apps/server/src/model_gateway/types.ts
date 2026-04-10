@@ -1,4 +1,5 @@
 import type {
+  EndingAdjudication,
   LocaleCode,
   ModelAccessMode,
   RuntimeModelConfigInput
@@ -34,6 +35,7 @@ export type TurnNarrationOutput = {
   text: string;
   provider: string;
   mode: ModelAccessMode;
+  adjudication?: EndingAdjudication | null;
 };
 
 export interface ModelGateway {

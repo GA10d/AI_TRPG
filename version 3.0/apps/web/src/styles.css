@@ -905,6 +905,78 @@ pre {
   padding-right: 6px;
 }
 
+.playthrough-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.playthrough-graph-scroll {
+  overflow: auto;
+  padding-bottom: 4px;
+}
+
+.playthrough-graph-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 240px;
+}
+
+.playthrough-graph-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.playthrough-node {
+  position: absolute;
+  width: 220px;
+  min-height: 92px;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 2px solid rgba(122, 50, 32, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 30px rgba(68, 37, 16, 0.08);
+}
+
+.playthrough-node-current {
+  box-shadow:
+    0 0 0 3px rgba(122, 50, 32, 0.12),
+    0 20px 36px rgba(68, 37, 16, 0.1);
+}
+
+.playthrough-node-meta,
+.playthrough-node-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.playthrough-node-meta {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.playthrough-node-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.playthrough-node-copy {
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.playthrough-node-button {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
 .message-item,
 .replay-item {
   padding: 12px;

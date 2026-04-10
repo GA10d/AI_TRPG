@@ -177,6 +177,7 @@ export async function generateTurnNarrationViaServerProxy(
   return {
     text: await callChatCompletion(config, buildTurnMessages(input)),
     provider: `${config.providerLabel}:${config.model}`,
-    mode: "server_proxy"
+    mode: "server_proxy",
+    adjudication: null
   };
 }

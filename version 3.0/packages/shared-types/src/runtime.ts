@@ -23,6 +23,44 @@ export type EndingType =
   | "hidden"
   | "emergent";
 
+export type EndingState = {
+  endingId: string;
+  endingType: EndingType;
+  title: string;
+  summary: string;
+  confirmedAtRound: number;
+};
+
+export type EndingAdjudication = {
+  isGameOver: boolean;
+  endingState: EndingState | null;
+  adjudicationSource: "mock" | "single_agent" | "multi_agent" | "unknown";
+};
+
+export type PlaythroughNodeKind =
+  | "opening"
+  | "turn"
+  | "manual"
+  | "ending"
+  | "debrief"
+  | "epilogue";
+
+export type PlaythroughExpandabilityMode =
+  | "open"
+  | "locked_by_ending"
+  | "special_followup_only"
+  | "closed";
+
+export type PlaythroughEdgeKind =
+  | "turn_progression"
+  | "branch_resume"
+  | "after_ending_followup";
+
+export type PlaythroughVisualFamily =
+  | "mainline"
+  | "branch"
+  | "after_ending";
+
 export type Participant = {
   id: string;
   role: "human_player" | "npc" | "gm" | "system";
@@ -41,13 +79,7 @@ export type SessionSettings = {
 
 export type GameState = {
   phase?: "setup" | "playing" | "ending" | "ended";
-  endingState?: null | {
-    endingId: string;
-    endingType: EndingType;
-    title: string;
-    summary: string;
-    confirmedAtRound: number;
-  };
+  endingState?: EndingState | null;
 };
 
 export type Session = {
@@ -97,6 +129,7 @@ export type ReplayEvent = {
     | "message_created"
     | "turn_submitted"
     | "gm_response_received"
+    | "ending_confirmed"
     | "save_created"
     | "save_loaded";
   displayLevel: "core" | "detail" | "debug";
@@ -128,4 +161,73 @@ export type SaveBundle = {
   replay: ReplayEvent[];
   contentSummary?: SessionContentSummary;
   runtimeConfig?: SaveRuntimeConfig;
+};
+
+export type PlaythroughGraph = {
+  id: string;
+  ruleId: string;
+  storyId: string;
+  locale: LocaleCode;
+  createdAt: string;
+  updatedAt: string;
+  rootNodeId: string;
+  currentNodeId: string;
+  activeRouteId: string;
+  pendingContinuationFromNodeId?: string | null;
+  unlockedAtEnding: boolean;
+  firstEndingReachedAt?: string;
+  nodeCount: number;
+  terminalNodeIds: string[];
+};
+
+export type PlaythroughNode = {
+  id: string;
+  graphId: string;
+  parentNodeId: string | null;
+  nodeKind: PlaythroughNodeKind;
+  round: number;
+  createdAt: string;
+  checkpointKind: "opening" | "turn" | "manual" | "ending";
+  sourceSessionId: string;
+  snapshotId: string;
+  playerPreview: string | null;
+  gmPreview: string | null;
+  statusAtCapture: SessionStatus;
+  expandability: {
+    mode: PlaythroughExpandabilityMode;
+    reason?: string;
+  };
+  terminalState: {
+    isTerminal: boolean;
+    reason: "open" | "ending_confirmed";
+    adjudicationSource: "mock" | "single_agent" | "multi_agent" | "unknown";
+  };
+  endingState?: EndingState | null;
+  tags?: string[];
+};
+
+export type PlaythroughEdge = {
+  id: string;
+  graphId: string;
+  fromNodeId: string;
+  toNodeId: string;
+  edgeKind: PlaythroughEdgeKind;
+  routeId: string;
+  depthInRoute: number;
+  visualFamily: PlaythroughVisualFamily;
+};
+
+export type SnapshotBlob = {
+  id: string;
+  graphId: string;
+  nodeId: string;
+  createdAt: string;
+  saveBundle: SaveBundle;
+};
+
+export type PlaythroughGraphBundle = {
+  graph: PlaythroughGraph;
+  nodes: PlaythroughNode[];
+  edges: PlaythroughEdge[];
+  snapshots: SnapshotBlob[];
 };

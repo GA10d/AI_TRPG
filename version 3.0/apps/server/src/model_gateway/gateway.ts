@@ -1,7 +1,7 @@
 import type { ModelAccessMode } from "../../../../packages/shared-types/src/index.ts";
 import {
   buildMockOpeningText,
-  buildMockTurnResponse
+  buildMockTurnOutcome
 } from "../mock/index.ts";
 import {
   generateOpeningViaServerProxy,
@@ -29,15 +29,17 @@ class MockModelGateway implements ModelGateway {
   }
 
   async generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput> {
+    const outcome = buildMockTurnOutcome(
+      input.playerInput,
+      String(input.locale),
+      input.round,
+      input.conversationContext
+    );
     return {
-      text: buildMockTurnResponse(
-        input.playerInput,
-        String(input.locale),
-        input.round,
-        input.conversationContext
-      ),
+      text: outcome.text,
       provider: "mock-local",
-      mode: "mock"
+      mode: "mock",
+      adjudication: outcome.adjudication
     };
   }
 }
