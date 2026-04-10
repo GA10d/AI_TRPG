@@ -16,6 +16,7 @@ type GameScreenProps = {
   isResumingBranch: boolean;
   onBack: () => void;
   onContinueFromNode: (nodeId: string) => Promise<void>;
+  onQuickEndingTest: () => Promise<void>;
   onSaveGame: () => Promise<void>;
   onTurnInputChange: (value: string) => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -31,6 +32,7 @@ export function GameScreen(props: GameScreenProps) {
     isResumingBranch,
     onBack,
     onContinueFromNode,
+    onQuickEndingTest,
     onSaveGame,
     onTurnInputChange,
     onSubmitTurn
@@ -53,6 +55,7 @@ export function GameScreen(props: GameScreenProps) {
     snapshot.messages.find((item) => item.kind === "gm_narration") ?? null;
   const endingState = snapshot.session.gameState.endingState ?? null;
   const isSessionEnded = snapshot.session.status === "ended";
+  const canUseQuickEndingTest = snapshot.session.modelAccessMode === "mock" && !isSessionEnded;
 
   return (
     <section className="panel page-panel">
@@ -120,6 +123,16 @@ export function GameScreen(props: GameScreenProps) {
             >
               {isSaving ? "正在保存..." : "手动存档"}
             </button>
+            {canUseQuickEndingTest ? (
+              <button
+                className="ghost-button"
+                disabled={isSubmittingTurn}
+                onClick={() => void onQuickEndingTest()}
+                type="button"
+              >
+                {isSubmittingTurn ? "测试中..." : "快速进入结局（mock）"}
+              </button>
+            ) : null}
           </div>
 
           <div className="log-columns">

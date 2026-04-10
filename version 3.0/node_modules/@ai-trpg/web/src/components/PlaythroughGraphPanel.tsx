@@ -1,3 +1,11 @@
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent
+} from "react";
+
 import type {
   PlaythroughEdge,
   PlaythroughGraphBundle,
@@ -10,6 +18,18 @@ type PlaythroughGraphPanelProps = {
   onContinueFromNode: (nodeId: string) => Promise<void>;
 };
 
+type NodePosition = {
+  x: number;
+  y: number;
+};
+
+type DragState = {
+  nodeId: string;
+  offsetX: number;
+  offsetY: number;
+} | null;
+
+const NODE_LAYOUT_STORAGE_KEY = "trpg3.playthroughNodeLayouts";
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 92;
 const COLUMN_GAP = 72;
@@ -80,6 +100,72 @@ function buildNodeTitle(node: PlaythroughNode): string {
   return `回合 ${node.round}`;
 }
 
+function canUseStorage(): boolean {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function loadStoredLayouts(): Record<string, Record<string, NodePosition>> {
+  if (!canUseStorage()) {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(NODE_LAYOUT_STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+    return JSON.parse(rawValue) as Record<string, Record<string, NodePosition>>;
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredGraphLayout(
+  graphId: string,
+  positions: Record<string, NodePosition>
+): void {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  const nextLayouts = loadStoredLayouts();
+  nextLayouts[graphId] = positions;
+  window.localStorage.setItem(NODE_LAYOUT_STORAGE_KEY, JSON.stringify(nextLayouts));
+}
+
+function buildDefaultPositions(
+  nodes: PlaythroughNode[]
+): Record<string, NodePosition> {
+  const nodesById = new Map(nodes.map((node) => [node.id, node] as const));
+  const depthCache = new Map<string, number>();
+  const nextPositions: Record<string, NodePosition> = {};
+
+  nodes.forEach((node, rowIndex) => {
+    const depth = deriveDepth(node, nodesById, depthCache);
+    nextPositions[node.id] = {
+      x: PADDING_X + depth * (NODE_WIDTH + COLUMN_GAP),
+      y: PADDING_Y + rowIndex * (NODE_HEIGHT + ROW_GAP)
+    };
+  });
+
+  return nextPositions;
+}
+
+function mergeNodePositions(
+  nodes: PlaythroughNode[],
+  graphId: string
+): Record<string, NodePosition> {
+  const defaults = buildDefaultPositions(nodes);
+  const stored = loadStoredLayouts()[graphId] ?? {};
+  const nextPositions: Record<string, NodePosition> = {};
+
+  for (const node of nodes) {
+    nextPositions[node.id] = stored[node.id] ?? defaults[node.id];
+  }
+
+  return nextPositions;
+}
+
 export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
   const {
     graphBundle,
@@ -87,30 +173,162 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
     onContinueFromNode
   } = props;
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
+  const [dragState, setDragState] = useState<DragState>(null);
+
+  const orderedNodes = useMemo(() => {
+    if (!graphBundle?.graph.unlockedAtEnding) {
+      return [];
+    }
+
+    return [...graphBundle.nodes].sort((left, right) =>
+      left.createdAt.localeCompare(right.createdAt)
+    );
+  }, [graphBundle]);
+
+  const edgesByTarget = useMemo(() => {
+    if (!graphBundle) {
+      return new Map<string, PlaythroughEdge>();
+    }
+
+    return new Map(graphBundle.edges.map((edge) => [edge.toNodeId, edge] as const));
+  }, [graphBundle]);
+
+  useEffect(() => {
+    if (!graphBundle?.graph.unlockedAtEnding) {
+      setNodePositions({});
+      return;
+    }
+
+    setNodePositions((current) => {
+      const merged = mergeNodePositions(orderedNodes, graphBundle.graph.id);
+      const currentKeys = Object.keys(current);
+      const mergedKeys = Object.keys(merged);
+
+      const isSame =
+        currentKeys.length === mergedKeys.length &&
+        mergedKeys.every((key) => {
+          const currentPosition = current[key];
+          const mergedPosition = merged[key];
+          return (
+            currentPosition &&
+            currentPosition.x === mergedPosition.x &&
+            currentPosition.y === mergedPosition.y
+          );
+        });
+
+      return isSame ? current : merged;
+    });
+  }, [graphBundle, orderedNodes]);
+
+  useEffect(() => {
+    if (!graphBundle?.graph.unlockedAtEnding || !Object.keys(nodePositions).length) {
+      return;
+    }
+
+    saveStoredGraphLayout(graphBundle.graph.id, nodePositions);
+  }, [graphBundle, nodePositions]);
+
+  useEffect(() => {
+    if (!dragState || !graphBundle?.graph.unlockedAtEnding) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent): void {
+      const scrollElement = scrollRef.current;
+      if (!scrollElement) {
+        return;
+      }
+
+      const rect = scrollElement.getBoundingClientRect();
+      const nextX = Math.max(
+        PADDING_X,
+        event.clientX - rect.left + scrollElement.scrollLeft - dragState.offsetX
+      );
+      const nextY = Math.max(
+        PADDING_Y,
+        event.clientY - rect.top + scrollElement.scrollTop - dragState.offsetY
+      );
+
+      setNodePositions((current) => ({
+        ...current,
+        [dragState.nodeId]: {
+          x: nextX,
+          y: nextY
+        }
+      }));
+    }
+
+    function handlePointerUp(): void {
+      setDragState(null);
+    }
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [dragState, graphBundle]);
+
   if (!graphBundle?.graph.unlockedAtEnding) {
     return null;
   }
 
-  const orderedNodes = [...graphBundle.nodes].sort((left, right) =>
-    left.createdAt.localeCompare(right.createdAt)
+  const positionedNodes = orderedNodes.map((node) => ({
+    node,
+    x: nodePositions[node.id]?.x ?? PADDING_X,
+    y: nodePositions[node.id]?.y ?? PADDING_Y
+  }));
+
+  const maxX = positionedNodes.reduce(
+    (value, item) => Math.max(value, item.x + NODE_WIDTH),
+    PADDING_X + NODE_WIDTH
   );
-  const nodesById = new Map(orderedNodes.map((node) => [node.id, node] as const));
-  const edgesByTarget = new Map(graphBundle.edges.map((edge) => [edge.toNodeId, edge] as const));
-  const depthCache = new Map<string, number>();
+  const maxY = positionedNodes.reduce(
+    (value, item) => Math.max(value, item.y + NODE_HEIGHT),
+    PADDING_Y + NODE_HEIGHT
+  );
+  const viewWidth = maxX + PADDING_X;
+  const viewHeight = maxY + PADDING_Y;
 
-  const positionedNodes = orderedNodes.map((node, rowIndex) => {
-    const depth = deriveDepth(node, nodesById, depthCache);
-    return {
-      node,
-      x: PADDING_X + depth * (NODE_WIDTH + COLUMN_GAP),
-      y: PADDING_Y + rowIndex * (NODE_HEIGHT + ROW_GAP)
-    };
-  });
+  function handleNodePointerDown(
+    nodeId: string,
+    event: ReactPointerEvent<HTMLElement>
+  ): void {
+    if ((event.target as HTMLElement).closest("button")) {
+      return;
+    }
 
-  const maxDepth = positionedNodes.reduce((value, item) => Math.max(value, item.x), PADDING_X);
-  const maxY = positionedNodes.reduce((value, item) => Math.max(value, item.y), PADDING_Y);
-  const viewWidth = maxDepth + NODE_WIDTH + PADDING_X;
-  const viewHeight = maxY + NODE_HEIGHT + PADDING_Y;
+    const currentPosition = nodePositions[nodeId];
+    if (!currentPosition) {
+      return;
+    }
+
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) {
+      return;
+    }
+
+    const rect = scrollElement.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left + scrollElement.scrollLeft;
+    const pointerY = event.clientY - rect.top + scrollElement.scrollTop;
+
+    setDragState({
+      nodeId,
+      offsetX: pointerX - currentPosition.x,
+      offsetY: pointerY - currentPosition.y
+    });
+  }
 
   return (
     <section className="summary-card playthrough-panel">
@@ -121,7 +339,7 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
             已在结局后解锁，共 {graphBundle.graph.nodeCount} 个节点
           </div>
           <div className="summary-text">
-            普通剧情分支和结局后的特殊分支会使用不同色系。当前节点会被高亮。
+            现在可以直接拖动节点重排视图，连线会实时跟随更新。
           </div>
         </div>
         <div className="flag-list">
@@ -131,7 +349,7 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
         </div>
       </div>
 
-      <div className="playthrough-graph-scroll">
+      <div className="playthrough-graph-scroll" ref={scrollRef}>
         <div
           className="playthrough-graph-canvas"
           style={{
@@ -175,8 +393,9 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
 
             return (
               <article
-                className={`playthrough-node ${isCurrent ? "playthrough-node-current" : ""}`}
+                className={`playthrough-node ${isCurrent ? "playthrough-node-current" : ""} ${dragState?.nodeId === node.id ? "playthrough-node-dragging" : ""}`}
                 key={node.id}
+                onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 style={{
                   left: `${x}px`,
                   top: `${y}px`,

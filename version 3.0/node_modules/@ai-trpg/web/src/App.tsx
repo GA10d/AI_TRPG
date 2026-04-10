@@ -144,6 +144,49 @@ export function App() {
     persistStoredSnapshot(nextSnapshot);
   }
 
+  async function submitPlayerTurn(
+    currentSnapshot: SessionSnapshot,
+    playerInput: string,
+    options?: {
+      pendingMessage?: string;
+      successMessage?: string;
+      endingSuccessMessage?: string;
+    }
+  ): Promise<void> {
+    setIsSubmittingTurn(true);
+    setStatus({
+      message: options?.pendingMessage ?? "正在提交本轮行动...",
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await submitTurn(currentSnapshot.session.id, {
+        playerInput
+      });
+      commitSnapshot(nextSnapshot);
+      captureTurn(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        playerInput
+      );
+      setTurnInput("");
+      setStatus({
+        message:
+          nextSnapshot.session.status === "ended"
+            ? options?.endingSuccessMessage ?? "本轮处理完成，并已进入结局。"
+            : options?.successMessage ?? "本轮处理完成。",
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsSubmittingTurn(false);
+    }
+  }
+
   async function handleCreateSession(
     event: React.FormEvent<HTMLFormElement>
   ): Promise<void> {
@@ -229,38 +272,31 @@ export function App() {
       return;
     }
 
-    setIsSubmittingTurn(true);
-    setStatus({
-      message: "正在提交本轮行动...",
-      tone: "neutral"
-    });
+    await submitPlayerTurn(snapshot, trimmedInput);
+  }
 
-    try {
-      const nextSnapshot = await submitTurn(snapshot.session.id, {
-        playerInput: trimmedInput
-      });
-      commitSnapshot(nextSnapshot);
-      captureTurn(
-        nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
-        trimmedInput
-      );
-      setTurnInput("");
+  async function handleQuickEndingTest(): Promise<void> {
+    if (!snapshot) {
       setStatus({
-        message:
-          nextSnapshot.session.status === "ended"
-            ? "本轮处理完成，并已进入结局。"
-            : "本轮处理完成。",
-        tone: "neutral"
-      });
-    } catch (error) {
-      setStatus({
-        message: error instanceof Error ? error.message : String(error),
+        message: "请先开始游戏。",
         tone: "error"
       });
-    } finally {
-      setIsSubmittingTurn(false);
+      return;
     }
+
+    if (snapshot.session.modelAccessMode !== "mock") {
+      setStatus({
+        message: "快速结局测试按钮只在 mock 模式下可用。",
+        tone: "error"
+      });
+      return;
+    }
+
+    await submitPlayerTurn(snapshot, "我掏出手枪自杀", {
+      pendingMessage: "正在触发 mock 结局测试...",
+      successMessage: "mock 结局测试已提交。",
+      endingSuccessMessage: "mock 结局测试成功，当前会话已进入结局。"
+    });
   }
 
   async function handleSaveGame(): Promise<void> {
@@ -644,6 +680,7 @@ export function App() {
           isResumingBranch={isResumingBranch}
           onBack={() => setView("menu")}
           onContinueFromNode={handleContinueFromNode}
+          onQuickEndingTest={handleQuickEndingTest}
           onSaveGame={handleSaveGame}
           onTurnInputChange={setTurnInput}
           onSubmitTurn={handleSubmitTurn}
