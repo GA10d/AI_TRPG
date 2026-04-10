@@ -489,11 +489,13 @@ img {
 
 .story-detail-panel {
   min-height: 100%;
+  display: grid;
+  gap: 16px;
 }
 
 .story-visual-card,
 .setup-preview-visual {
-  min-height: 280px;
+  min-height: 0;
   overflow: hidden;
   border-radius: 22px;
   background:
@@ -502,20 +504,38 @@ img {
   border: 1px solid rgba(95, 33, 18, 0.12);
 }
 
-.story-cover-image {
+.story-visual-card {
+  position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 280px;
-  object-fit: cover;
+  justify-self: stretch;
+  height: clamp(220px, 26vw, 320px);
+  max-height: none;
+  aspect-ratio: auto;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.story-cover-expand-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  background: rgba(255, 251, 247, 0.92);
 }
 
 .story-cover-placeholder {
-  min-height: 280px;
+  min-height: 100%;
   padding: 24px;
   display: grid;
   align-content: end;
   gap: 12px;
   color: #f8efe9;
+}
+
+.story-cover-overlay {
+  min-height: 100%;
+  background: linear-gradient(180deg, rgba(28, 13, 10, 0.12) 0%, rgba(28, 13, 10, 0.82) 100%);
 }
 
 .story-cover-placeholder p {
@@ -524,13 +544,85 @@ img {
   color: rgba(248, 239, 233, 0.84);
 }
 
-.story-detail-copy {
+.story-cover-fallback-copy {
+  font-size: 13px;
+  color: rgba(248, 239, 233, 0.72);
+}
+
+.story-cover-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 9, 7, 0.86);
+  backdrop-filter: blur(6px);
+}
+
+.story-cover-lightbox-panel {
+  position: relative;
+  width: min(92vw, 1400px);
+  height: min(88vh, 900px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border-radius: 24px;
+  background: rgba(31, 17, 12, 0.92);
+  border: 1px solid rgba(255, 245, 236, 0.12);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.32);
+}
+
+.story-cover-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+.story-cover-lightbox-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 16px;
+}
+
+.story-detail-block {
   display: grid;
   gap: 12px;
 }
 
-.story-detail-copy p {
+.story-markdown-block {
+  display: grid;
+  gap: 10px;
+  color: var(--text);
+  line-height: 1.72;
+}
+
+.story-markdown-block h3,
+.story-markdown-block h4,
+.story-markdown-block p,
+.story-markdown-block ul {
   margin: 0;
+}
+
+.story-markdown-block h3 {
+  font-size: 18px;
+}
+
+.story-markdown-block h4 {
+  font-size: 15px;
+}
+
+.story-markdown-block ul {
+  padding-left: 18px;
+}
+
+.story-detail-meta-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .story-detail-footer {
@@ -913,13 +1005,58 @@ pre {
 }
 
 .playthrough-panel {
+  position: relative;
   display: grid;
   gap: 16px;
 }
 
+.playthrough-panel-tools {
+  display: contents;
+}
+
+.playthrough-expand-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 92px;
+  justify-content: center;
+}
+
+.playthrough-expand-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.playthrough-panel .record-header {
+  padding-right: 120px;
+}
+
+.playthrough-panel .flag-list {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2;
+  max-width: min(40%, 320px);
+  justify-content: flex-end;
+}
+
 .playthrough-graph-scroll {
   overflow: auto;
-  padding-bottom: 4px;
+  padding-bottom: 56px;
+}
+
+.playthrough-panel-collapsed .playthrough-graph-scroll {
+  min-height: 280px;
+  max-height: 280px;
+}
+
+.playthrough-panel-expanded .playthrough-graph-scroll {
+  min-height: min(68vh, 720px);
+  max-height: min(68vh, 720px);
 }
 
 .playthrough-graph-canvas {
@@ -1062,6 +1199,10 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .story-detail-meta-row {
+    grid-template-columns: 1fr;
+  }
+
   .menu-grid {
     grid-template-columns: 1fr;
   }
@@ -1070,6 +1211,30 @@ pre {
   .menu-panel-right,
   .menu-splitter {
     grid-column: auto;
+  }
+
+  .playthrough-panel-tools {
+    display: block;
+  }
+
+  .playthrough-panel-collapsed .playthrough-graph-scroll,
+  .playthrough-panel-expanded .playthrough-graph-scroll {
+    min-height: 240px;
+    max-height: 240px;
+  }
+
+  .playthrough-expand-button,
+  .playthrough-panel .flag-list {
+    position: static;
+    max-width: none;
+  }
+
+  .playthrough-panel .record-header {
+    padding-right: 0;
+  }
+
+  .playthrough-graph-scroll {
+    padding-bottom: 4px;
   }
 
   .menu-splitter {

@@ -37,6 +37,7 @@ export type StoryManifest = {
     max: number;
   };
   supportsModes: string[];
+  coverQuote?: Record<string, string>;
   recommendedLength: string;
   recommendedPacing: string;
   gmStyle: string;
@@ -88,6 +89,7 @@ export type ContentCatalogStoryEntry = {
   directoryName: string;
   title: string;
   availableLocales: LocaleCode[];
+  coverQuote: string | null;
   intro: string | null;
   tags: string[];
   supportsModes: string[];

@@ -157,6 +157,7 @@ function validateStoryManifest(raw: unknown, manifestPath: string): StoryManifes
       max: assertNumber(playerCountObject.max, "playerCount.max")
     },
     supportsModes: assertStringArray(data.supportsModes, "supportsModes"),
+    coverQuote: data.coverQuote ? assertStringRecord(data.coverQuote, "coverQuote") : undefined,
     recommendedLength: assertString(data.recommendedLength, "recommendedLength"),
     recommendedPacing: assertString(data.recommendedPacing, "recommendedPacing"),
     gmStyle: assertString(data.gmStyle, "gmStyle"),
@@ -398,6 +399,8 @@ export async function loadContentCatalog(contentRoot: string): Promise<ContentCa
           directoryName: storyItem.name,
           title: storyPackage.manifest.title[storyPackage.manifest.defaultLocale] ?? storyItem.name,
           availableLocales: storyPackage.manifest.availableLocales,
+          coverQuote:
+            storyPackage.manifest.coverQuote?.[storyPackage.manifest.defaultLocale] ?? null,
           intro: normalizeCatalogText(storyPackage.intro?.content),
           tags: storyPackage.manifest.tags,
           supportsModes: storyPackage.manifest.supportsModes,

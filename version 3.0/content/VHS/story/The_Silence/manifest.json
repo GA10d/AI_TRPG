@@ -17,6 +17,9 @@
   "supportsModes": [
     "single_player"
   ],
+  "coverQuote": {
+    "zh-CN": "让真相被放映，还是让沉默再赢一次。"
+  },
   "recommendedLength": "medium",
   "recommendedPacing": "medium",
   "gmStyle": "strong-guidance",

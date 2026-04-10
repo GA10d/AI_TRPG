@@ -176,6 +176,7 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
   const [dragState, setDragState] = useState<DragState>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const orderedNodes = useMemo(() => {
     if (!graphBundle?.graph.unlockedAtEnding) {
@@ -331,7 +332,7 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
   }
 
   return (
-    <section className="summary-card playthrough-panel">
+    <section className={`summary-card playthrough-panel ${isExpanded ? "playthrough-panel-expanded" : "playthrough-panel-collapsed"}`}>
       <div className="record-header">
         <div>
           <div className="meta-label">分支回溯树</div>
@@ -342,11 +343,26 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
             现在可以直接拖动节点重排视图，连线会实时跟随更新。
           </div>
         </div>
-        <div className="flag-list">
+        <div className="playthrough-panel-tools">
+          <button
+            aria-label={isExpanded ? "收起分支回溯树" : "放大分支回溯树"}
+            className="ghost-button playthrough-expand-button"
+            onClick={() => setIsExpanded((current) => !current)}
+            type="button"
+          >
+            <span aria-hidden="true" className="playthrough-expand-icon">
+              {isExpanded ? "⊟" : "⊞"}
+            </span>
+            <span>{isExpanded ? "收起" : "放大"}</span>
+          </button>
+
+          <div className="flag-list">
           <span className="badge">主线 / 棕红</span>
           <span className="badge">分支 / 青绿</span>
           <span className="badge">结局后 / 紫色</span>
         </div>
+      </div>
+
       </div>
 
       <div className="playthrough-graph-scroll" ref={scrollRef}>

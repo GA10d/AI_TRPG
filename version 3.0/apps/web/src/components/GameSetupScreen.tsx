@@ -386,7 +386,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     selectedStory?.intro ?? selectedRule?.ruleIntro ?? null,
     5
   );
-  const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
+  const previewHeadline =
+    selectedStory?.coverQuote?.trim() ||
+    clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120);
 
   const leftPaneStyle: CSSProperties = {
     width: layout.leftWidth,
@@ -651,7 +653,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             <div className="setup-pane-scroll">
               <div className="setup-preview-card">
                 <div className="setup-preview-visual">
-                  {coverAsset ? (
+                  {false ? (
                     <img
                       alt={`${selectedStory?.title ?? "剧本"}封面`}
                       className="story-cover-image"
@@ -661,7 +663,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     <div className="story-cover-placeholder">
                       <div className="eyebrow">Preview</div>
                       <h2>{selectedStory?.title ?? "未选择剧本"}</h2>
-                      <p>{clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120)}</p>
+                      <p>{previewHeadline}</p>
                     </div>
                   )}
                 </div>

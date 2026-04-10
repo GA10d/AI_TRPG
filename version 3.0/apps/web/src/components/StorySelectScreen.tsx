@@ -13,6 +13,7 @@ import type {
   ContentCatalogStoryEntry
 } from "../../../../packages/shared-types/src/index.ts";
 import { clipText, renderJoinedList } from "../ui.ts";
+import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type StorySelectScreenProps = {
@@ -55,6 +56,14 @@ const RULE_COLLAPSED_WIDTH = 52;
 const STORY_COLLAPSED_WIDTH = 52;
 const SPLITTER_WIDTH = 14;
 const HOVER_DELAY_MS = 1000;
+const DEFAULT_RULE_INTRO =
+  "这条规则暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你可以继续选择剧本并进入设置页，后续也可以再补完整的规则简介。";
+const DEFAULT_STORY_INTRO =
+  "这个剧本暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你仍然可以进入游戏，后续再补完整简介和演出文本。";
+const DEFAULT_COVER_COPY =
+  "当前剧本暂时没有提供 `cover.png`，这里先使用默认封面区。后续只要在剧本目录放入 `cover.png`、`cover.jpg` 或 `cover.webp`，这里就会自动读取。";
+const DEFAULT_COVER_QUOTE =
+  "当前剧本还没有单独提供封面短句，所以这里先回退到剧本简介摘要。";
 
 const DEFAULT_LAYOUT: StoryLayoutState = {
   ruleWidth: 320,
@@ -192,6 +201,30 @@ function buildStoryHoverPayload(story: ContentCatalogStoryEntry): HoverPreviewPa
   };
 }
 
+function pickRuleIntroText(rule: ContentCatalogEntry | null): string {
+  const intro = rule?.ruleIntro?.trim();
+  return intro && intro.length > 0 ? intro : DEFAULT_RULE_INTRO;
+}
+
+function pickStoryIntroText(story: ContentCatalogStoryEntry | null): string {
+  const intro = story?.intro?.trim();
+  return intro && intro.length > 0 ? intro : DEFAULT_STORY_INTRO;
+}
+
+function pickStoryCoverQuote(story: ContentCatalogStoryEntry | null): string {
+  const quote = story?.coverQuote?.trim();
+  if (quote && quote.length > 0) {
+    return quote;
+  }
+
+  const intro = story?.intro?.trim();
+  if (intro && intro.length > 0) {
+    return clipText(intro, 120);
+  }
+
+  return DEFAULT_COVER_QUOTE;
+}
+
 export function StorySelectScreen(props: StorySelectScreenProps) {
   const {
     bootstrap,
@@ -210,6 +243,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   const [layout, setLayout] = useState<StoryLayoutState>(() => loadStoredLayout());
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreviewState>(null);
+  const [isCoverExpanded, setIsCoverExpanded] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -312,6 +346,10 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
     };
   }, []);
 
+  useEffect(() => {
+    setIsCoverExpanded(false);
+  }, [ruleDirectoryName, storyDirectoryName]);
+
   function handleSplitterPointerDown(
     target: DragTarget,
     event: ReactPointerEvent<HTMLButtonElement>
@@ -385,6 +423,17 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   const selectedStory =
     stories.find((item) => item.directoryName === storyDirectoryName) ?? stories[0] ?? null;
   const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
+  const ruleIntroText = pickRuleIntroText(selectedRule);
+  const storyIntroText = pickStoryIntroText(selectedStory);
+  const storyCoverQuote = pickStoryCoverQuote(selectedStory);
+  const visualCardStyle: CSSProperties | undefined = coverAsset
+    ? {
+        backgroundImage: [
+          "linear-gradient(180deg, rgba(24, 11, 8, 0.16) 0%, rgba(24, 11, 8, 0.78) 100%)",
+          `url("${coverAsset.url}")`
+        ].join(", ")
+      }
+    : undefined;
 
   const rulePaneStyle: CSSProperties = {
     width: layout.ruleWidth,
@@ -582,33 +631,41 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
         >
           {selectedRule && selectedStory ? (
             <div className="story-detail-panel">
-              <div className="story-visual-card">
+              <div
+                className={`story-visual-card ${coverAsset ? "story-visual-card-covered" : "story-visual-card-fallback"}`}
+                style={visualCardStyle}
+              >
                 {coverAsset ? (
-                  <img
-                    alt={`${selectedStory.title} 封面`}
-                    className="story-cover-image"
-                    src={coverAsset.url}
-                  />
-                ) : (
-                  <div className="story-cover-placeholder">
-                    <div className="eyebrow">Story Preview</div>
-                    <h2>{selectedStory.title}</h2>
-                    <p>{clipText(selectedStory.intro, 120)}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="story-detail-copy">
-                <div className="eyebrow">Story Detail</div>
-                <h2>{selectedStory.title}</h2>
-                <p className="summary-text">{clipText(selectedStory.intro, 260)}</p>
-              </div>
-
-              <div className="story-detail-matrix">
-                <div className="summary-card">
-                  <div className="meta-label">规则简介</div>
-                  <div className="summary-text">{clipText(selectedRule.ruleIntro, 180)}</div>
+                  <button
+                    aria-label={isCoverExpanded ? "收起大图" : "查看大图"}
+                    className="ghost-button story-cover-expand-button"
+                    onClick={() => setIsCoverExpanded(true)}
+                    type="button"
+                  >
+                    查看大图
+                  </button>
+                ) : null}
+                <div className="story-cover-placeholder story-cover-overlay">
+                  <div className="eyebrow">Story Preview</div>
+                  <h2>{selectedStory.title}</h2>
+                  <p>{storyCoverQuote}</p>
+                  {!coverAsset ? (
+                    <p className="story-cover-fallback-copy">{DEFAULT_COVER_COPY}</p>
+                  ) : null}
                 </div>
+              </div>
+
+              <div className="summary-card story-detail-block">
+                <div className="meta-label">剧本简介</div>
+                <MarkdownBlock className="story-markdown-block" content={storyIntroText} />
+              </div>
+
+              <div className="summary-card story-detail-block">
+                <div className="meta-label">规则简介</div>
+                <MarkdownBlock className="story-markdown-block" content={ruleIntroText} />
+              </div>
+
+              <div className="story-detail-meta-row">
                 <div className="summary-card">
                   <div className="meta-label">标签</div>
                   <div className="summary-text">{renderJoinedList(selectedStory.tags)}</div>
@@ -617,12 +674,6 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                   <div className="meta-label">节奏与时长</div>
                   <div className="summary-text">
                     {selectedStory.recommendedPacing} / {selectedStory.recommendedLength}
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="meta-label">支持模式</div>
-                  <div className="summary-text">
-                    {renderJoinedList(selectedStory.supportsModes)}
                   </div>
                 </div>
               </div>
@@ -649,6 +700,34 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
           <div className="story-hover-preview-title">{hoverPreview.payload.title}</div>
           <div className="story-hover-preview-meta">{hoverPreview.payload.meta}</div>
           <div className="story-hover-preview-body">{hoverPreview.payload.body}</div>
+        </div>
+      ) : null}
+
+      {coverAsset && isCoverExpanded ? (
+        <div
+          aria-label="剧本封面大图预览"
+          className="story-cover-lightbox"
+          onClick={() => setIsCoverExpanded(false)}
+          role="dialog"
+        >
+          <div
+            className="story-cover-lightbox-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              aria-label="关闭大图预览"
+              className="ghost-button story-cover-lightbox-close"
+              onClick={() => setIsCoverExpanded(false)}
+              type="button"
+            >
+              收起图片
+            </button>
+            <img
+              alt={`${selectedStory.title} 封面大图`}
+              className="story-cover-lightbox-image"
+              src={coverAsset.url}
+            />
+          </div>
         </div>
       ) : null}
     </section>
