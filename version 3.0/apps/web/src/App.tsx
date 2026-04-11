@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import type {
   AiGenerationMetadata,
+  CharacterConceptAssistMode,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   SaveBundle,
@@ -9,6 +10,7 @@ import type {
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 import {
+  assistCharacterConcept,
   createSave,
   createSession,
   fetchSession,
@@ -118,6 +120,9 @@ export function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
+  const [characterConceptAssistLoading, setCharacterConceptAssistLoading] = useState(false);
+  const [characterConceptAssistMode, setCharacterConceptAssistMode] =
+    useState<CharacterConceptAssistMode>("generate");
   const [openingPreviewText, setOpeningPreviewText] = useState("");
   const [openingPreviewProvider, setOpeningPreviewProvider] = useState<string | null>(null);
   const [openingPreviewMeta, setOpeningPreviewMeta] = useState<AiGenerationMetadata | null>(null);
@@ -427,6 +432,7 @@ export function App() {
         playMode,
         gmArchitecture,
         modelAccessMode,
+        characterConcept,
         modelProfileId,
         runtimeModelConfig,
         debugEnabled,
@@ -753,6 +759,66 @@ export function App() {
     setOpeningPreviewRegenerateNonce((current) => current + 1);
   }
 
+  async function handleAssistCharacterConcept(): Promise<void> {
+    const openingText = openingPreviewText.trim();
+    const trimmedCharacterConcept = characterConcept.trim();
+    const nextMode: CharacterConceptAssistMode =
+      trimmedCharacterConcept.length > 0 ? "complete" : "generate";
+
+    if (!openingText) {
+      setStatus({
+        message: "请先等开场白生成完成，再使用 AI 生成或补全角色概念。",
+        tone: "error"
+      });
+      return;
+    }
+
+    setCharacterConceptAssistLoading(true);
+    setCharacterConceptAssistMode(nextMode);
+    setStatus({
+      message:
+        nextMode === "generate"
+          ? "AI 正在根据开场白生成角色概念..."
+          : "AI 正在根据开场白补全角色概念...",
+      tone: "neutral"
+    });
+
+    try {
+      const result = await assistCharacterConcept({
+        ruleDirectoryName,
+        storyDirectoryName,
+        locale,
+        playMode,
+        gmArchitecture,
+        modelAccessMode,
+        modelProfileId,
+        runtimeModelConfig,
+        debugEnabled,
+        promptDebugEnabled: false,
+        logViewMode,
+        mode: nextMode,
+        openingText,
+        currentText: trimmedCharacterConcept
+      });
+
+      setCharacterConcept(result.text);
+      setStatus({
+        message:
+          nextMode === "generate"
+            ? "AI 已生成角色概念，你可以继续手动修改。"
+            : "AI 已补全角色概念，你可以继续手动修改。",
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setCharacterConceptAssistLoading(false);
+    }
+  }
+
   function handleEnterGameSetup(): void {
     const selectedRule =
       bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
@@ -803,6 +869,8 @@ export function App() {
           logViewMode={logViewMode}
           openingPreviewDeliveryMode={openingPreviewDeliveryMode}
           characterConcept={characterConcept}
+          characterConceptAssistLoading={characterConceptAssistLoading}
+          characterConceptAssistMode={characterConceptAssistMode}
           isCreating={isCreating}
           openingPreviewText={openingPreviewText}
           openingPreviewProvider={openingPreviewProvider}
@@ -822,6 +890,7 @@ export function App() {
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
           onRegenerateOpeningPreview={handleRegenerateOpeningPreview}
+          onAssistCharacterConcept={handleAssistCharacterConcept}
           onOpeningPreviewDeliveryModeChange={setOpeningPreviewDeliveryMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}

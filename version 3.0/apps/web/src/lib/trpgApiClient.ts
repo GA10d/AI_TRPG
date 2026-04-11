@@ -1,5 +1,7 @@
 import type {
   BootstrapResponse,
+  CharacterConceptAssistRequest,
+  CharacterConceptAssistResponse,
   CreateSaveResponse,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
@@ -24,22 +26,36 @@ type OpeningPreviewStreamEvent =
     };
 
 async function parseJson<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T & {
-    message?: string;
-  };
+  const responseText = await response.text();
+  let data: (T & { message?: string }) | null = null;
+
+  if (responseText.trim()) {
+    try {
+      data = JSON.parse(responseText) as T & {
+        message?: string;
+      };
+    } catch {
+      if (!response.ok) {
+        throw new Error(responseText.trim());
+      }
+
+      throw new Error("服务端返回了非 JSON 响应。");
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data.message ?? "请求失败");
+    throw new Error(data?.message ?? (responseText.trim() || "请求失败"));
+  }
+
+  if (!data) {
+    throw new Error("服务端返回了空响应。");
   }
 
   return data;
 }
 
 function normalizeNetworkError(error: unknown): Error {
-  if (
-    error instanceof DOMException &&
-    error.name === "AbortError"
-  ) {
+  if (error instanceof DOMException && error.name === "AbortError") {
     return error;
   }
 
@@ -196,6 +212,30 @@ export async function fetchSession(sessionId: string): Promise<SessionSnapshot> 
     const response = await fetch(`/api/sessions/${sessionId}`);
     return parseJson<SessionSnapshot>(response);
   } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function assistCharacterConcept(
+  payload: CharacterConceptAssistRequest
+): Promise<CharacterConceptAssistResponse> {
+  try {
+    const response = await fetch("/api/character-concept/assist", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<CharacterConceptAssistResponse>(response);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Not Found") {
+      throw new Error(
+        "角色概念 AI 接口当前不可用。现在很可能仍连接着旧的 version 3.0 服务端进程，请重启服务端后再试。"
+      );
+    }
+
     throw normalizeNetworkError(error);
   }
 }

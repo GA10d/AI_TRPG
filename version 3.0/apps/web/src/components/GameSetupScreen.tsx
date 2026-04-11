@@ -9,6 +9,7 @@
 import type {
   AiGenerationMetadata,
   BootstrapResponse,
+  CharacterConceptAssistMode,
   CreateSessionRequest,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
@@ -45,6 +46,8 @@ type GameSetupScreenProps = {
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
   markdownFontSize: MarkdownFontSizePreset;
   characterConcept: string;
+  characterConceptAssistLoading: boolean;
+  characterConceptAssistMode: CharacterConceptAssistMode;
   isCreating: boolean;
   openingPreviewText: string;
   openingPreviewProvider: string | null;
@@ -56,6 +59,7 @@ type GameSetupScreenProps = {
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
   onRegenerateOpeningPreview: () => void;
+  onAssistCharacterConcept: () => Promise<void>;
   onLocaleChange: (value: CreateSessionRequest["locale"]) => void;
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
@@ -256,6 +260,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     openingPreviewDeliveryMode,
     markdownFontSize,
     characterConcept,
+    characterConceptAssistLoading,
+    characterConceptAssistMode,
     isCreating,
     openingPreviewText,
     openingPreviewProvider,
@@ -267,6 +273,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onClose,
     onSubmit,
     onRegenerateOpeningPreview,
+    onAssistCharacterConcept,
     onLocaleChange,
     onPlayModeChange,
     onGmArchitectureChange,
@@ -428,6 +435,17 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120);
   const resolvedModelName =
     runtimeModelConfig.model?.trim() || selectedProfile?.baseModel || "未配置";
+  const trimmedCharacterConcept = characterConcept.trim();
+  const characterAssistButtonLabel =
+    trimmedCharacterConcept.length > 0 ? "AI 补全" : "AI 生成";
+  const characterAssistBusyLabel =
+    characterConceptAssistMode === "complete" ? "AI 补全中..." : "AI 生成中...";
+  const canAssistCharacterConcept =
+    !characterConceptAssistLoading &&
+    !isCreating &&
+    !openingPreviewLoading &&
+    hasPreviewText &&
+    profileReady;
 
   const leftPaneStyle: CSSProperties = {
     width: layout.leftWidth,
@@ -806,15 +824,34 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="eyebrow">Character Setup</div>
                 <h2>你是谁？</h2>
                 <p className="summary-text">
-                  这里先保留玩家角色概念输入，后续再接 AI 补全和角色卡结构化输出。
+                  可以先自己写，也可以基于开场白让 AI 生成或补全一版角色概念。
                 </p>
               </div>
-              <textarea
-                className="character-setup-input"
-                placeholder="例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。"
-                value={characterConcept}
-                onChange={(event) => onCharacterConceptChange(event.target.value)}
-              />
+              <div
+                className={`character-setup-input-shell ${
+                  characterConceptAssistLoading
+                    ? "character-setup-input-shell-loading"
+                    : ""
+                }`}
+              >
+                <textarea
+                  className="character-setup-input"
+                  disabled={characterConceptAssistLoading}
+                  placeholder="例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。"
+                  value={characterConcept}
+                  onChange={(event) => onCharacterConceptChange(event.target.value)}
+                />
+                {characterConceptAssistLoading ? (
+                  <div className="character-setup-loading-overlay">
+                    <div className="character-setup-loading-bar" />
+                    <div className="character-setup-loading-copy">
+                      {characterConceptAssistMode === "complete"
+                        ? "AI 正在补全角色概念..."
+                        : "AI 正在生成角色概念..."}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </section>
 
@@ -884,12 +921,24 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 </div>
 
                 <div className="setup-pane-footer setup-pane-actions-footer">
-                  <button className="ghost-button" disabled type="button">
-                    AI 补全（待开发）
+                  <button
+                    className="ghost-button"
+                    disabled={!canAssistCharacterConcept}
+                    onClick={() => void onAssistCharacterConcept()}
+                    type="button"
+                  >
+                    {characterConceptAssistLoading
+                      ? characterAssistBusyLabel
+                      : characterAssistButtonLabel}
                   </button>
                   <button
                     className="primary-button"
-                    disabled={isCreating || !profileReady || !selectedStory}
+                    disabled={
+                      isCreating ||
+                      characterConceptAssistLoading ||
+                      !profileReady ||
+                      !selectedStory
+                    }
                     type="submit"
                   >
                     {isCreating ? "正在创建会话..." : "开始游戏"}

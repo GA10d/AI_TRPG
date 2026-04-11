@@ -13,6 +13,8 @@ import type {
   OpeningGenerationInput,
   OpeningGenerationOutput,
   OpeningGenerationStreamOptions,
+  PromptedTextGenerationInput,
+  PromptedTextGenerationOutput,
   TurnNarrationInput,
   TurnNarrationOutput
 } from "./types.ts";
@@ -227,6 +229,19 @@ function buildTurnMessages(input: TurnNarrationInput): ChatMessage[] {
         "Task:",
         "Write the next GM narration for the player. Keep it concise, specific, and actionable."
       ].join("\n")
+    }
+  ];
+}
+
+function buildPromptedTextMessages(input: PromptedTextGenerationInput): ChatMessage[] {
+  return [
+    {
+      role: "system",
+      content: input.systemPrompt
+    },
+    {
+      role: "user",
+      content: input.userPrompt
     }
   ];
 }
@@ -645,10 +660,18 @@ async function uploadOpenAiUserFile(
     body: formData
   });
 
-  const payload = (await response.json()) as { id?: string; error?: { message?: string } };
+  const responseText = await readResponseText(response);
+  let payload: { id?: string; error?: { message?: string } } = {};
+  try {
+    payload = responseText ? (JSON.parse(responseText) as typeof payload) : {};
+  } catch {
+    payload = {};
+  }
+
   if (!response.ok || !payload.id) {
     throw new Error(
-      payload.error?.message ?? `OpenAI file upload failed with HTTP ${response.status}.`
+      payload.error?.message ??
+        (responseText || `OpenAI file upload failed with HTTP ${response.status}.`)
     );
   }
 
@@ -743,6 +766,105 @@ async function callOpenAiResponsesWithFiles(
   }
 }
 
+function buildInlineOpenAiFileData(content: string, mimeType: string = "text/plain"): string {
+  return `data:${mimeType};base64,${Buffer.from(content, "utf8").toString("base64")}`;
+}
+
+function buildOpenAiOpeningFileContents(input: OpeningGenerationInput): {
+  ruleFileName: string;
+  ruleFileContent: string;
+  storyFileName: string;
+  storyFileContent: string;
+} {
+  return {
+    ruleFileName: "rule.txt",
+    ruleFileContent: [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n"),
+    storyFileName: "story.txt",
+    storyFileContent: [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+  };
+}
+
+function shouldFallbackToInlineOpenAiFileData(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("api.files.write") ||
+    normalizedMessage.includes("missing scopes") ||
+    normalizedMessage.includes("insufficient permissions")
+  );
+}
+
+async function callOpenAiResponsesWithInlineFiles(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  openingSystemPrompt: string
+): Promise<ChatCompletionResult> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), config.timeoutMs);
+  const startedAt = Date.now();
+  const { ruleFileName, ruleFileContent, storyFileName, storyFileContent } =
+    buildOpenAiOpeningFileContents(input);
+
+  try {
+    const payload: Record<string, unknown> = {
+      model: config.model,
+      instructions: openingSystemPrompt,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildOpeningTaskText(input)
+            },
+            {
+              type: "input_file",
+              filename: ruleFileName,
+              file_data: buildInlineOpenAiFileData(ruleFileContent)
+            },
+            {
+              type: "input_file",
+              filename: storyFileName,
+              file_data: buildInlineOpenAiFileData(storyFileContent)
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${config.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    const data = (await response.json()) as ResponsesApiResponse;
+    if (!response.ok) {
+      throw new Error(
+        data.error?.message ?? `OpenAI responses request failed with HTTP ${response.status}.`
+      );
+    }
+
+    const text = normalizeResponsesOutput(data);
+    if (!text) {
+      throw new Error("OpenAI responses request returned an empty opening preview.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: buildOpenAiUsage(data)
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 async function callOpenAiResponsesWithFilesStream(
   config: ServerProxyConfig,
   input: OpeningGenerationInput,
@@ -785,6 +907,119 @@ async function callOpenAiResponsesWithFilesStream(
             {
               type: "input_file",
               file_id: storyFileId
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${config.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const responseText = await readResponseText(response);
+      throw new Error(
+        responseText || `OpenAI responses stream failed with HTTP ${response.status}.`
+      );
+    }
+
+    for await (const event of readSseEvents(response, options?.signal)) {
+      if (event.data === "[DONE]") {
+        break;
+      }
+
+      const data = JSON.parse(event.data) as ResponsesApiResponse;
+      if (data.error?.message) {
+        throw new Error(data.error.message);
+      }
+
+      if (data.type === "response.output_text.delta" && typeof data.delta === "string") {
+        text += data.delta;
+        await options?.onTextDelta?.(data.delta);
+      }
+
+      if (data.response?.usage) {
+        latestUsage = buildOpenAiUsage({
+          usage: data.response.usage
+        } as ResponsesApiResponse);
+      }
+
+      if (
+        data.type === "response.completed" &&
+        !text &&
+        typeof data.response?.output_text === "string" &&
+        data.response.output_text.trim().length > 0
+      ) {
+        text = data.response.output_text.trim();
+        await options?.onTextDelta?.(text);
+      }
+    }
+
+    if (!text) {
+      throw new Error("OpenAI responses stream returned an empty opening preview.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: latestUsage
+    };
+  } finally {
+    cleanup();
+  }
+}
+
+async function callOpenAiResponsesWithInlineFilesStream(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  openingSystemPrompt: string,
+  options?: StreamTextOptions
+): Promise<ChatCompletionResult> {
+  const startedAt = Date.now();
+  const { controller, cleanup } = createCombinedAbortController(
+    config.timeoutMs,
+    options?.signal
+  );
+  const { ruleFileName, ruleFileContent, storyFileName, storyFileContent } =
+    buildOpenAiOpeningFileContents(input);
+  let latestUsage: AiGenerationUsage = {
+    promptTokens: null,
+    completionTokens: null,
+    totalTokens: null,
+    promptCacheHitTokens: null,
+    promptCacheMissTokens: null
+  };
+  let text = "";
+
+  try {
+    const payload: Record<string, unknown> = {
+      model: config.model,
+      instructions: openingSystemPrompt,
+      stream: true,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildOpeningTaskText(input)
+            },
+            {
+              type: "input_file",
+              filename: ruleFileName,
+              file_data: buildInlineOpenAiFileData(ruleFileContent)
+            },
+            {
+              type: "input_file",
+              filename: storyFileName,
+              file_data: buildInlineOpenAiFileData(storyFileContent)
             }
           ]
         }
@@ -1055,17 +1290,19 @@ async function callOpeningWithUploadedFiles(
 
   let ruleFileId: string | null = null;
   let storyFileId: string | null = null;
+  const { ruleFileName, ruleFileContent, storyFileName, storyFileContent } =
+    buildOpenAiOpeningFileContents(input);
 
   try {
     ruleFileId = await uploadOpenAiUserFile(
       config,
-      "rule.txt",
-      [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n")
+      ruleFileName,
+      ruleFileContent
     );
     storyFileId = await uploadOpenAiUserFile(
       config,
-      "story.txt",
-      [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+      storyFileName,
+      storyFileContent
     );
 
     return await callOpenAiResponsesWithFiles(
@@ -1075,6 +1312,15 @@ async function callOpeningWithUploadedFiles(
       ruleFileId,
       storyFileId
     );
+  } catch (error) {
+    if (!shouldFallbackToInlineOpenAiFileData(error)) {
+      throw error;
+    }
+
+    console.warn(
+      `[opening] OpenAI file upload failed for ${config.model}; falling back to inline file_data.`
+    );
+    return await callOpenAiResponsesWithInlineFiles(config, input, openingSystemPrompt);
   } finally {
     await deleteOpenAiUserFile(config, storyFileId);
     await deleteOpenAiUserFile(config, ruleFileId);
@@ -1096,17 +1342,19 @@ async function callOpeningWithUploadedFilesStream(
 
   let ruleFileId: string | null = null;
   let storyFileId: string | null = null;
+  const { ruleFileName, ruleFileContent, storyFileName, storyFileContent } =
+    buildOpenAiOpeningFileContents(input);
 
   try {
     ruleFileId = await uploadOpenAiUserFile(
       config,
-      "rule.txt",
-      [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n")
+      ruleFileName,
+      ruleFileContent
     );
     storyFileId = await uploadOpenAiUserFile(
       config,
-      "story.txt",
-      [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+      storyFileName,
+      storyFileContent
     );
 
     return await callOpenAiResponsesWithFilesStream(
@@ -1115,6 +1363,20 @@ async function callOpeningWithUploadedFilesStream(
       openingSystemPrompt,
       ruleFileId,
       storyFileId,
+      options
+    );
+  } catch (error) {
+    if (!shouldFallbackToInlineOpenAiFileData(error)) {
+      throw error;
+    }
+
+    console.warn(
+      `[opening] OpenAI file upload failed for ${config.model}; falling back to inline file_data stream.`
+    );
+    return await callOpenAiResponsesWithInlineFilesStream(
+      config,
+      input,
+      openingSystemPrompt,
       options
     );
   } finally {
@@ -1212,5 +1474,32 @@ export async function generateTurnNarrationViaServerProxy(
       usage: completion.usage
     },
     adjudication: null
+  };
+}
+
+export async function generatePromptedTextViaServerProxy(
+  input: PromptedTextGenerationInput
+): Promise<PromptedTextGenerationOutput> {
+  const config = getServerProxyConfig({
+    modelProfileId: input.modelProfileId,
+    runtimeModelConfig: input.runtimeModelConfig
+  });
+  const completion = await callChatCompletion(config, buildPromptedTextMessages(input));
+
+  return {
+    text: completion.text,
+    provider: `${config.providerLabel}:${config.model}`,
+    mode: "server_proxy",
+    meta: {
+      provider: `${config.providerLabel}:${config.model}`,
+      mode: "server_proxy",
+      model: config.model,
+      durationMs: completion.durationMs,
+      estimatedCost: estimateModelUsageCost({
+        model: config.model,
+        usage: completion.usage
+      }),
+      usage: completion.usage
+    }
   };
 }

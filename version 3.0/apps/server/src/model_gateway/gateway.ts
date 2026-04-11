@@ -5,6 +5,7 @@ import {
 } from "../mock/index.ts";
 import {
   generateOpeningViaServerProxy,
+  generatePromptedTextViaServerProxy,
   streamOpeningViaServerProxy,
   generateTurnNarrationViaServerProxy
 } from "./openai_compatible.ts";
@@ -13,6 +14,8 @@ import type {
   OpeningGenerationInput,
   OpeningGenerationStreamOptions,
   OpeningGenerationOutput,
+  PromptedTextGenerationInput,
+  PromptedTextGenerationOutput,
   TurnNarrationInput,
   TurnNarrationOutput
 } from "./types.ts";
@@ -131,6 +134,42 @@ class MockModelGateway implements ModelGateway {
       adjudication: outcome.adjudication
     };
   }
+
+  async generatePromptedText(
+    input: PromptedTextGenerationInput
+  ): Promise<PromptedTextGenerationOutput> {
+    const currentTextMatch = input.userPrompt.match(/Current character draft:\n([\s\S]*?)\n(?:\n|$)/u);
+    const currentText = currentTextMatch?.[1]?.trim() ?? "";
+    const generatedText =
+      currentText.length > 0
+        ? `${currentText}\n我把录音笔和手电塞进外套口袋，告诉自己这趟回来不是为了逞强，而是为了把一直卡在心口的那件事查清楚。`
+        : "我是个做民俗采访的自由撰稿人，背着旧相机和录音笔进山，表面上说是来补最后一篇稿，实际上是想确认多年前那场怪事到底有没有把我家人一起卷进去。";
+
+    return {
+      text: generatedText,
+      provider: "mock-local",
+      mode: "mock",
+      meta: {
+        provider: "mock-local",
+        mode: "mock",
+        model: "mock-local",
+        durationMs: 0,
+        estimatedCost: {
+          amount: 0,
+          currency: "USD",
+          pricingModel: "mock-local",
+          note: "Mock mode does not consume billable tokens."
+        },
+        usage: {
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null,
+          promptCacheHitTokens: null,
+          promptCacheMissTokens: null
+        }
+      }
+    };
+  }
 }
 
 class ServerProxyModelGateway implements ModelGateway {
@@ -147,6 +186,12 @@ class ServerProxyModelGateway implements ModelGateway {
 
   async generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput> {
     return generateTurnNarrationViaServerProxy(input);
+  }
+
+  async generatePromptedText(
+    input: PromptedTextGenerationInput
+  ): Promise<PromptedTextGenerationOutput> {
+    return generatePromptedTextViaServerProxy(input);
   }
 }
 

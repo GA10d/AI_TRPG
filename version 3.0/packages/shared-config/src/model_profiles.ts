@@ -86,7 +86,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     description: "使用 OpenAI 原生接口或兼容接口调用 GPT 系列文本模型。",
     urlRequirements: false,
     baseUrl: null,
-    baseModel: "gpt-5.2",
+    baseModel: "gpt-5.4",
     chargeUrl: "https://platform.openai.com/api-keys",
     docsUrl: "https://platform.openai.com/docs",
     envKeyCandidates: ["OPENAI_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
@@ -99,14 +99,14 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
       mini_version: { supported: true, model: "gpt-5-nano", url: null },
       deep_think: {
         supported: true,
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         url: "https://platform.openai.com/docs/guides/reasoning"
       },
-      json_output: { supported: true, model: "gpt-5.2", url: null },
-      tool_calls: { supported: true, model: "gpt-5.2", url: null },
+      json_output: { supported: true, model: "gpt-5.4", url: null },
+      tool_calls: { supported: true, model: "gpt-5.4", url: null },
       file_upload: {
         supported: true,
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         url: "https://platform.openai.com/docs/guides/pdf-files"
       }
     }

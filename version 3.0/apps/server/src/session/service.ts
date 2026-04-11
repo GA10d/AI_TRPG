@@ -120,6 +120,7 @@ export async function createSessionSnapshot(
     bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ?? bundle.story.manifest.id;
   const modelProfileId =
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
+  const characterConcept = request.characterConcept?.trim() ?? "";
   const openingResult = await resolveStoryOpening(bundle, {
     modelAccessMode: request.modelAccessMode,
     modelProfileId,
@@ -194,6 +195,20 @@ export async function createSessionSnapshot(
     }
   ];
 
+  if (characterConcept.length > 0) {
+    messages.push({
+      id: `msg_${randomUUID()}`,
+      round: 0,
+      createdAt: timestamp,
+      senderId: playerParticipantId,
+      recipientIds: [gmParticipantId],
+      visibility: "public",
+      kind: "player_input",
+      content: characterConcept,
+      tags: ["character_concept"]
+    });
+  }
+
   const replay: ReplayEvent[] = [
     {
       id: `evt_${randomUUID()}`,
@@ -237,6 +252,21 @@ export async function createSessionSnapshot(
     }
   ];
 
+  if (characterConcept.length > 0) {
+    replay.push({
+      id: `evt_${randomUUID()}`,
+      round: 0,
+      createdAt: timestamp,
+      actorId: playerParticipantId,
+      type: "message_created",
+      displayLevel: "detail",
+      summary: "Player character concept recorded",
+      payload: {
+        messageId: messages.at(-1)?.id ?? null
+      }
+    });
+  }
+
   const snapshot: SessionSnapshot = {
     session,
     messages,
@@ -264,6 +294,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     playMode: PHASE1_DEFAULTS.playMode,
     gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
     modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
+    characterConcept: "",
     modelProfileId: PHASE1_DEFAULTS.modelProfileId,
     debugEnabled: true,
     promptDebugEnabled: false,

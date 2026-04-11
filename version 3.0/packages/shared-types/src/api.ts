@@ -27,6 +27,7 @@ export type CreateSessionRequest = {
   playMode: PlayMode;
   gmArchitecture: GmArchitecture;
   modelAccessMode: ModelAccessMode;
+  characterConcept?: string;
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   debugEnabled?: boolean;
@@ -39,6 +40,21 @@ export type GenerateOpeningPreviewRequest = CreateSessionRequest & {
 };
 
 export type GenerateOpeningPreviewResponse = {
+  text: string;
+  provider: string;
+  mode: ModelAccessMode;
+  meta?: AiGenerationMetadata | null;
+};
+
+export type CharacterConceptAssistMode = "generate" | "complete";
+
+export type CharacterConceptAssistRequest = CreateSessionRequest & {
+  mode: CharacterConceptAssistMode;
+  openingText: string;
+  currentText?: string;
+};
+
+export type CharacterConceptAssistResponse = {
   text: string;
   provider: string;
   mode: ModelAccessMode;

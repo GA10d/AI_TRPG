@@ -735,6 +735,7 @@ img {
 
 .setup-pane-center {
   flex: 1 1 auto;
+  padding: 0 16px;
 }
 
 .setup-pane-scroll {
@@ -1072,8 +1073,65 @@ img {
   gap: 14px;
 }
 
+.character-setup-input-shell {
+  position: relative;
+}
+
 .character-setup-input {
   min-height: 140px;
+}
+
+.character-setup-input-shell-loading .character-setup-input {
+  color: rgba(55, 38, 26, 0.72);
+  background: #f8f1ea;
+}
+
+.character-setup-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.92), rgba(248, 241, 234, 0.88)),
+    rgba(255, 255, 255, 0.74);
+  pointer-events: none;
+}
+
+.character-setup-loading-bar {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(99, 63, 36, 0.12);
+}
+
+.character-setup-loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(122, 50, 32, 0.08), rgba(122, 50, 32, 0.9));
+  animation: character-setup-loading-slide 1.15s ease-in-out infinite;
+}
+
+.character-setup-loading-copy {
+  font-size: calc(13px * var(--ui-scale, 1));
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+@keyframes character-setup-loading-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
 }
 
 .grid-two,

@@ -11,6 +11,7 @@ import {
 } from "../../../packages/shared-config/src/index.ts";
 import type {
   BootstrapResponse,
+  CharacterConceptAssistRequest,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
@@ -34,6 +35,7 @@ import {
   listModelProfileSummaries
 } from "./model_gateway/config.ts";
 import { resolveStoryOpening } from "./opening/service.ts";
+import { generateCharacterConcept } from "./text_completion/service.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -316,6 +318,21 @@ async function handleApiRequest(
       response.end();
     }
 
+    return true;
+  }
+
+  if (url.pathname === "/api/character-concept/assist" && request.method === "POST") {
+    const payload = await readJsonBody<CharacterConceptAssistRequest>(request);
+    const result = await generateCharacterConcept({
+      mode: payload.mode,
+      locale: payload.locale,
+      modelAccessMode: payload.modelAccessMode,
+      modelProfileId: payload.modelProfileId,
+      runtimeModelConfig: payload.runtimeModelConfig,
+      openingText: payload.openingText,
+      currentText: payload.currentText
+    });
+    sendJson(response, 200, result);
     return true;
   }
 

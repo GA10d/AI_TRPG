@@ -48,6 +48,22 @@ export type TurnNarrationOutput = {
   adjudication?: EndingAdjudication | null;
 };
 
+export type PromptedTextGenerationInput = {
+  accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+  locale: LocaleCode;
+  systemPrompt: string;
+  userPrompt: string;
+};
+
+export type PromptedTextGenerationOutput = {
+  text: string;
+  provider: string;
+  mode: ModelAccessMode;
+  meta: AiGenerationMetadata;
+};
+
 export interface ModelGateway {
   generateOpening(input: OpeningGenerationInput): Promise<OpeningGenerationOutput>;
   streamOpening(
@@ -55,4 +71,7 @@ export interface ModelGateway {
     options?: OpeningGenerationStreamOptions
   ): Promise<OpeningGenerationOutput>;
   generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput>;
+  generatePromptedText(
+    input: PromptedTextGenerationInput
+  ): Promise<PromptedTextGenerationOutput>;
 }
