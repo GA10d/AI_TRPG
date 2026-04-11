@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ROM_SCHOOL_UNREAD_MESSAGES",
+  "version": "0.1.0",
+  "ruleId": "ROM",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "初夏未读消息"
+  },
+  "playerCount": {
+    "min": 1,
+    "max": 1
+  },
+  "supportsModes": [
+    "single_player"
+  ],
+  "coverQuote": {
+    "zh-CN": "在同一个初夏，被不同的人以不同方式喜欢着。你要靠近谁，回应谁，放下谁。"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "slow-burn",
+  "gmStyle": "relationship-guidance",
+  "tags": [
+    "romance",
+    "school",
+    "campus",
+    "multiple-love-interests",
+    "good-ending"
+  ],
+  "contentWarnings": [
+    "romantic-tension",
+    "jealousy",
+    "teacher-student-boundary"
+  ],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "new_term_opening"
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ROM",
+  "version": "0.1.0",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "心动边界"
+  },
+  "themes": [
+    "romance",
+    "relationships",
+    "campus"
+  ],
+  "tones": [
+    "tender",
+    "slow-burn",
+    "hopeful"
+  ],
+  "supportsModes": [
+    "single_player"
+  ],
+  "gmStyles": [
+    "single_agent",
+    "multi_agent"
+  ],
+  "authoringSpec": "规则范式(1)",
+  "contentWarnings": [
+    "romantic-tension",
+    "jealousy",
+    "teacher-student-boundary"
+  ]
+}
