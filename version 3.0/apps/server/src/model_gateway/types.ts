@@ -24,6 +24,11 @@ export type OpeningGenerationOutput = {
   meta: AiGenerationMetadata;
 };
 
+export type OpeningGenerationStreamOptions = {
+  onTextDelta?: (delta: string) => void | Promise<void>;
+  signal?: AbortSignal;
+};
+
 export type TurnNarrationInput = {
   accessMode: ModelAccessMode;
   modelProfileId?: string;
@@ -45,5 +50,9 @@ export type TurnNarrationOutput = {
 
 export interface ModelGateway {
   generateOpening(input: OpeningGenerationInput): Promise<OpeningGenerationOutput>;
+  streamOpening(
+    input: OpeningGenerationInput,
+    options?: OpeningGenerationStreamOptions
+  ): Promise<OpeningGenerationOutput>;
   generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput>;
 }

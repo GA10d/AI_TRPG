@@ -23,6 +23,10 @@ import {
   renderJoinedList,
   type MarkdownFontSizePreset
 } from "../ui.ts";
+import {
+  OPENING_PREVIEW_DELIVERY_OPTIONS,
+  type OpeningPreviewDeliveryMode
+} from "../openingPreviewPreferences.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
@@ -38,6 +42,7 @@ type GameSetupScreenProps = {
   runtimeModelConfig: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
+  openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
   markdownFontSize: MarkdownFontSizePreset;
   characterConcept: string;
   isCreating: boolean;
@@ -59,6 +64,7 @@ type GameSetupScreenProps = {
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
+  onOpeningPreviewDeliveryModeChange: (value: OpeningPreviewDeliveryMode) => void;
   onMarkdownFontSizeChange: (value: MarkdownFontSizePreset) => void;
   onCharacterConceptChange: (value: string) => void;
 };
@@ -246,6 +252,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     runtimeModelConfig,
     debugEnabled,
     logViewMode,
+    openingPreviewDeliveryMode,
     markdownFontSize,
     characterConcept,
     isCreating,
@@ -265,6 +272,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onModelProfileIdChange,
     onDebugEnabledChange,
     onLogViewModeChange,
+    onOpeningPreviewDeliveryModeChange,
     onMarkdownFontSizeChange,
     onCharacterConceptChange
   } = props;
@@ -405,12 +413,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     selectedStory?.intro ?? selectedRule?.ruleIntro ?? null,
     5
   );
+  const hasPreviewText = openingPreviewText.trim().length > 0;
   const previewMarkdownContent =
-    openingPreviewText.trim().length > 0 ? openingPreviewText : previewLines.join("\n\n");
+    hasPreviewText ? openingPreviewText : previewLines.join("\n\n");
   const openingPreviewMetaLine =
     showAiMetadata && !openingPreviewLoading
       ? formatAiGenerationMeta(openingPreviewMeta) ||
-        (openingPreviewProvider ? `鏉ユ簮锛?{openingPreviewProvider}` : "")
+        (openingPreviewProvider ? `来源：${openingPreviewProvider}` : "")
       : "";
   const previewHeadline =
     selectedStory?.coverQuote?.trim() ||
@@ -451,7 +460,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               type="button"
             >
               <span className="collapsed-pane-toggle-label">CONFIG</span>
-              <span className="collapsed-pane-toggle-action">灞曞紑</span>
+              <span className="collapsed-pane-toggle-action">展开</span>
             </button>
           ) : (
             <>
@@ -459,14 +468,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="selection-column-header">
                   <div>
                     <div className="eyebrow">Global Config</div>
-                    <h2>鍏ㄥ眬閰嶇疆</h2>
+                    <h2>全局配置</h2>
                   </div>
                   <button
                     className="ghost-button pane-toggle-button"
                     onClick={handleToggleLeftCollapse}
                     type="button"
                   >
-                    鏀惰捣
+                    收起
                   </button>
                 </div>
 
@@ -561,6 +570,26 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       }
                     >
                       {LOG_VIEW_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </SettingField>
+
+                  <SettingField
+                    label="开场传输"
+                    hint="流式会边生成边显示；完整传输会等待全文完成后再一次性渲染。"
+                  >
+                    <select
+                      value={openingPreviewDeliveryMode}
+                      onChange={(event) =>
+                        onOpeningPreviewDeliveryModeChange(
+                          event.target.value as OpeningPreviewDeliveryMode
+                        )
+                      }
+                    >
+                      {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
@@ -732,7 +761,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 </div>
 
                 <div className="opening-block setup-preview-copy">
-                  {openingPreviewLoading ? (
+                  {openingPreviewLoading && !hasPreviewText ? (
                     <p>正在生成 AI 开场预览...</p>
                   ) : (
                     <MarkdownBlock
@@ -743,6 +772,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   )}
                   {openingPreviewMetaLine ? (
                     <p className="preview-meta-line">{openingPreviewMetaLine}</p>
+                  ) : null}
+                  {openingPreviewLoading ? (
+                    <p className="preview-meta-line">
+                      {openingPreviewDeliveryMode === "stream"
+                        ? "正在流式接收开场预览..."
+                        : "正在等待完整开场预览..."}
+                    </p>
                   ) : null}
                   {!openingPreviewLoading && openingPreviewError ? (
                     <p className="preview-meta-line preview-meta-line-error">

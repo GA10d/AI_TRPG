@@ -8,6 +8,20 @@ import type {
   SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
 
+type OpeningPreviewStreamEvent =
+  | {
+      type: "delta";
+      delta: string;
+    }
+  | {
+      type: "done";
+      result: GenerateOpeningPreviewResponse;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
 async function parseJson<T>(response: Response): Promise<T> {
   const data = (await response.json()) as T & {
     message?: string;
@@ -21,6 +35,13 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 function normalizeNetworkError(error: unknown): Error {
+  if (
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  ) {
+    return error;
+  }
+
   if (error instanceof TypeError) {
     return new Error(
       "无法连接到本地 API 服务。请确认游戏服务正在运行，并访问 http://127.0.0.1:4316/ 。"
@@ -58,7 +79,10 @@ export async function createSession(
 }
 
 export async function generateOpeningPreview(
-  payload: CreateSessionRequest
+  payload: CreateSessionRequest,
+  options?: {
+    signal?: AbortSignal;
+  }
 ): Promise<GenerateOpeningPreviewResponse> {
   try {
     const response = await fetch("/api/previews/opening", {
@@ -66,10 +90,101 @@ export async function generateOpeningPreview(
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: options?.signal
     });
 
     return parseJson<GenerateOpeningPreviewResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function streamOpeningPreview(
+  payload: CreateSessionRequest,
+  options?: {
+    signal?: AbortSignal;
+    onTextDelta?: (delta: string) => void;
+  }
+): Promise<GenerateOpeningPreviewResponse> {
+  try {
+    const response = await fetch("/api/previews/opening/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    if (!response.body) {
+      throw new Error("预览流未返回可读取的数据。");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResult: GenerateOpeningPreviewResponse | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), {
+          stream: !done
+        });
+
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex >= 0) {
+          const rawLine = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          newlineIndex = buffer.indexOf("\n");
+
+          if (!rawLine) {
+            continue;
+          }
+
+          const event = JSON.parse(rawLine) as OpeningPreviewStreamEvent;
+          if (event.type === "delta") {
+            options?.onTextDelta?.(event.delta);
+            continue;
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message || "开场预览流生成失败。");
+          }
+
+          finalResult = event.result;
+        }
+
+        if (done) {
+          break;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const trailing = buffer.trim();
+    if (trailing) {
+      const event = JSON.parse(trailing) as OpeningPreviewStreamEvent;
+      if (event.type === "delta") {
+        options?.onTextDelta?.(event.delta);
+      } else if (event.type === "error") {
+        throw new Error(event.message || "开场预览流生成失败。");
+      } else {
+        finalResult = event.result;
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error("开场预览流已结束，但没有收到最终结果。");
+    }
+
+    return finalResult;
   } catch (error) {
     throw normalizeNetworkError(error);
   }

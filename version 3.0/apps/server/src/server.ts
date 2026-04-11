@@ -13,6 +13,7 @@ import type {
   BootstrapResponse,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
+  GenerateOpeningPreviewResponse,
   LoadSaveRequest,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
@@ -52,6 +53,20 @@ const mimeTypes: Record<string, string> = {
   ".webp": "image/webp"
 };
 
+type OpeningPreviewStreamEvent =
+  | {
+      type: "delta";
+      delta: string;
+    }
+  | {
+      type: "done";
+      result: GenerateOpeningPreviewResponse;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
 
@@ -84,6 +99,13 @@ function sendText(response: ServerResponse, statusCode: number, content: string)
     "Content-Type": "text/plain; charset=utf-8"
   });
   response.end(content);
+}
+
+function sendNdjsonEvent(
+  response: ServerResponse,
+  event: OpeningPreviewStreamEvent
+): void {
+  response.write(`${JSON.stringify(event)}\n`);
 }
 
 async function serveAbsoluteFile(
@@ -233,6 +255,88 @@ async function handleApiRequest(
       storyText: bundle.story.story.content
     });
     sendJson(response, 200, openingPreview);
+    return true;
+  }
+
+  if (url.pathname === "/api/previews/opening/stream" && request.method === "POST") {
+    const payload = await readJsonBody<GenerateOpeningPreviewRequest>(request);
+    const bundle = await loadPlayableContentBundle(
+      contentRoot,
+      payload.ruleDirectoryName,
+      payload.storyDirectoryName,
+      payload.locale
+    );
+    const modelGateway = getModelGateway(payload.modelAccessMode);
+    const ruleTitle =
+      bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ??
+      bundle.rule.manifest.id;
+    const storyTitle =
+      bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ??
+      bundle.story.manifest.id;
+
+    response.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    response.flushHeaders?.();
+
+    const abortController = new AbortController();
+    request.on("close", () => abortController.abort());
+
+    try {
+      const openingPreview = await modelGateway.streamOpening(
+        {
+          accessMode: payload.modelAccessMode,
+          modelProfileId: payload.modelProfileId,
+          runtimeModelConfig: payload.runtimeModelConfig,
+          locale: bundle.resolvedLocale,
+          ruleTitle,
+          ruleText: bundle.rule.rule.content,
+          storyTitle,
+          storyText: bundle.story.story.content
+        },
+        {
+          signal: abortController.signal,
+          onTextDelta: async (delta) => {
+            if (
+              abortController.signal.aborted ||
+              response.writableEnded ||
+              response.destroyed
+            ) {
+              return;
+            }
+
+            sendNdjsonEvent(response, {
+              type: "delta",
+              delta
+            });
+          }
+        }
+      );
+
+      if (!abortController.signal.aborted && !response.writableEnded && !response.destroyed) {
+        sendNdjsonEvent(response, {
+          type: "done",
+          result: openingPreview
+        });
+        response.end();
+      }
+    } catch (error: unknown) {
+      if (abortController.signal.aborted) {
+        response.end();
+        return true;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      sendNdjsonEvent(response, {
+        type: "error",
+        message
+      });
+      response.end();
+    }
+
     return true;
   }
 

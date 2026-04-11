@@ -41,6 +41,7 @@ async function main(): Promise<void> {
       const body = await readRequestBody(request);
       const payload = JSON.parse(body.toString("utf8")) as {
         instructions?: string;
+        stream?: boolean;
         input?: Array<{
           content?: Array<{
             type?: string;
@@ -56,6 +57,46 @@ async function main(): Promise<void> {
         .filter((item) => item.type === "input_file")
         .map((item) => item.file_id ?? "missing-file-id")
         .join(", ");
+
+      if (payload.stream) {
+        response.writeHead(200, {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache"
+        });
+        response.write(
+          `data: ${JSON.stringify({
+            type: "response.output_text.delta",
+            delta: "FAKE_RESPONSES_OPENING\n"
+          })}\n\n`
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "response.output_text.delta",
+            delta: `${String(payload.instructions ?? "").slice(0, 40)}\n`
+          })}\n\n`
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "response.output_text.delta",
+            delta: `${promptText.slice(0, 80)}\nfiles=${fileRefs}`
+          })}\n\n`
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            type: "response.completed",
+            response: {
+              output_text: `FAKE_RESPONSES_OPENING\n${String(payload.instructions ?? "").slice(0, 40)}\n${promptText.slice(0, 80)}\nfiles=${fileRefs}`,
+              usage: {
+                input_tokens: 120,
+                output_tokens: 32,
+                total_tokens: 152
+              }
+            }
+          })}\n\n`
+        );
+        response.end("data: [DONE]\n\n");
+        return;
+      }
 
       response.writeHead(200, {
         "Content-Type": "application/json; charset=utf-8"
@@ -76,9 +117,51 @@ async function main(): Promise<void> {
     if (request.method === "POST" && request.url === "/chat/completions") {
       const body = await readRequestBody(request);
       const payload = JSON.parse(body.toString("utf8")) as {
+        stream?: boolean;
         messages?: Array<{ role?: string; content?: string }>;
       };
       const finalUserPrompt = payload.messages?.at(-1)?.content ?? "no prompt";
+
+      if (payload.stream) {
+        response.writeHead(200, {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache"
+        });
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  content: "FAKE_SERVER_PROXY_RESPONSE\n"
+                }
+              }
+            ]
+          })}\n\n`
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  content: finalUserPrompt.slice(0, 120)
+                }
+              }
+            ]
+          })}\n\n`
+        );
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [],
+            usage: {
+              prompt_tokens: 88,
+              completion_tokens: 21,
+              total_tokens: 109
+            }
+          })}\n\n`
+        );
+        response.end("data: [DONE]\n\n");
+        return;
+      }
 
       response.writeHead(200, {
         "Content-Type": "application/json; charset=utf-8"
@@ -118,7 +201,9 @@ async function main(): Promise<void> {
 
   try {
     const gateway = getModelGateway("server_proxy");
-    const opening = await gateway.generateOpening({
+    let streamedOpening = "";
+    const opening = await gateway.streamOpening(
+      {
       accessMode: "server_proxy",
       modelProfileId: "chatgpt",
       locale: "zh-CN",
@@ -126,7 +211,13 @@ async function main(): Promise<void> {
       ruleText: "Rule full text for smoke testing.",
       storyTitle: "The Silence",
       storyText: "Story full text for smoke testing."
-    });
+      },
+      {
+        onTextDelta: (delta) => {
+          streamedOpening += delta;
+        }
+      }
+    );
     const turn = await gateway.generateTurnNarration({
       accessMode: "server_proxy",
       modelProfileId: "chatgpt",
@@ -139,6 +230,7 @@ async function main(): Promise<void> {
     });
 
     console.log("opening.provider =", opening.provider);
+    console.log("opening.streamedText =", streamedOpening);
     console.log("opening.text =", opening.text);
     console.log("turn.provider =", turn.provider);
     console.log("turn.text =", turn.text);

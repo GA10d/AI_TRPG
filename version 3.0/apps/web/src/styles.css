@@ -614,6 +614,12 @@ img {
   gap: 12px;
 }
 
+.story-detail-panel .meta-label {
+  font-size: calc(15px * var(--ui-scale, 1));
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
 .story-markdown-block {
   display: grid;
   gap: 10px;

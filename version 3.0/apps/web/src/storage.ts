@@ -4,6 +4,7 @@ import type {
   SaveBundle,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
+import type { OpeningPreviewDeliveryMode } from "./openingPreviewPreferences.ts";
 import type { MarkdownFontSizePreset, MenuFontSizePreset } from "./ui.ts";
 
 const RECENT_SNAPSHOT_STORAGE_KEY = "trpg3.recentSnapshot";
@@ -23,6 +24,7 @@ export type StoredWebDefaults = {
   profileRuntimeConfigs?: Record<string, RuntimeModelConfigInput>;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
+  openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
   showAiMetadata: boolean;
   markdownFontSize: MarkdownFontSizePreset;
   menuFontSize: MenuFontSizePreset;

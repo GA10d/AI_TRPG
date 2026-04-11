@@ -12,6 +12,7 @@ import type { AiGenerationUsage } from "../../../../packages/shared-types/src/in
 import type {
   OpeningGenerationInput,
   OpeningGenerationOutput,
+  OpeningGenerationStreamOptions,
   TurnNarrationInput,
   TurnNarrationOutput
 } from "./types.ts";
@@ -31,9 +32,13 @@ type ChatMessage = {
 
 type ChatCompletionResponse = {
   choices?: Array<{
+    delta?: {
+      content?: unknown;
+    };
     message?: {
       content?: unknown;
     };
+    finish_reason?: string | null;
   }>;
   usage?: {
     prompt_tokens?: number;
@@ -46,6 +51,19 @@ type ChatCompletionResponse = {
 };
 
 type ResponsesApiResponse = {
+  type?: string;
+  delta?: string;
+  text?: string;
+  response?: {
+    output_text?: string;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+    };
+  };
   output_text?: string;
   output?: Array<{
     content?: Array<{
@@ -104,6 +122,16 @@ type UploadedGeminiFile = {
   name: string;
   uri: string;
   mimeType: string;
+};
+
+type SseEventPayload = {
+  event: string | null;
+  data: string;
+};
+
+type StreamTextOptions = {
+  onTextDelta?: (delta: string) => void | Promise<void>;
+  signal?: AbortSignal;
 };
 
 async function loadBeginningSystemPrompt(): Promise<string> {
@@ -311,6 +339,152 @@ async function readResponseText(response: Response): Promise<string> {
   }
 }
 
+function splitTextIntoStreamChunks(text: string): string[] {
+  const tokens = text.match(/\S+\s*|\n+/gu) ?? [text];
+  const chunks: string[] = [];
+  let currentChunk = "";
+
+  for (const token of tokens) {
+    if (
+      currentChunk.length > 0 &&
+      currentChunk.length + token.length > 40 &&
+      !token.includes("\n")
+    ) {
+      chunks.push(currentChunk);
+      currentChunk = token;
+      continue;
+    }
+
+    currentChunk += token;
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new Error("Opening preview stream aborted.");
+  }
+}
+
+async function emitTextAsChunks(
+  text: string,
+  options?: StreamTextOptions
+): Promise<void> {
+  for (const chunk of splitTextIntoStreamChunks(text)) {
+    throwIfAborted(options?.signal);
+    await options?.onTextDelta?.(chunk);
+  }
+}
+
+function createCombinedAbortController(
+  timeoutMs: number,
+  signal: AbortSignal | undefined
+): {
+  controller: AbortController;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+  const handleAbort = () => controller.abort();
+  signal?.addEventListener("abort", handleAbort);
+
+  return {
+    controller,
+    cleanup: () => {
+      clearTimeout(timeoutHandle);
+      signal?.removeEventListener("abort", handleAbort);
+    }
+  };
+}
+
+async function* readSseEvents(
+  response: Response,
+  signal?: AbortSignal
+): AsyncGenerator<SseEventPayload> {
+  if (!response.body) {
+    throw new Error("Streaming response body is unavailable.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      throwIfAborted(signal);
+      const { done, value } = await reader.read();
+      buffer += decoder
+        .decode(value ?? new Uint8Array(), {
+          stream: !done
+        })
+        .replace(/\r\n/gu, "\n");
+
+      let separatorIndex = buffer.indexOf("\n\n");
+      while (separatorIndex >= 0) {
+        const rawEvent = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + 2);
+        separatorIndex = buffer.indexOf("\n\n");
+
+        const lines = rawEvent
+          .split(/\r?\n/u)
+          .map((line) => line.trimEnd())
+          .filter(Boolean);
+        if (lines.length === 0) {
+          continue;
+        }
+
+        let eventName: string | null = null;
+        const dataLines: string[] = [];
+
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            eventName = line.slice("event:".length).trim();
+            continue;
+          }
+
+          if (line.startsWith("data:")) {
+            dataLines.push(line.slice("data:".length).trimStart());
+          }
+        }
+
+        if (dataLines.length === 0) {
+          continue;
+        }
+
+        yield {
+          event: eventName,
+          data: dataLines.join("\n")
+        };
+      }
+
+      if (done) {
+        break;
+      }
+    }
+
+    const trailing = buffer.trim();
+    if (trailing.length > 0) {
+      const dataLine = trailing
+        .split(/\r?\n/u)
+        .find((line) => line.trimStart().startsWith("data:"));
+      if (dataLine) {
+        yield {
+          event: null,
+          data: dataLine.trimStart().slice("data:".length).trimStart()
+        };
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function callChatCompletion(
   config: ServerProxyConfig,
   messages: ChatMessage[]
@@ -359,6 +533,92 @@ async function callChatCompletion(
     };
   } finally {
     clearTimeout(timeoutHandle);
+  }
+}
+
+async function callChatCompletionStream(
+  config: ServerProxyConfig,
+  messages: ChatMessage[],
+  options?: StreamTextOptions
+): Promise<ChatCompletionResult> {
+  const startedAt = Date.now();
+  const { controller, cleanup } = createCombinedAbortController(
+    config.timeoutMs,
+    options?.signal
+  );
+  let latestUsage: AiGenerationUsage = {
+    promptTokens: null,
+    completionTokens: null,
+    totalTokens: null,
+    promptCacheHitTokens: null,
+    promptCacheMissTokens: null
+  };
+  let text = "";
+
+  try {
+    const payload: Record<string, unknown> = {
+      model: config.model,
+      messages,
+      temperature: config.temperature,
+      stream: true,
+      stream_options: {
+        include_usage: true
+      }
+    };
+
+    if (config.maxTokens !== null) {
+      payload.max_tokens = config.maxTokens;
+    }
+
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const responseText = await readResponseText(response);
+      throw new Error(
+        responseText || `server_proxy stream request failed with HTTP ${response.status}.`
+      );
+    }
+
+    for await (const event of readSseEvents(response, options?.signal)) {
+      if (event.data === "[DONE]") {
+        break;
+      }
+
+      const data = JSON.parse(event.data) as ChatCompletionResponse;
+      if (data.error?.message) {
+        throw new Error(data.error.message);
+      }
+
+      const delta = normalizeContent(data.choices?.[0]?.delta?.content);
+      if (delta) {
+        text += delta;
+        await options?.onTextDelta?.(delta);
+      }
+
+      if (data.usage) {
+        latestUsage = buildOpenAiUsage(data);
+      }
+    }
+
+    if (!text) {
+      throw new Error("server_proxy stream returned an empty completion.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: latestUsage
+    };
+  } finally {
+    cleanup();
   }
 }
 
@@ -480,6 +740,117 @@ async function callOpenAiResponsesWithFiles(
     };
   } finally {
     clearTimeout(timeoutHandle);
+  }
+}
+
+async function callOpenAiResponsesWithFilesStream(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  openingSystemPrompt: string,
+  ruleFileId: string,
+  storyFileId: string,
+  options?: StreamTextOptions
+): Promise<ChatCompletionResult> {
+  const startedAt = Date.now();
+  const { controller, cleanup } = createCombinedAbortController(
+    config.timeoutMs,
+    options?.signal
+  );
+  let latestUsage: AiGenerationUsage = {
+    promptTokens: null,
+    completionTokens: null,
+    totalTokens: null,
+    promptCacheHitTokens: null,
+    promptCacheMissTokens: null
+  };
+  let text = "";
+
+  try {
+    const payload: Record<string, unknown> = {
+      model: config.model,
+      instructions: openingSystemPrompt,
+      stream: true,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildOpeningTaskText(input)
+            },
+            {
+              type: "input_file",
+              file_id: ruleFileId
+            },
+            {
+              type: "input_file",
+              file_id: storyFileId
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${config.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const responseText = await readResponseText(response);
+      throw new Error(
+        responseText || `OpenAI responses stream failed with HTTP ${response.status}.`
+      );
+    }
+
+    for await (const event of readSseEvents(response, options?.signal)) {
+      if (event.data === "[DONE]") {
+        break;
+      }
+
+      const data = JSON.parse(event.data) as ResponsesApiResponse;
+      if (data.error?.message) {
+        throw new Error(data.error.message);
+      }
+
+      if (data.type === "response.output_text.delta" && typeof data.delta === "string") {
+        text += data.delta;
+        await options?.onTextDelta?.(data.delta);
+      }
+
+      if (data.response?.usage) {
+        latestUsage = buildOpenAiUsage({
+          usage: data.response.usage
+        } as ResponsesApiResponse);
+      }
+
+      if (
+        data.type === "response.completed" &&
+        !text &&
+        typeof data.response?.output_text === "string" &&
+        data.response.output_text.trim().length > 0
+      ) {
+        text = data.response.output_text.trim();
+        await options?.onTextDelta?.(text);
+      }
+    }
+
+    if (!text) {
+      throw new Error("OpenAI responses stream returned an empty opening preview.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: latestUsage
+    };
+  } finally {
+    cleanup();
   }
 }
 
@@ -710,6 +1081,48 @@ async function callOpeningWithUploadedFiles(
   }
 }
 
+async function callOpeningWithUploadedFilesStream(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  options?: StreamTextOptions
+): Promise<ChatCompletionResult> {
+  const openingSystemPrompt = await loadBeginningSystemPrompt();
+
+  if (config.dependence === "Google") {
+    const completion = await callOpeningWithUploadedFiles(config, input);
+    await emitTextAsChunks(completion.text, options);
+    return completion;
+  }
+
+  let ruleFileId: string | null = null;
+  let storyFileId: string | null = null;
+
+  try {
+    ruleFileId = await uploadOpenAiUserFile(
+      config,
+      "rule.txt",
+      [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n")
+    );
+    storyFileId = await uploadOpenAiUserFile(
+      config,
+      "story.txt",
+      [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+    );
+
+    return await callOpenAiResponsesWithFilesStream(
+      config,
+      input,
+      openingSystemPrompt,
+      ruleFileId,
+      storyFileId,
+      options
+    );
+  } finally {
+    await deleteOpenAiUserFile(config, storyFileId);
+    await deleteOpenAiUserFile(config, ruleFileId);
+  }
+}
+
 export async function generateOpeningViaServerProxy(
   input: OpeningGenerationInput
 ): Promise<OpeningGenerationOutput> {
@@ -721,6 +1134,41 @@ export async function generateOpeningViaServerProxy(
   const completion = config.features.file_upload.supported
     ? await callOpeningWithUploadedFiles(config, input)
     : await callChatCompletion(config, await buildOpeningMessages(input));
+
+  return {
+    text: completion.text,
+    provider: `${config.providerLabel}:${config.model}`,
+    mode: "server_proxy",
+    meta: {
+      provider: `${config.providerLabel}:${config.model}`,
+      mode: "server_proxy",
+      model: config.model,
+      durationMs: completion.durationMs,
+      estimatedCost: estimateModelUsageCost({
+        model: config.model,
+        usage: completion.usage
+      }),
+      usage: completion.usage
+    }
+  };
+}
+
+export async function streamOpeningViaServerProxy(
+  input: OpeningGenerationInput,
+  options?: OpeningGenerationStreamOptions
+): Promise<OpeningGenerationOutput> {
+  const config = getServerProxyConfig({
+    modelProfileId: input.modelProfileId,
+    runtimeModelConfig: input.runtimeModelConfig
+  });
+
+  const completion = config.features.file_upload.supported
+    ? await callOpeningWithUploadedFilesStream(config, input, options)
+    : await callChatCompletionStream(
+        config,
+        await buildOpeningMessages(input),
+        options
+      );
 
   return {
     text: completion.text,

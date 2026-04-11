@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import type {
   AiGenerationMetadata,
+  CreateSessionRequest,
   SaveBundle,
   SaveRuntimeConfig,
   SessionSnapshot
@@ -12,6 +13,7 @@ import {
   fetchSession,
   generateOpeningPreview,
   loadSaveBundle,
+  streamOpeningPreview,
   submitTurn
 } from "./lib/trpgApiClient.ts";
 import { useBootstrapState } from "./hooks/useBootstrapState.ts";
@@ -60,7 +62,7 @@ function normalizeRuntimeConfig(
 }
 
 function hasPreviewModelConfig(
-  accessMode: "mock" | "server_proxy",
+  accessMode: CreateSessionRequest["modelAccessMode"],
   bootstrap: ReturnType<typeof useBootstrapState>["bootstrap"],
   modelProfileId: string,
   runtimeModelConfig: {
@@ -71,6 +73,10 @@ function hasPreviewModelConfig(
 ): boolean {
   if (accessMode === "mock") {
     return true;
+  }
+
+  if (accessMode !== "server_proxy") {
+    return false;
   }
 
   const selectedProfile =
@@ -92,6 +98,12 @@ function hasPreviewModelConfig(
   const modelReady = hasModel || Boolean(selectedProfile.baseModel);
 
   return hasApiKey && baseUrlReady && modelReady;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
 }
 
 export function App() {
@@ -124,6 +136,7 @@ export function App() {
     profileRuntimeConfigs,
     debugEnabled,
     logViewMode,
+    openingPreviewDeliveryMode,
     showAiMetadata,
     markdownFontSize,
     menuFontSize,
@@ -139,6 +152,7 @@ export function App() {
     clearProfileRuntimeConfigs,
     setDebugEnabled,
     setLogViewMode,
+    setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
     setMenuFontSize
@@ -201,11 +215,16 @@ export function App() {
       setOpeningPreviewProvider(null);
       setOpeningPreviewMeta(null);
       setOpeningPreviewLoading(false);
-      setOpeningPreviewError("当前模型尚未配置完整，暂时使用默认预览文案。");
+      setOpeningPreviewError(
+        modelAccessMode === "browser_direct"
+          ? "当前模型模式暂不支持 AI 开场预览，请切换到 Mock 或 Server Proxy。"
+          : "当前模型档案尚未配置完整，暂时只能显示静态预览文案。"
+      );
       return;
     }
 
     let cancelled = false;
+    const abortController = new AbortController();
     setOpeningPreviewText("");
     setOpeningPreviewProvider(null);
     setOpeningPreviewMeta(null);
@@ -214,7 +233,7 @@ export function App() {
 
     const timeoutHandle = window.setTimeout(async () => {
       try {
-        const result = await generateOpeningPreview({
+        const requestPayload: CreateSessionRequest = {
           ruleDirectoryName,
           storyDirectoryName,
           locale,
@@ -226,7 +245,22 @@ export function App() {
           debugEnabled,
           promptDebugEnabled: false,
           logViewMode
-        });
+        };
+        const result =
+          openingPreviewDeliveryMode === "stream"
+            ? await streamOpeningPreview(requestPayload, {
+                signal: abortController.signal,
+                onTextDelta: (delta) => {
+                  if (cancelled) {
+                    return;
+                  }
+
+                  setOpeningPreviewText((current) => current + delta);
+                }
+              })
+            : await generateOpeningPreview(requestPayload, {
+                signal: abortController.signal
+              });
 
         if (cancelled) {
           return;
@@ -236,7 +270,7 @@ export function App() {
         setOpeningPreviewProvider(result.provider);
         setOpeningPreviewMeta(result.meta ?? null);
       } catch (error) {
-        if (cancelled) {
+        if (cancelled || isAbortError(error)) {
           return;
         }
 
@@ -253,6 +287,7 @@ export function App() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
       window.clearTimeout(timeoutHandle);
     };
   }, [
@@ -261,6 +296,7 @@ export function App() {
     gmArchitecture,
     locale,
     logViewMode,
+    openingPreviewDeliveryMode,
     modelAccessMode,
     modelProfileId,
     playMode,
@@ -291,6 +327,7 @@ export function App() {
       profileRuntimeConfigs,
       debugEnabled,
       logViewMode,
+      openingPreviewDeliveryMode,
       showAiMetadata,
       markdownFontSize,
       menuFontSize
@@ -640,6 +677,7 @@ export function App() {
     setModelProfileId(bootstrap.defaults.modelProfileId);
     clearProfileRuntimeConfigs();
     setLogViewMode(bootstrap.defaults.logViewMode);
+    setOpeningPreviewDeliveryMode("stream");
     setDebugEnabled(true);
     setShowAiMetadata(true);
     setMarkdownFontSize("large");
@@ -747,6 +785,7 @@ export function App() {
           runtimeModelConfig={runtimeModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
+          openingPreviewDeliveryMode={openingPreviewDeliveryMode}
           characterConcept={characterConcept}
           isCreating={isCreating}
           openingPreviewText={openingPreviewText}
@@ -766,6 +805,7 @@ export function App() {
           onModelProfileIdChange={setModelProfileId}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
+          onOpeningPreviewDeliveryModeChange={setOpeningPreviewDeliveryMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}
         />

@@ -6,6 +6,10 @@ import type {
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchBootstrap } from "../lib/trpgApiClient.ts";
+import {
+  OPENING_PREVIEW_DELIVERY_OPTIONS,
+  type OpeningPreviewDeliveryMode
+} from "../openingPreviewPreferences.ts";
 import { loadStoredWebDefaults } from "../storage.ts";
 import {
   GM_ARCHITECTURE_OPTIONS,
@@ -129,6 +133,8 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [debugEnabled, setDebugEnabled] = useState(true);
   const [logViewMode, setLogViewMode] =
     useState<NonNullable<CreateSessionRequest["logViewMode"]>>("compact");
+  const [openingPreviewDeliveryMode, setOpeningPreviewDeliveryMode] =
+    useState<OpeningPreviewDeliveryMode>("stream");
   const [showAiMetadata, setShowAiMetadata] = useState(true);
   const [markdownFontSize, setMarkdownFontSize] =
     useState<MarkdownFontSizePreset>("large");
@@ -206,6 +212,13 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             storedDefaults?.logViewMode,
             LOG_VIEW_OPTIONS.map((item) => item.value),
             data.defaults.logViewMode
+          )
+        );
+        setOpeningPreviewDeliveryMode(
+          pickOption(
+            storedDefaults?.openingPreviewDeliveryMode,
+            OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => item.value),
+            "stream"
           )
         );
         setShowAiMetadata(storedDefaults?.showAiMetadata ?? true);
@@ -320,6 +333,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     profileRuntimeConfigs,
     debugEnabled,
     logViewMode,
+    openingPreviewDeliveryMode,
     showAiMetadata,
     markdownFontSize,
     menuFontSize,
@@ -335,6 +349,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     clearProfileRuntimeConfigs,
     setDebugEnabled,
     setLogViewMode,
+    setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
     setMenuFontSize
