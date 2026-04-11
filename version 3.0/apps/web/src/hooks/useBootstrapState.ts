@@ -65,6 +65,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [debugEnabled, setDebugEnabled] = useState(true);
   const [logViewMode, setLogViewMode] =
     useState<NonNullable<CreateSessionRequest["logViewMode"]>>("compact");
+  const [showAiMetadata, setShowAiMetadata] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +124,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             data.defaults.logViewMode
           )
         );
+        setShowAiMetadata(storedDefaults?.showAiMetadata ?? true);
       } catch (error) {
         if (cancelled) {
           return;
@@ -183,6 +185,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     runtimeModelConfig,
     debugEnabled,
     logViewMode,
+    showAiMetadata,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setLocale,
@@ -192,6 +195,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setModelProfileId,
     setRuntimeModelConfig,
     setDebugEnabled,
-    setLogViewMode
+    setLogViewMode,
+    setShowAiMetadata
   };
 }

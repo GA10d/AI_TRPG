@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import type {
+  AiGenerationMetadata,
   BootstrapResponse,
   CreateSessionRequest,
   RuntimeModelConfigInput
@@ -14,11 +15,13 @@ import type {
 import {
   buildPreviewLines,
   clipText,
+  formatAiGenerationMeta,
   GM_ARCHITECTURE_OPTIONS,
   LOG_VIEW_OPTIONS,
   PLAY_MODE_OPTIONS,
   renderJoinedList
 } from "../ui.ts";
+import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type GameSetupScreenProps = {
@@ -35,6 +38,12 @@ type GameSetupScreenProps = {
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   characterConcept: string;
   isCreating: boolean;
+  openingPreviewText: string;
+  openingPreviewProvider: string | null;
+  openingPreviewMeta: AiGenerationMetadata | null;
+  openingPreviewLoading: boolean;
+  openingPreviewError: string | null;
+  showAiMetadata: boolean;
   onBack: () => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -79,33 +88,6 @@ function clampNumber(value: number, minValue: number, maxValue: number): number 
   }
 
   return Math.min(maxValue, Math.max(minValue, value));
-}
-
-function isProfileReady(
-  accessMode: CreateSessionRequest["modelAccessMode"],
-  selectedProfile: BootstrapResponse["modelProfiles"][number] | null,
-  runtimeModelConfig: RuntimeModelConfigInput
-): boolean {
-  if (accessMode === "mock") {
-    return true;
-  }
-
-  if (!selectedProfile) {
-    return false;
-  }
-
-  if (selectedProfile.configured) {
-    return true;
-  }
-
-  const hasApiKey = (runtimeModelConfig.apiKey?.trim() ?? "").length > 0;
-  const hasBaseUrl = (runtimeModelConfig.baseUrl?.trim() ?? "").length > 0;
-  const hasModel = (runtimeModelConfig.model?.trim() ?? "").length > 0;
-  const baseUrlReady =
-    !selectedProfile.urlRequirements || hasBaseUrl || Boolean(selectedProfile.baseUrl);
-  const modelReady = hasModel || Boolean(selectedProfile.baseModel);
-
-  return hasApiKey && baseUrlReady && modelReady;
 }
 
 function loadStoredLayout(): SetupLayoutState {
@@ -177,10 +159,7 @@ function computeMaxRightWidth(layout: SetupLayoutState, containerWidth: number):
   );
 }
 
-function normalizeLayout(
-  layout: SetupLayoutState,
-  containerWidth: number
-): SetupLayoutState {
+function normalizeLayout(layout: SetupLayoutState, containerWidth: number): SetupLayoutState {
   if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
     return layout;
   }
@@ -206,6 +185,33 @@ function normalizeLayout(
   }
 
   return nextLayout;
+}
+
+function isProfileReady(
+  accessMode: CreateSessionRequest["modelAccessMode"],
+  selectedProfile: BootstrapResponse["modelProfiles"][number] | null,
+  runtimeModelConfig: RuntimeModelConfigInput
+): boolean {
+  if (accessMode === "mock") {
+    return true;
+  }
+
+  if (!selectedProfile) {
+    return false;
+  }
+
+  if (selectedProfile.configured) {
+    return true;
+  }
+
+  const hasApiKey = (runtimeModelConfig.apiKey?.trim() ?? "").length > 0;
+  const hasBaseUrl = (runtimeModelConfig.baseUrl?.trim() ?? "").length > 0;
+  const hasModel = (runtimeModelConfig.model?.trim() ?? "").length > 0;
+  const baseUrlReady =
+    !selectedProfile.urlRequirements || hasBaseUrl || Boolean(selectedProfile.baseUrl);
+  const modelReady = hasModel || Boolean(selectedProfile.baseModel);
+
+  return hasApiKey && baseUrlReady && modelReady;
 }
 
 function SettingField(props: {
@@ -239,6 +245,12 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     logViewMode,
     characterConcept,
     isCreating,
+    openingPreviewText,
+    openingPreviewProvider,
+    openingPreviewMeta,
+    openingPreviewLoading,
+    openingPreviewError,
+    showAiMetadata,
     onBack,
     onClose,
     onSubmit,
@@ -256,6 +268,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<SetupLayoutState>(() => loadStoredLayout());
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
+  const [isCoverExpanded, setIsCoverExpanded] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -274,10 +287,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
       setLayout((current) => {
         const nextLayout = normalizeLayout(current, containerWidth);
-        if (JSON.stringify(nextLayout) === JSON.stringify(current)) {
-          return current;
-        }
-        return nextLayout;
+        return JSON.stringify(nextLayout) === JSON.stringify(current) ? current : nextLayout;
       });
     }
 
@@ -349,6 +359,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     };
   }, [dragTarget]);
 
+  useEffect(() => {
+    setIsCoverExpanded(false);
+  }, [ruleDirectoryName, storyDirectoryName]);
+
   function handleSplitterPointerDown(
     target: DragTarget,
     event: ReactPointerEvent<HTMLButtonElement>
@@ -382,10 +396,20 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const selectedProfile =
     availableProfiles.find((item) => item.id === modelProfileId) ?? availableProfiles[0] ?? null;
   const profileReady = isProfileReady(modelAccessMode, selectedProfile, runtimeModelConfig);
+  const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
   const previewLines = buildPreviewLines(
     selectedStory?.intro ?? selectedRule?.ruleIntro ?? null,
     5
   );
+  const previewMarkdownContent =
+    openingPreviewText.trim().length > 0
+      ? openingPreviewText
+      : previewLines.join("\n\n");
+  const openingPreviewMetaLine =
+    showAiMetadata && !openingPreviewLoading
+      ? formatAiGenerationMeta(openingPreviewMeta) ||
+        (openingPreviewProvider ? `来源：${openingPreviewProvider}` : "")
+      : "";
   const previewHeadline =
     selectedStory?.coverQuote?.trim() ||
     clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120);
@@ -443,7 +467,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 </div>
 
                 <div className="setup-pane-scroll">
-                  <SettingField hint="控制内容文本和界面的基础语言。" label="语言">
+                  <SettingField label="语言" hint="控制内容文本和界面的基础语言。">
                     <select
                       value={locale}
                       onChange={(event) =>
@@ -458,18 +482,15 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </select>
                   </SettingField>
 
-                  <SettingField
-                    hint="难度还没接入真实裁定，当前先固定为标准。"
-                    label="难度"
-                  >
+                  <SettingField label="难度" hint="难度还没接入真实裁定，当前先固定为标准。">
                     <select disabled value="normal">
                       <option value="normal">标准（待开发）</option>
                     </select>
                   </SettingField>
 
                   <SettingField
-                    hint="决定这局是纯 mock 还是通过代理接入真实模型。"
                     label="模型模式"
+                    hint="决定这局是纯 mock，还是通过代理接入真实模型。"
                   >
                     <select
                       value={modelAccessMode}
@@ -488,8 +509,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   </SettingField>
 
                   <SettingField
-                    hint="为单 Agent / 多 Agent 主持预留统一入口。"
                     label="主持架构"
+                    hint="为单 Agent / 多 Agent 主持预留统一入口。"
                   >
                     <select
                       value={gmArchitecture}
@@ -508,8 +529,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   </SettingField>
 
                   <SettingField
-                    hint="用于切换不同 provider 的默认模型档案。"
                     label="模型档案"
+                    hint="用于切换不同 provider 的默认模型档案。"
                   >
                     <select
                       value={selectedProfile?.id ?? modelProfileId}
@@ -524,8 +545,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   </SettingField>
 
                   <SettingField
-                    hint="控制日志区域的细粒度，方便你游玩或排查。"
                     label="日志显示"
+                    hint="控制日志区域的细粒度，方便你游玩或排查。"
                   >
                     <select
                       value={logViewMode}
@@ -544,8 +565,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   </SettingField>
 
                   <SettingField
-                    hint="当前 MVP 先保留单人、单人 + NPC 和多人入口。"
                     label="游戏模式"
+                    hint="当前 MVP 先保留单人、单人 + NPC 和多人入口。"
                   >
                     <select
                       value={playMode}
@@ -563,7 +584,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                   {modelAccessMode === "server_proxy" ? (
                     <>
-                      <SettingField hint="留空时优先读取本地 .env。" label="API Key 覆盖">
+                      <SettingField label="API Key 覆盖" hint="留空时优先读取本地 .env。">
                         <input
                           autoComplete="new-password"
                           className="text-input"
@@ -580,8 +601,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       </SettingField>
 
                       <SettingField
-                        hint="留空则使用模型档案的默认模型名。"
                         label="模型名覆盖"
+                        hint="留空则使用模型档案的默认模型名。"
                       >
                         <input
                           className="text-input"
@@ -598,8 +619,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       </SettingField>
 
                       <SettingField
-                        hint="兼容 OpenAI 风格代理接口。"
                         label="Base URL 覆盖"
+                        hint="兼容 OpenAI 风格代理接口。"
                       >
                         <input
                           className="text-input"
@@ -618,8 +639,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   ) : null}
 
                   <SettingField
-                    hint="当前主要用于调试模型与运行时日志。"
                     label="调试模式"
+                    hint="当前主要用于调试模型与运行时日志。"
                   >
                     <label className="toggle-row">
                       <input
@@ -653,12 +674,27 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             <div className="setup-pane-scroll">
               <div className="setup-preview-card">
                 <div className="setup-preview-visual">
-                  {false ? (
-                    <img
-                      alt={`${selectedStory?.title ?? "剧本"}封面`}
-                      className="story-cover-image"
-                      src={coverAsset.url}
-                    />
+                  {coverAsset ? (
+                    <>
+                      <img
+                        alt={`${selectedStory?.title ?? "剧本"}封面`}
+                        className="story-cover-image"
+                        src={coverAsset.url}
+                      />
+                      <button
+                        aria-label="查看大图"
+                        className="ghost-button story-cover-expand-button"
+                        onClick={() => setIsCoverExpanded(true)}
+                        type="button"
+                      >
+                        查看大图
+                      </button>
+                      <div className="story-cover-placeholder story-cover-overlay">
+                        <div className="eyebrow">Preview</div>
+                        <h2>{selectedStory?.title ?? "未选择剧本"}</h2>
+                        <p>{previewHeadline}</p>
+                      </div>
+                    </>
                   ) : (
                     <div className="story-cover-placeholder">
                       <div className="eyebrow">Preview</div>
@@ -669,9 +705,22 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 </div>
 
                 <div className="opening-block setup-preview-copy">
-                  {previewLines.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
+                  {openingPreviewLoading ? (
+                    <p>正在生成 AI 开场预览...</p>
+                  ) : (
+                    <MarkdownBlock
+                      className="story-markdown-block opening-markdown setup-preview-markdown"
+                      content={previewMarkdownContent}
+                    />
+                  )}
+                  {openingPreviewMetaLine ? (
+                    <p className="preview-meta-line">{openingPreviewMetaLine}</p>
+                  ) : null}
+                  {!openingPreviewLoading && openingPreviewError ? (
+                    <p className="preview-meta-line preview-meta-line-error">
+                      {openingPreviewError}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="summary-card">
@@ -733,7 +782,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     <div className="companion-card">
                       <div className="selection-card-title">AI 同伴入口</div>
                       <div className="summary-text">
-                        这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。
+                        这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2
+                        先保留页面结构和操作位置。
                       </div>
                     </div>
                     <div className="companion-card">
@@ -791,6 +841,34 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           </div>
         </div>
       </form>
+
+      {coverAsset && isCoverExpanded ? (
+        <div
+          aria-label="剧本封面大图预览"
+          className="story-cover-lightbox"
+          onClick={() => setIsCoverExpanded(false)}
+          role="dialog"
+        >
+          <div
+            className="story-cover-lightbox-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              aria-label="关闭大图预览"
+              className="ghost-button story-cover-lightbox-close"
+              onClick={() => setIsCoverExpanded(false)}
+              type="button"
+            >
+              收起图片
+            </button>
+            <img
+              alt={`${selectedStory?.title ?? "剧本"}封面大图`}
+              className="story-cover-lightbox-image"
+              src={coverAsset.url}
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

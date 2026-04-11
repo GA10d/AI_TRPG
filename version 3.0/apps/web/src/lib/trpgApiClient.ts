@@ -2,6 +2,7 @@ import type {
   BootstrapResponse,
   CreateSaveResponse,
   CreateSessionRequest,
+  GenerateOpeningPreviewResponse,
   SaveBundle,
   SessionSnapshot,
   SubmitTurnRequest
@@ -51,6 +52,24 @@ export async function createSession(
     });
 
     return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function generateOpeningPreview(
+  payload: CreateSessionRequest
+): Promise<GenerateOpeningPreviewResponse> {
+  try {
+    const response = await fetch("/api/previews/opening", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<GenerateOpeningPreviewResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

@@ -5,6 +5,7 @@ import type {
   PlayMode
 } from "./content.ts";
 import type {
+  AiGenerationMetadata,
   Message,
   ModelAccessMode,
   ReplayEvent,
@@ -31,6 +32,15 @@ export type CreateSessionRequest = {
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
   logViewMode?: "all" | "compact" | "hidden";
+};
+
+export type GenerateOpeningPreviewRequest = CreateSessionRequest;
+
+export type GenerateOpeningPreviewResponse = {
+  text: string;
+  provider: string;
+  mode: ModelAccessMode;
+  meta?: AiGenerationMetadata | null;
 };
 
 export type SubmitTurnRequest = {

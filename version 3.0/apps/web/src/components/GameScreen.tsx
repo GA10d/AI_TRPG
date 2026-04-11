@@ -4,6 +4,8 @@ import type {
   PlaythroughGraphBundle,
   SessionSnapshot
 } from "../../../../packages/shared-types/src/index.ts";
+import { formatAiGenerationMeta } from "../ui.ts";
+import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { PlaythroughGraphPanel } from "./PlaythroughGraphPanel.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
@@ -14,6 +16,7 @@ type GameScreenProps = {
   isSubmittingTurn: boolean;
   isSaving: boolean;
   isResumingBranch: boolean;
+  showAiMetadata: boolean;
   onBack: () => void;
   onContinueFromNode: (nodeId: string) => Promise<void>;
   onQuickEndingTest: () => Promise<void>;
@@ -30,6 +33,7 @@ export function GameScreen(props: GameScreenProps) {
     isSubmittingTurn,
     isSaving,
     isResumingBranch,
+    showAiMetadata,
     onBack,
     onContinueFromNode,
     onQuickEndingTest,
@@ -96,7 +100,13 @@ export function GameScreen(props: GameScreenProps) {
 
         <div className="opening-block">
           <div className="meta-label">主持人开场</div>
-          <pre>{openingMessage?.content ?? "暂未找到开场文本。"}</pre>
+          <MarkdownBlock
+            className="story-markdown-block opening-markdown"
+            content={openingMessage?.content ?? "暂未找到开场文本。"}
+          />
+          {showAiMetadata && openingMessage?.aiMetadata ? (
+            <div className="ai-meta-line">{formatAiGenerationMeta(openingMessage.aiMetadata)}</div>
+          ) : null}
         </div>
 
         {endingState ? (
@@ -146,7 +156,19 @@ export function GameScreen(props: GameScreenProps) {
                         {message.kind} / R{message.round}
                       </span>
                     </div>
-                    <div className="message-body">{message.content}</div>
+                    {message.aiMetadata ? (
+                      <MarkdownBlock
+                        className="story-markdown-block message-body message-body-markdown"
+                        content={message.content}
+                      />
+                    ) : (
+                      <div className="message-body">{message.content}</div>
+                    )}
+                    {showAiMetadata && message.aiMetadata ? (
+                      <div className="ai-meta-line">
+                        {formatAiGenerationMeta(message.aiMetadata)}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>
@@ -173,7 +195,8 @@ export function GameScreen(props: GameScreenProps) {
             <div className="info-banner info-banner-warning">
               <div className="meta-label">普通剧情已封口</div>
               <div className="summary-text">
-                这个会话已经进入结局，不能继续往后提交普通剧情。你可以从上方树里的旧节点继续，生成新的分支。
+                这个会话已经进入结局，不能继续往后提交普通剧情。你可以从上方树里的旧节点继续，
+                生成新的分支。
               </div>
             </div>
           ) : null}

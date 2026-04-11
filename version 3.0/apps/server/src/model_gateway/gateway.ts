@@ -20,11 +20,23 @@ class MockModelGateway implements ModelGateway {
     return {
       text: buildMockOpeningText(
         input.storyTitle,
-        input.storyIntro,
+        input.storyText,
         String(input.locale)
       ),
       provider: "mock-local",
-      mode: "mock"
+      mode: "mock",
+      meta: {
+        provider: "mock-local",
+        mode: "mock",
+        model: "mock-local",
+        durationMs: 0,
+        estimatedCostUsd: 0,
+        usage: {
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null
+        }
+      }
     };
   }
 
@@ -39,6 +51,18 @@ class MockModelGateway implements ModelGateway {
       text: outcome.text,
       provider: "mock-local",
       mode: "mock",
+      meta: {
+        provider: "mock-local",
+        mode: "mock",
+        model: "mock-local",
+        durationMs: 0,
+        estimatedCostUsd: 0,
+        usage: {
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null
+        }
+      },
       adjudication: outcome.adjudication
     };
   }

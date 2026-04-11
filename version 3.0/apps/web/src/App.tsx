@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
+  AiGenerationMetadata,
   SaveBundle,
   SaveRuntimeConfig,
   SessionSnapshot
@@ -9,6 +10,7 @@ import {
   createSave,
   createSession,
   fetchSession,
+  generateOpeningPreview,
   loadSaveBundle,
   submitTurn
 } from "./lib/trpgApiClient.ts";
@@ -57,6 +59,41 @@ function normalizeRuntimeConfig(
   };
 }
 
+function hasPreviewModelConfig(
+  accessMode: "mock" | "server_proxy",
+  bootstrap: ReturnType<typeof useBootstrapState>["bootstrap"],
+  modelProfileId: string,
+  runtimeModelConfig: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  }
+): boolean {
+  if (accessMode === "mock") {
+    return true;
+  }
+
+  const selectedProfile =
+    bootstrap?.modelProfiles.find((profile) => profile.id === modelProfileId) ?? null;
+
+  if (!selectedProfile) {
+    return false;
+  }
+
+  if (selectedProfile.configured) {
+    return true;
+  }
+
+  const hasApiKey = (runtimeModelConfig.apiKey?.trim() ?? "").length > 0;
+  const hasBaseUrl = (runtimeModelConfig.baseUrl?.trim() ?? "").length > 0;
+  const hasModel = (runtimeModelConfig.model?.trim() ?? "").length > 0;
+  const baseUrlReady =
+    !selectedProfile.urlRequirements || hasBaseUrl || Boolean(selectedProfile.baseUrl);
+  const modelReady = hasModel || Boolean(selectedProfile.baseModel);
+
+  return hasApiKey && baseUrlReady && modelReady;
+}
+
 export function App() {
   const [view, setView] = useState<AppView>("menu");
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
@@ -68,6 +105,11 @@ export function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
+  const [openingPreviewText, setOpeningPreviewText] = useState("");
+  const [openingPreviewProvider, setOpeningPreviewProvider] = useState<string | null>(null);
+  const [openingPreviewMeta, setOpeningPreviewMeta] = useState<AiGenerationMetadata | null>(null);
+  const [openingPreviewLoading, setOpeningPreviewLoading] = useState(false);
+  const [openingPreviewError, setOpeningPreviewError] = useState<string | null>(null);
 
   const {
     bootstrap,
@@ -81,6 +123,7 @@ export function App() {
     runtimeModelConfig,
     debugEnabled,
     logViewMode,
+    showAiMetadata,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setLocale,
@@ -90,7 +133,8 @@ export function App() {
     setModelProfileId,
     setRuntimeModelConfig,
     setDebugEnabled,
-    setLogViewMode
+    setLogViewMode,
+    setShowAiMetadata
   } = useBootstrapState({
     onStatusChange: setStatus
   });
@@ -116,6 +160,109 @@ export function App() {
   } = usePlaythroughGraph();
 
   const recentSave = savedGames[0] ?? null;
+  const previewModelReady = hasPreviewModelConfig(
+    modelAccessMode,
+    bootstrap,
+    modelProfileId,
+    runtimeModelConfig
+  );
+
+  useEffect(() => {
+    if (view !== "game_setup") {
+      setOpeningPreviewMeta(null);
+      setOpeningPreviewLoading(false);
+      setOpeningPreviewError(null);
+      return;
+    }
+
+    const selectedRule =
+      bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
+    const selectedStory =
+      selectedRule?.stories.find((item) => item.directoryName === storyDirectoryName) ?? null;
+
+    if (!bootstrap || !selectedRule || !selectedStory) {
+      setOpeningPreviewText("");
+      setOpeningPreviewProvider(null);
+      setOpeningPreviewMeta(null);
+      setOpeningPreviewLoading(false);
+      setOpeningPreviewError(null);
+      return;
+    }
+
+    if (!previewModelReady) {
+      setOpeningPreviewText("");
+      setOpeningPreviewProvider(null);
+      setOpeningPreviewMeta(null);
+      setOpeningPreviewLoading(false);
+      setOpeningPreviewError("当前模型尚未配置完整，暂时使用默认预览文案。");
+      return;
+    }
+
+    let cancelled = false;
+    setOpeningPreviewText("");
+    setOpeningPreviewProvider(null);
+    setOpeningPreviewMeta(null);
+    setOpeningPreviewLoading(true);
+    setOpeningPreviewError(null);
+
+    const timeoutHandle = window.setTimeout(async () => {
+      try {
+        const result = await generateOpeningPreview({
+          ruleDirectoryName,
+          storyDirectoryName,
+          locale,
+          playMode,
+          gmArchitecture,
+          modelAccessMode,
+          modelProfileId,
+          runtimeModelConfig,
+          debugEnabled,
+          promptDebugEnabled: false,
+          logViewMode
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setOpeningPreviewText(result.text);
+        setOpeningPreviewProvider(result.provider);
+        setOpeningPreviewMeta(result.meta ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setOpeningPreviewText("");
+        setOpeningPreviewProvider(null);
+        setOpeningPreviewMeta(null);
+        setOpeningPreviewError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!cancelled) {
+          setOpeningPreviewLoading(false);
+        }
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutHandle);
+    };
+  }, [
+    bootstrap,
+    debugEnabled,
+    gmArchitecture,
+    locale,
+    logViewMode,
+    modelAccessMode,
+    modelProfileId,
+    playMode,
+    previewModelReady,
+    ruleDirectoryName,
+    runtimeModelConfig,
+    storyDirectoryName,
+    view
+  ]);
 
   function buildSaveRuntimeConfig(
     profileIdOverride?: string
@@ -135,7 +282,8 @@ export function App() {
       modelProfileId,
       runtimeModelConfig,
       debugEnabled,
-      logViewMode
+      logViewMode,
+      showAiMetadata
     });
   }
 
@@ -487,6 +635,7 @@ export function App() {
     });
     setLogViewMode(bootstrap.defaults.logViewMode);
     setDebugEnabled(true);
+    setShowAiMetadata(true);
     setStatus({
       message: "已恢复默认设置。",
       tone: "neutral"
@@ -592,6 +741,12 @@ export function App() {
           logViewMode={logViewMode}
           characterConcept={characterConcept}
           isCreating={isCreating}
+          openingPreviewText={openingPreviewText}
+          openingPreviewProvider={openingPreviewProvider}
+          openingPreviewMeta={openingPreviewMeta}
+          openingPreviewLoading={openingPreviewLoading}
+          openingPreviewError={openingPreviewError}
+          showAiMetadata={showAiMetadata}
           onBack={() => setView("story_select")}
           onClose={() => setView("menu")}
           onSubmit={handleCreateSession}
@@ -645,6 +800,7 @@ export function App() {
           runtimeModelConfig={runtimeModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
+          showAiMetadata={showAiMetadata}
           onBack={() => setView("menu")}
           onSubmit={handleSaveSettings}
           onReset={handleResetSettings}
@@ -655,6 +811,7 @@ export function App() {
           onModelProfileIdChange={setModelProfileId}
           onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
+          onShowAiMetadataChange={setShowAiMetadata}
           onLogViewModeChange={setLogViewMode}
         />
       );
@@ -678,6 +835,7 @@ export function App() {
           isSubmittingTurn={isSubmittingTurn}
           isSaving={isSaving}
           isResumingBranch={isResumingBranch}
+          showAiMetadata={showAiMetadata}
           onBack={() => setView("menu")}
           onContinueFromNode={handleContinueFromNode}
           onQuickEndingTest={handleQuickEndingTest}

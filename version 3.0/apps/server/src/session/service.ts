@@ -117,7 +117,8 @@ export async function createSessionSnapshot(
     bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ?? bundle.rule.manifest.id;
   const storyTitle =
     bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ?? bundle.story.manifest.id;
-  const storyIntro = bundle.story.intro?.content ?? bundle.story.story.content;
+  const ruleText = bundle.rule.rule.content;
+  const storyText = bundle.story.story.content;
   const modelProfileId =
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
   const modelGateway = getModelGateway(request.modelAccessMode);
@@ -126,8 +127,10 @@ export async function createSessionSnapshot(
     modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig,
     locale: bundle.resolvedLocale,
+    ruleTitle,
+    ruleText,
     storyTitle,
-    storyIntro
+    storyText
   });
 
   const session: Session = {
@@ -187,12 +190,13 @@ export async function createSessionSnapshot(
       createdAt: timestamp,
       senderId: gmParticipantId,
       recipientIds: [playerParticipantId],
-      visibility: "public",
-      kind: "gm_narration",
-      content: openingResult.text,
-      tags: [
-        "opening",
-        `provider:${openingResult.provider}`
+    visibility: "public",
+    kind: "gm_narration",
+    content: openingResult.text,
+    aiMetadata: openingResult.meta,
+    tags: [
+      "opening",
+      `provider:${openingResult.provider}`
       ]
     }
   ];
@@ -343,6 +347,7 @@ export async function submitMockTurn(
     visibility: "public",
     kind: "gm_narration",
     content: turnNarration.text,
+    aiMetadata: turnNarration.meta,
     tags: [
       "turn_response",
       `provider:${turnNarration.provider}`

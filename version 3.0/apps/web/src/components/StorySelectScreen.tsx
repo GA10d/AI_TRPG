@@ -426,15 +426,6 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   const ruleIntroText = pickRuleIntroText(selectedRule);
   const storyIntroText = pickStoryIntroText(selectedStory);
   const storyCoverQuote = pickStoryCoverQuote(selectedStory);
-  const visualCardStyle: CSSProperties | undefined = coverAsset
-    ? {
-        backgroundImage: [
-          "linear-gradient(180deg, rgba(24, 11, 8, 0.16) 0%, rgba(24, 11, 8, 0.78) 100%)",
-          `url("${coverAsset.url}")`
-        ].join(", ")
-      }
-    : undefined;
-
   const rulePaneStyle: CSSProperties = {
     width: layout.ruleWidth,
     minWidth: RULE_MIN_WIDTH
@@ -633,8 +624,14 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             <div className="story-detail-panel">
               <div
                 className={`story-visual-card ${coverAsset ? "story-visual-card-covered" : "story-visual-card-fallback"}`}
-                style={visualCardStyle}
               >
+                {coverAsset ? (
+                  <img
+                    alt={`${selectedStory.title} 灏侀潰`}
+                    className="story-cover-image"
+                    src={coverAsset.url}
+                  />
+                ) : null}
                 {coverAsset ? (
                   <button
                     aria-label={isCoverExpanded ? "收起大图" : "查看大图"}

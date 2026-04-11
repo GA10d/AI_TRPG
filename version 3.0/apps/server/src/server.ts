@@ -12,10 +12,14 @@ import {
 import type {
   BootstrapResponse,
   CreateSessionRequest,
+  GenerateOpeningPreviewRequest,
   LoadSaveRequest,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
-import { loadContentCatalog } from "./content/index.ts";
+import {
+  loadContentCatalog,
+  loadPlayableContentBundle
+} from "./content/index.ts";
 import {
   buildDefaultCreateSessionRequest,
   createSaveBundleForSession,
@@ -28,6 +32,7 @@ import {
   getServerProxyStatus,
   listModelProfileSummaries
 } from "./model_gateway/config.ts";
+import { getModelGateway } from "./model_gateway/index.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -199,6 +204,35 @@ async function handleApiRequest(
     const payload = await readJsonBody<CreateSessionRequest>(request);
     const snapshot = await createSessionSnapshot(contentRoot, payload, store);
     sendJson(response, 201, snapshot);
+    return true;
+  }
+
+  if (url.pathname === "/api/previews/opening" && request.method === "POST") {
+    const payload = await readJsonBody<GenerateOpeningPreviewRequest>(request);
+    const bundle = await loadPlayableContentBundle(
+      contentRoot,
+      payload.ruleDirectoryName,
+      payload.storyDirectoryName,
+      payload.locale
+    );
+    const modelGateway = getModelGateway(payload.modelAccessMode);
+    const ruleTitle =
+      bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ??
+      bundle.rule.manifest.id;
+    const storyTitle =
+      bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ??
+      bundle.story.manifest.id;
+    const openingPreview = await modelGateway.generateOpening({
+      accessMode: payload.modelAccessMode,
+      modelProfileId: payload.modelProfileId,
+      runtimeModelConfig: payload.runtimeModelConfig,
+      locale: bundle.resolvedLocale,
+      ruleTitle,
+      ruleText: bundle.rule.rule.content,
+      storyTitle,
+      storyText: bundle.story.story.content
+    });
+    sendJson(response, 200, openingPreview);
     return true;
   }
 

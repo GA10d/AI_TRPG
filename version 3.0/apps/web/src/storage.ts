@@ -21,6 +21,7 @@ export type StoredWebDefaults = {
   runtimeModelConfig?: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
+  showAiMetadata: boolean;
 };
 
 export type SessionRecord = {

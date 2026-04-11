@@ -12,6 +12,21 @@ export type ModelAccessMode =
   | "server_proxy"
   | "browser_direct";
 
+export type AiGenerationUsage = {
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+};
+
+export type AiGenerationMetadata = {
+  provider: string;
+  mode: ModelAccessMode;
+  model?: string | null;
+  durationMs?: number | null;
+  estimatedCostUsd?: number | null;
+  usage?: AiGenerationUsage | null;
+};
+
 export type Visibility =
   | "public"
   | "private"
@@ -117,6 +132,7 @@ export type Message = {
     | "debug";
   content: string;
   tags?: string[];
+  aiMetadata?: AiGenerationMetadata | null;
 };
 
 export type ReplayEvent = {

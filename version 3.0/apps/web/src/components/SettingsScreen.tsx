@@ -20,6 +20,7 @@ type SettingsScreenProps = {
   runtimeModelConfig: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
+  showAiMetadata: boolean;
   onBack: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
@@ -30,6 +31,7 @@ type SettingsScreenProps = {
   onModelProfileIdChange: (value: string) => void;
   onRuntimeModelConfigChange: (value: RuntimeModelConfigInput) => void;
   onDebugEnabledChange: (value: boolean) => void;
+  onShowAiMetadataChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
@@ -46,6 +48,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
     runtimeModelConfig,
     debugEnabled,
     logViewMode,
+    showAiMetadata,
     onBack,
     onSubmit,
     onReset,
@@ -56,6 +59,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onModelProfileIdChange,
     onRuntimeModelConfigChange,
     onDebugEnabledChange,
+    onShowAiMetadataChange,
     onLogViewModeChange
   } = props;
 
@@ -256,6 +260,18 @@ export function SettingsScreen(props: SettingsScreenProps) {
               onChange={(event) => onDebugEnabledChange(event.target.checked)}
             />
             <span>默认开启调试日志</span>
+          </label>
+        </label>
+
+        <label className="field checkbox-field">
+          <span>AI 生成信息</span>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={showAiMetadata}
+              onChange={(event) => onShowAiMetadataChange(event.target.checked)}
+            />
+            <span>{showAiMetadata ? "显示耗时 / token / 费用信息" : "隐藏耗时 / token / 费用信息"}</span>
           </label>
         </label>
 

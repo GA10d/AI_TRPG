@@ -1,4 +1,5 @@
 import type {
+  AiGenerationMetadata,
   EndingAdjudication,
   LocaleCode,
   ModelAccessMode,
@@ -10,14 +11,17 @@ export type OpeningGenerationInput = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
+  ruleTitle: string;
+  ruleText: string;
   storyTitle: string;
-  storyIntro: string;
+  storyText: string;
 };
 
 export type OpeningGenerationOutput = {
   text: string;
   provider: string;
   mode: ModelAccessMode;
+  meta: AiGenerationMetadata;
 };
 
 export type TurnNarrationInput = {
@@ -35,6 +39,7 @@ export type TurnNarrationOutput = {
   text: string;
   provider: string;
   mode: ModelAccessMode;
+  meta: AiGenerationMetadata;
   adjudication?: EndingAdjudication | null;
 };
 

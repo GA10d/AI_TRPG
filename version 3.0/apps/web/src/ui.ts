@@ -1,4 +1,7 @@
-import type { CreateSessionRequest } from "../../../packages/shared-types/src/index.ts";
+import type {
+  AiGenerationMetadata,
+  CreateSessionRequest
+} from "../../../packages/shared-types/src/index.ts";
 
 export type AppView =
   | "menu"
@@ -23,7 +26,7 @@ export const PLAY_MODE_OPTIONS: Array<{
   {
     value: "single_player",
     label: "单人模式",
-    description: "由你一人推进剧情，适合最轻量的体验。"
+    description: "由你一个人推进剧情，适合最轻量的体验。"
   },
   {
     value: "single_player_with_npc",
@@ -112,7 +115,7 @@ export function buildPreviewLines(content: string | null | undefined, maxLines =
   if (!normalized) {
     return [
       "夜幕正在收拢，旧磁带里的声音还没完全显形。",
-      "这一段预览区会在后续接入真实开场生成。",
+      "这段预览区会在后续接入真实开场生成。",
       "当前先根据剧本简介和规则设定为你搭起氛围。"
     ];
   }
@@ -122,4 +125,30 @@ export function buildPreviewLines(content: string | null | undefined, maxLines =
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, maxLines);
+}
+
+export function formatAiGenerationMeta(meta: AiGenerationMetadata | null | undefined): string {
+  if (!meta) {
+    return "";
+  }
+
+  const segments: string[] = [];
+  if (meta.provider) {
+    segments.push(`来源：${meta.provider}`);
+  }
+  if (typeof meta.durationMs === "number") {
+    segments.push(
+      `耗时：${(meta.durationMs / 1000).toFixed(meta.durationMs >= 1000 ? 2 : 1)}s`
+    );
+  }
+  if (typeof meta.usage?.totalTokens === "number") {
+    segments.push(`Tokens：${meta.usage.totalTokens}`);
+  }
+  if (typeof meta.estimatedCostUsd === "number") {
+    segments.push(`费用：$${meta.estimatedCostUsd.toFixed(6)}`);
+  } else {
+    segments.push("费用：待补充");
+  }
+
+  return segments.join(" · ");
 }
