@@ -34,7 +34,9 @@ export type CreateSessionRequest = {
   logViewMode?: "all" | "compact" | "hidden";
 };
 
-export type GenerateOpeningPreviewRequest = CreateSessionRequest;
+export type GenerateOpeningPreviewRequest = CreateSessionRequest & {
+  forceRegenerateOpening?: boolean;
+};
 
 export type GenerateOpeningPreviewResponse = {
   text: string;

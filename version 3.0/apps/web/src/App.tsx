@@ -1,8 +1,9 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import type {
   AiGenerationMetadata,
   CreateSessionRequest,
+  GenerateOpeningPreviewRequest,
   SaveBundle,
   SaveRuntimeConfig,
   SessionSnapshot
@@ -122,6 +123,8 @@ export function App() {
   const [openingPreviewMeta, setOpeningPreviewMeta] = useState<AiGenerationMetadata | null>(null);
   const [openingPreviewLoading, setOpeningPreviewLoading] = useState(false);
   const [openingPreviewError, setOpeningPreviewError] = useState<string | null>(null);
+  const [openingPreviewRegenerateNonce, setOpeningPreviewRegenerateNonce] = useState(0);
+  const lastHandledOpeningPreviewRegenerateNonceRef = useRef(0);
 
   const {
     bootstrap,
@@ -225,6 +228,13 @@ export function App() {
 
     let cancelled = false;
     const abortController = new AbortController();
+    const forceRegenerateOpening =
+      openingPreviewRegenerateNonce > lastHandledOpeningPreviewRegenerateNonceRef.current;
+
+    if (forceRegenerateOpening) {
+      lastHandledOpeningPreviewRegenerateNonceRef.current = openingPreviewRegenerateNonce;
+    }
+
     setOpeningPreviewText("");
     setOpeningPreviewProvider(null);
     setOpeningPreviewMeta(null);
@@ -233,7 +243,7 @@ export function App() {
 
     const timeoutHandle = window.setTimeout(async () => {
       try {
-        const requestPayload: CreateSessionRequest = {
+        const requestPayload: GenerateOpeningPreviewRequest = {
           ruleDirectoryName,
           storyDirectoryName,
           locale,
@@ -244,7 +254,8 @@ export function App() {
           runtimeModelConfig,
           debugEnabled,
           promptDebugEnabled: false,
-          logViewMode
+          logViewMode,
+          forceRegenerateOpening
         };
         const result =
           openingPreviewDeliveryMode === "stream"
@@ -297,6 +308,7 @@ export function App() {
     locale,
     logViewMode,
     openingPreviewDeliveryMode,
+    openingPreviewRegenerateNonce,
     modelAccessMode,
     modelProfileId,
     playMode,
@@ -737,6 +749,10 @@ export function App() {
     setView("story_select");
   }
 
+  function handleRegenerateOpeningPreview(): void {
+    setOpeningPreviewRegenerateNonce((current) => current + 1);
+  }
+
   function handleEnterGameSetup(): void {
     const selectedRule =
       bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
@@ -805,6 +821,7 @@ export function App() {
           onModelProfileIdChange={setModelProfileId}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
+          onRegenerateOpeningPreview={handleRegenerateOpeningPreview}
           onOpeningPreviewDeliveryModeChange={setOpeningPreviewDeliveryMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}

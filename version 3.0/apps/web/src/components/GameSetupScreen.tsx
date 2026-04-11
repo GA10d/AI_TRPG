@@ -55,6 +55,7 @@ type GameSetupScreenProps = {
   onBack: () => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onRegenerateOpeningPreview: () => void;
   onLocaleChange: (value: CreateSessionRequest["locale"]) => void;
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
@@ -265,6 +266,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onBack,
     onClose,
     onSubmit,
+    onRegenerateOpeningPreview,
     onLocaleChange,
     onPlayModeChange,
     onGmArchitectureChange,
@@ -723,8 +725,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
           <section className="setup-pane setup-pane-center">
             <div className="selection-column-header">
-              <div className="eyebrow">Opening Preview</div>
-              <h2>开场预览</h2>
+              <div>
+                <div className="eyebrow">Opening Preview</div>
+                <h2>开场预览</h2>
+              </div>
+              <button
+                className="ghost-button ghost-button-small"
+                disabled={openingPreviewLoading}
+                onClick={onRegenerateOpeningPreview}
+                type="button"
+              >
+                {openingPreviewLoading ? "生成中..." : "重新生成开场白"}
+              </button>
             </div>
 
             <div className="setup-pane-scroll">

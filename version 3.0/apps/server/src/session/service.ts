@@ -16,8 +16,9 @@ import type {
   SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
 import { buildSystemCreatedMessage } from "../mock/index.ts";
-import { getModelGateway } from "../model_gateway/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
+import { getModelGateway } from "../model_gateway/index.ts";
+import { resolveStoryOpening } from "../opening/service.ts";
 import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
 
 function nowIso(): string {
@@ -117,20 +118,12 @@ export async function createSessionSnapshot(
     bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ?? bundle.rule.manifest.id;
   const storyTitle =
     bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ?? bundle.story.manifest.id;
-  const ruleText = bundle.rule.rule.content;
-  const storyText = bundle.story.story.content;
   const modelProfileId =
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
-  const modelGateway = getModelGateway(request.modelAccessMode);
-  const openingResult = await modelGateway.generateOpening({
-    accessMode: request.modelAccessMode,
+  const openingResult = await resolveStoryOpening(bundle, {
+    modelAccessMode: request.modelAccessMode,
     modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig,
-    locale: bundle.resolvedLocale,
-    ruleTitle,
-    ruleText,
-    storyTitle,
-    storyText
   });
 
   const session: Session = {

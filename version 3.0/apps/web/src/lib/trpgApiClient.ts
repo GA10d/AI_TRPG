@@ -2,6 +2,7 @@ import type {
   BootstrapResponse,
   CreateSaveResponse,
   CreateSessionRequest,
+  GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
   SaveBundle,
   SessionSnapshot,
@@ -79,7 +80,7 @@ export async function createSession(
 }
 
 export async function generateOpeningPreview(
-  payload: CreateSessionRequest,
+  payload: GenerateOpeningPreviewRequest,
   options?: {
     signal?: AbortSignal;
   }
@@ -101,7 +102,7 @@ export async function generateOpeningPreview(
 }
 
 export async function streamOpeningPreview(
-  payload: CreateSessionRequest,
+  payload: GenerateOpeningPreviewRequest,
   options?: {
     signal?: AbortSignal;
     onTextDelta?: (delta: string) => void;

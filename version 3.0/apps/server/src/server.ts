@@ -33,7 +33,7 @@ import {
   getServerProxyStatus,
   listModelProfileSummaries
 } from "./model_gateway/config.ts";
-import { getModelGateway } from "./model_gateway/index.ts";
+import { resolveStoryOpening } from "./opening/service.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -237,22 +237,11 @@ async function handleApiRequest(
       payload.storyDirectoryName,
       payload.locale
     );
-    const modelGateway = getModelGateway(payload.modelAccessMode);
-    const ruleTitle =
-      bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ??
-      bundle.rule.manifest.id;
-    const storyTitle =
-      bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ??
-      bundle.story.manifest.id;
-    const openingPreview = await modelGateway.generateOpening({
-      accessMode: payload.modelAccessMode,
+    const openingPreview = await resolveStoryOpening(bundle, {
+      modelAccessMode: payload.modelAccessMode,
       modelProfileId: payload.modelProfileId,
       runtimeModelConfig: payload.runtimeModelConfig,
-      locale: bundle.resolvedLocale,
-      ruleTitle,
-      ruleText: bundle.rule.rule.content,
-      storyTitle,
-      storyText: bundle.story.story.content
+      forceRegenerateOpening: payload.forceRegenerateOpening
     });
     sendJson(response, 200, openingPreview);
     return true;
@@ -266,13 +255,6 @@ async function handleApiRequest(
       payload.storyDirectoryName,
       payload.locale
     );
-    const modelGateway = getModelGateway(payload.modelAccessMode);
-    const ruleTitle =
-      bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ??
-      bundle.rule.manifest.id;
-    const storyTitle =
-      bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ??
-      bundle.story.manifest.id;
 
     response.writeHead(200, {
       "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -286,16 +268,13 @@ async function handleApiRequest(
     request.on("close", () => abortController.abort());
 
     try {
-      const openingPreview = await modelGateway.streamOpening(
+      const openingPreview = await resolveStoryOpening(
+        bundle,
         {
-          accessMode: payload.modelAccessMode,
+          modelAccessMode: payload.modelAccessMode,
           modelProfileId: payload.modelProfileId,
           runtimeModelConfig: payload.runtimeModelConfig,
-          locale: bundle.resolvedLocale,
-          ruleTitle,
-          ruleText: bundle.rule.rule.content,
-          storyTitle,
-          storyText: bundle.story.story.content
+          forceRegenerateOpening: payload.forceRegenerateOpening
         },
         {
           signal: abortController.signal,

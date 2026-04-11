@@ -347,7 +347,9 @@ export async function loadStoryPackage(
   ]);
   const story = await readLocalizedAsset(baseDir, requestedLocale, manifest.defaultLocale, manifest.availableLocales, "story.md", [
     "story.md",
-    "story.txt"
+    "story.txt",
+    `${storyId}.md`,
+    `${storyId}.txt`
   ]);
 
   if (!story) {

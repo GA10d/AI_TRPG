@@ -527,6 +527,9 @@
 
 **类型**：同伴 / 历史看守人 / 潜在误导者  
 **表层印象**：瘦削、谨慎、礼数周全，像个想把整件事平平稳稳“处理掉”的老管家  
+**外貌**： an elderly Chinese male steward of a decaying ancestral mansion in the mountains, gaunt, reserved, meticulous, and deeply burdened by old family secrets. He has a narrow bony face, hollow cheeks, pale sallow skin, thin lips, deep nasolabial lines, and wary, intelligent eyes that avoid direct confrontation. His hair is sparse, graying, carefully combed back with a slightly old-fashioned side part, neat but damp from the humid air. His posture is slightly stooped from age and long years of service, yet still disciplined and formal, like a man trained to keep order even while everything around him rots.
+
+He wears a dark charcoal-black traditional long Chinese changshan layered with an old butler-like sleeveless outer vest, slightly worn at the cuffs and hem, the fabric matte, heavy, and well maintained despite its age. The collar is high and buttoned neatly to the throat. His sleeves are narrow and practical, one sleeve subtly hiding an old brass key. He wears old black cloth shoes, clean but softened by years of use. His clothing should feel understated, severe, and conservative, showing loyalty, restraint, and emotional repression rather than wealth.
 **真实动机**：他既想让白栀离开，又怕真相彻底掀开后余家最后一点体面和自己守了一辈子的意义一起塌掉。他不是恶人，但长期用“替死人找个说法”的方式替活人遮羞。  
 **立场**：摇摆；前期偏向保宅和止事，后期视玩家行为可能转向坦白或继续遮掩  
 **与玩家关系**：最早的向导与信息源，也是最重要的不可靠叙述者  
