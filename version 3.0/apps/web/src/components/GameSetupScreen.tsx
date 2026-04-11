@@ -75,6 +75,7 @@ type GameSetupScreenProps = {
 };
 
 type DragTarget = "left" | "right" | null;
+type SetupDetailTab = "game" | "model" | "companions";
 
 type SetupLayoutState = {
   leftWidth: number;
@@ -290,6 +291,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const [layout, setLayout] = useState<SetupLayoutState>(() => loadStoredLayout());
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
   const [isCoverExpanded, setIsCoverExpanded] = useState(false);
+  const [isSettingsDetailOpen, setIsSettingsDetailOpen] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<SetupDetailTab>("game");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -406,6 +409,15 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     }));
   }
 
+  function handleOpenSettingsDetail(tab: SetupDetailTab): void {
+    setActiveDetailTab(tab);
+    setIsSettingsDetailOpen(true);
+  }
+
+  function handleCloseSettingsDetail(): void {
+    setIsSettingsDetailOpen(false);
+  }
+
   const selectedRule =
     bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
   const selectedStory =
@@ -457,6 +469,488 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     minWidth: RIGHT_MIN_WIDTH
   };
 
+  const detailTabs: Array<{
+    value: SetupDetailTab;
+    label: string;
+    description: string;
+  }> = [
+    {
+      value: "game",
+      label: "游戏设置",
+      description: "语言、主持方式、显示和游玩节奏相关配置。"
+    },
+    {
+      value: "model",
+      label: "模型设置",
+      description: "模型入口、档案与当前能力概览。"
+    },
+    {
+      value: "companions",
+      label: "同行者设置",
+      description: "AI 同伴入口、内容边界与后续扩展位。"
+    }
+  ];
+
+  function renderGameSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
+    const containerClassName =
+      layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
+
+    return (
+      <div className={containerClassName}>
+        <SettingField label="语言" hint="控制内容文本和界面的基础语言。">
+          <select
+            value={locale}
+            onChange={(event) =>
+              onLocaleChange(event.target.value as CreateSessionRequest["locale"])
+            }
+          >
+            {bootstrap?.languages.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.nativeLabel} / {language.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField label="难度" hint="难度还没接入真实裁定，当前先固定为标准。">
+          <select disabled value="normal">
+            <option value="normal">标准（待开发）</option>
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="主持架构"
+          hint="为单 Agent / 多 Agent 主持预留统一入口。"
+        >
+          <select
+            value={gmArchitecture}
+            onChange={(event) =>
+              onGmArchitectureChange(
+                event.target.value as CreateSessionRequest["gmArchitecture"]
+              )
+            }
+          >
+            {GM_ARCHITECTURE_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="游戏模式"
+          hint="当前 MVP 先保留单人、单人 + NPC 和多人入口。"
+        >
+          <select
+            value={playMode}
+            onChange={(event) =>
+              onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
+            }
+          >
+            {PLAY_MODE_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+      </div>
+    );
+  }
+
+  function renderModelSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
+    const containerClassName =
+      layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
+
+    return (
+      <div className={containerClassName}>
+        <SettingField
+          label="模型模式"
+          hint="决定这局是纯 mock，还是通过代理接入真实模型。"
+        >
+          <select
+            value={modelAccessMode}
+            onChange={(event) =>
+              onModelAccessModeChange(
+                event.target.value as CreateSessionRequest["modelAccessMode"]
+              )
+            }
+          >
+            {bootstrap?.modelAccessModes.map((mode) => (
+              <option key={mode.code} value={mode.code}>
+                {mode.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="模型档案"
+          hint="这里只负责选择本局要使用的模型档案。"
+        >
+          <select
+            value={selectedProfile?.id ?? modelProfileId}
+            onChange={(event) => onModelProfileIdChange(event.target.value)}
+          >
+            {availableProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="日志显示"
+          hint="控制日志区域的细粒度，方便游玩或排查。"
+        >
+          <select
+            value={logViewMode}
+            onChange={(event) =>
+              onLogViewModeChange(
+                event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
+              )
+            }
+          >
+            {LOG_VIEW_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="开场传输"
+          hint="流式会边生成边显示；完整传输会等待全文完成后再显示。"
+        >
+          <select
+            value={openingPreviewDeliveryMode}
+            onChange={(event) =>
+              onOpeningPreviewDeliveryModeChange(
+                event.target.value as OpeningPreviewDeliveryMode
+              )
+            }
+          >
+            {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="Markdown 字号"
+          hint="控制 AI 正文、标题和列表的渲染大小。"
+        >
+          <select
+            value={markdownFontSize}
+            onChange={(event) =>
+              onMarkdownFontSizeChange(
+                event.target.value as MarkdownFontSizePreset
+              )
+            }
+          >
+            {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingField>
+
+        <SettingField
+          label="调试模式"
+          hint="当前主要用于调试模型与运行时日志。"
+        >
+          <label className="toggle-row">
+            <input
+              checked={debugEnabled}
+              type="checkbox"
+              onChange={(event) => onDebugEnabledChange(event.target.checked)}
+            />
+            <span>{debugEnabled ? "开启" : "关闭"}</span>
+          </label>
+        </SettingField>
+      </div>
+    );
+  }
+
+  function renderCompanionCards(gridClassName?: string): React.ReactNode {
+    return (
+      <div className={gridClassName ?? "companion-list"}>
+        <div className="companion-card">
+          <div className="selection-card-title">AI 同伴入口</div>
+          <div className="summary-text">
+            这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。
+          </div>
+        </div>
+
+        <div className="companion-card">
+          <div className="selection-card-title">添加同伴</div>
+          <div className="summary-text">待开发：支持创建、编辑和删除 AI 玩家。</div>
+          <button className="ghost-button" disabled type="button">
+            + 添加同伴
+          </button>
+        </div>
+
+        <div className="companion-card">
+          <div className="selection-card-title">内容警告</div>
+          <div className="summary-text">
+            {renderJoinedList(
+              selectedStory?.contentWarnings ?? selectedRule?.contentWarnings ?? []
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderGameSettingsDetailTab(): React.ReactNode {
+    return (
+      <div className="settings-model-overview">
+        <div className="settings-model-grid">
+          <article className="summary-card settings-model-card">
+            <div className="setup-section-heading">
+              <div className="eyebrow">Game</div>
+              <div className="summary-title">基础游戏设置</div>
+            </div>
+            {renderGameSettingsFields("detail")}
+          </article>
+
+          <article className="summary-card settings-model-card">
+            <div className="setup-section-heading">
+              <div className="eyebrow">Display</div>
+              <div className="summary-title">显示与调试</div>
+            </div>
+            <div className="setup-detail-fields-grid">
+              <SettingField
+                label="日志显示"
+                hint="控制日志区域的细粒度，方便游玩或排查。"
+              >
+                <select
+                  value={logViewMode}
+                  onChange={(event) =>
+                    onLogViewModeChange(
+                      event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
+                    )
+                  }
+                >
+                  {LOG_VIEW_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </SettingField>
+
+              <SettingField
+                label="开场传输"
+                hint="流式会边生成边显示；完整传输会等待全文完成后再显示。"
+              >
+                <select
+                  value={openingPreviewDeliveryMode}
+                  onChange={(event) =>
+                    onOpeningPreviewDeliveryModeChange(
+                      event.target.value as OpeningPreviewDeliveryMode
+                    )
+                  }
+                >
+                  {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </SettingField>
+
+              <SettingField
+                label="Markdown 字号"
+                hint="控制 AI 正文、标题和列表的渲染大小。"
+              >
+                <select
+                  value={markdownFontSize}
+                  onChange={(event) =>
+                    onMarkdownFontSizeChange(
+                      event.target.value as MarkdownFontSizePreset
+                    )
+                  }
+                >
+                  {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </SettingField>
+
+              <SettingField
+                label="调试模式"
+                hint="当前主要用于调试模型与运行时日志。"
+              >
+                <label className="toggle-row">
+                  <input
+                    checked={debugEnabled}
+                    type="checkbox"
+                    onChange={(event) => onDebugEnabledChange(event.target.checked)}
+                  />
+                  <span>{debugEnabled ? "开启" : "关闭"}</span>
+                </label>
+              </SettingField>
+            </div>
+          </article>
+        </div>
+
+        <article className="summary-card settings-model-entry">
+          <div className="settings-model-entry-head">
+            <div>
+              <div className="eyebrow">Current Run</div>
+              <div className="summary-title">当前局面概览</div>
+            </div>
+          </div>
+          <div className="settings-model-entry-grid">
+            <div className="summary-text">
+              规则：{selectedRule?.ruleTitle ?? "未选择规则"}
+            </div>
+            <div className="summary-text">
+              剧本：{selectedStory?.title ?? "未选择剧本"}
+            </div>
+            <div className="summary-text">
+              标签：{renderJoinedList(selectedStory?.tags ?? [])}
+            </div>
+            <div className="summary-text">
+              主持风格：{selectedStory?.gmStyle ?? "待定"}
+            </div>
+          </div>
+        </article>
+      </div>
+    );
+  }
+
+  function renderModelSettingsDetailTab(): React.ReactNode {
+    return (
+      <div className="settings-model-overview">
+        <div className="settings-model-grid">
+          <article className="summary-card settings-model-card">
+            <div className="setup-section-heading">
+              <div className="eyebrow">Model</div>
+              <div className="summary-title">模型入口设置</div>
+            </div>
+            {renderModelSettingsFields("detail")}
+          </article>
+
+          {selectedProfile ? (
+            <article className="summary-card settings-model-card">
+              <div className="setup-section-heading">
+                <div className="eyebrow">Capabilities</div>
+                <div className="summary-title">模型能力</div>
+                <div className="summary-text">
+                  这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。
+                </div>
+              </div>
+              <div className="model-capability-list">
+                {selectedProfile.featureDetails.map((feature) => (
+                  <div
+                    key={feature.key}
+                    className={`model-capability-item ${
+                      feature.supported
+                        ? "model-capability-item-supported"
+                        : "model-capability-item-unsupported"
+                    }`}
+                  >
+                    <div className="model-capability-row">
+                      <span className="model-capability-label">{feature.label}</span>
+                      <span className="model-capability-state">
+                        {feature.supported ? "支持" : "不支持"}
+                      </span>
+                    </div>
+                    <div className="model-capability-meta">
+                      {feature.model ? `参考模型：${feature.model}` : "未标注具体模型"}
+                      {feature.url ? (
+                        <>
+                          {" · "}
+                          <a href={feature.url} rel="noreferrer" target="_blank">
+                            官方说明
+                          </a>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ) : (
+            <article className="summary-card settings-model-card">
+              <div className="setup-section-heading">
+                <div className="eyebrow">Capabilities</div>
+                <div className="summary-title">模型能力</div>
+              </div>
+              <div className="summary-text">当前没有可用模型档案，暂时无法显示能力信息。</div>
+            </article>
+          )}
+        </div>
+
+        <article className="summary-card settings-model-entry">
+          <div className="settings-model-entry-head">
+            <div>
+              <div className="eyebrow">Summary</div>
+              <div className="summary-title">当前模型概览</div>
+            </div>
+          </div>
+          <div className="settings-model-entry-grid">
+            <div className="summary-text">
+              入口：{selectedModelMode?.label ?? "未配置"}
+            </div>
+            <div className="summary-text">
+              档案：{selectedProfile?.name ?? "未配置"}
+            </div>
+            <div className="summary-text">实际模型：{resolvedModelName}</div>
+            <div className="summary-text">
+              状态：{profileReady ? "可创建会话" : "还需补全配置"}
+            </div>
+            <div className="summary-text">
+              说明：{selectedProfile?.message ?? "未提供说明"}
+            </div>
+          </div>
+        </article>
+      </div>
+    );
+  }
+
+  function renderCompanionSettingsDetailTab(): React.ReactNode {
+    return (
+      <div className="settings-model-overview">
+        <article className="summary-card settings-model-entry">
+          <div className="settings-model-entry-head">
+            <div>
+              <div className="eyebrow">Companions</div>
+              <div className="summary-title">同行者设置</div>
+            </div>
+          </div>
+          <div className="summary-text">
+            这里集中展示同伴入口、扩展位和当前剧本的内容边界，后续多人玩法也会从这里展开。
+          </div>
+        </article>
+
+        {renderCompanionCards("setup-detail-companion-grid")}
+      </div>
+    );
+  }
+
+  function renderActiveDetailTab(): React.ReactNode {
+    if (activeDetailTab === "model") {
+      return renderModelSettingsDetailTab();
+    }
+
+    if (activeDetailTab === "companions") {
+      return renderCompanionSettingsDetailTab();
+    }
+
+    return renderGameSettingsDetailTab();
+  }
+
   return (
     <section className="panel page-panel setup-page-panel">
       <ScreenHeader
@@ -487,245 +981,79 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               <section className="setup-pane setup-pane-left" style={leftPaneStyle}>
                 <div className="selection-column-header">
                   <div>
-                    <div className="eyebrow">Global Config</div>
-                    <h2>全局配置</h2>
+                    <div className="eyebrow">Setup Overview</div>
+                    <h2>设置概览</h2>
                   </div>
-                  <button
-                    className="ghost-button pane-toggle-button"
-                    onClick={handleToggleLeftCollapse}
-                    type="button"
-                  >
-                    收起
-                  </button>
+                  <div className="setup-pane-header-actions">
+                    <button
+                      className="ghost-button ghost-button-small pane-header-button"
+                      onClick={() => handleOpenSettingsDetail("game")}
+                      type="button"
+                    >
+                      详情
+                    </button>
+                    <button
+                      className="ghost-button ghost-button-small pane-header-button pane-toggle-button"
+                      onClick={handleToggleLeftCollapse}
+                      type="button"
+                    >
+                      收起
+                    </button>
+                  </div>
                 </div>
 
                 <div className="setup-pane-scroll">
-                  <SettingField label="语言" hint="控制内容文本和界面的基础语言。">
-                    <select
-                      value={locale}
-                      onChange={(event) =>
-                        onLocaleChange(event.target.value as CreateSessionRequest["locale"])
-                      }
-                    >
-                      {bootstrap?.languages.map((language) => (
-                        <option key={language.code} value={language.code}>
-                          {language.nativeLabel} / {language.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField label="难度" hint="难度还没接入真实裁定，当前先固定为标准。">
-                    <select disabled value="normal">
-                      <option value="normal">标准（待开发）</option>
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="模型模式"
-                    hint="决定这局是纯 mock，还是通过代理接入真实模型。"
-                  >
-                    <select
-                      value={modelAccessMode}
-                      onChange={(event) =>
-                        onModelAccessModeChange(
-                          event.target.value as CreateSessionRequest["modelAccessMode"]
-                        )
-                      }
-                    >
-                      {bootstrap?.modelAccessModes.map((mode) => (
-                        <option key={mode.code} value={mode.code}>
-                          {mode.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="主持架构"
-                    hint="为单 Agent / 多 Agent 主持预留统一入口。"
-                  >
-                    <select
-                      value={gmArchitecture}
-                      onChange={(event) =>
-                        onGmArchitectureChange(
-                          event.target.value as CreateSessionRequest["gmArchitecture"]
-                        )
-                      }
-                    >
-                      {GM_ARCHITECTURE_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="模型档案"
-                    hint="这里只负责选择本局要使用的模型档案。API Key、Base URL 和模型名请到“设置 -> 配置模型信息”里统一维护。"
-                  >
-                    <select
-                      value={selectedProfile?.id ?? modelProfileId}
-                      onChange={(event) => onModelProfileIdChange(event.target.value)}
-                    >
-                      {availableProfiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                          {profile.name}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="日志显示"
-                    hint="控制日志区域的细粒度，方便游玩或排查。"
-                  >
-                    <select
-                      value={logViewMode}
-                      onChange={(event) =>
-                        onLogViewModeChange(
-                          event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
-                        )
-                      }
-                    >
-                      {LOG_VIEW_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="开场传输"
-                    hint="流式会边生成边显示；完整传输会等待全文完成后再一次性渲染。"
-                  >
-                    <select
-                      value={openingPreviewDeliveryMode}
-                      onChange={(event) =>
-                        onOpeningPreviewDeliveryModeChange(
-                          event.target.value as OpeningPreviewDeliveryMode
-                        )
-                      }
-                    >
-                      {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="Markdown 字号"
-                    hint="控制 AI 正文、标题和列表的渲染大小。"
-                  >
-                    <select
-                      value={markdownFontSize}
-                      onChange={(event) =>
-                        onMarkdownFontSizeChange(
-                          event.target.value as MarkdownFontSizePreset
-                        )
-                      }
-                    >
-                      {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="游戏模式"
-                    hint="当前 MVP 先保留单人、单人 + NPC 和多人入口。"
-                  >
-                    <select
-                      value={playMode}
-                      onChange={(event) =>
-                        onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
-                      }
-                    >
-                      {PLAY_MODE_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </SettingField>
-
-                  <SettingField
-                    label="调试模式"
-                    hint="当前主要用于调试模型与运行时日志。"
-                  >
-                    <label className="toggle-row">
-                      <input
-                        checked={debugEnabled}
-                        type="checkbox"
-                        onChange={(event) => onDebugEnabledChange(event.target.checked)}
-                      />
-                      <span>{debugEnabled ? "开启" : "关闭"}</span>
-                    </label>
-                  </SettingField>
-
-                  {selectedProfile ? (
-                    <SettingField
-                      label="模型能力"
-                      hint="这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。"
-                    >
-                      <div className="model-capability-list">
-                        {selectedProfile.featureDetails.map((feature) => (
-                          <div
-                            key={feature.key}
-                            className={`model-capability-item ${
-                              feature.supported
-                                ? "model-capability-item-supported"
-                                : "model-capability-item-unsupported"
-                            }`}
-                          >
-                            <div className="model-capability-row">
-                              <span className="model-capability-label">{feature.label}</span>
-                              <span className="model-capability-state">
-                                {feature.supported ? "支持" : "不支持"}
-                              </span>
-                            </div>
-                            <div className="model-capability-meta">
-                              {feature.model
-                                ? `参考模型：${feature.model}`
-                                : "未标注具体模型"}
-                              {feature.url ? (
-                                <>
-                                  {" · "}
-                                  <a href={feature.url} rel="noreferrer" target="_blank">
-                                    官方说明
-                                  </a>
-                                </>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
+                  <article className="summary-card setup-section-card">
+                    <div className="setup-section-heading">
+                      <div className="eyebrow">Game</div>
+                      <div className="summary-title">游戏设置</div>
+                      <div className="summary-text">
+                        管理语言、主持架构和本局的基础游玩方式。
                       </div>
-                    </SettingField>
-                  ) : null}
+                    </div>
+                    {renderGameSettingsFields("sidebar")}
+                  </article>
 
-                  <div className="companion-card setup-config-summary-card">
-                    <div className="selection-card-title">当前配置</div>
-                    <div className="summary-text">
-                      {selectedRule?.ruleTitle ?? "未选择规则"} /{" "}
-                      {selectedStory?.title ?? "未选择剧本"}
+                  <article className="summary-card setup-section-card">
+                    <div className="setup-section-heading">
+                      <div className="eyebrow">Model</div>
+                      <div className="summary-title">模型设置</div>
+                      <div className="summary-text">
+                        选择本局使用的模型入口、档案以及显示偏好。
+                      </div>
                     </div>
-                    <div className="summary-text">
-                      标签：{renderJoinedList(selectedStory?.tags ?? [])}
+                    {renderModelSettingsFields("sidebar")}
+                    <div className="setup-section-summary-list">
+                      <div className="summary-text">
+                        当前档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
+                      </div>
+                      <div className="summary-text">实际模型：{resolvedModelName}</div>
+                      <div className="summary-text">
+                        可用状态：{profileReady ? "可创建会话" : "还需补全配置"}
+                      </div>
                     </div>
-                    <div className="summary-text">
-                      主持风格：{selectedStory?.gmStyle ?? "待定"}
+                  </article>
+
+                  <article className="summary-card setup-section-card">
+                    <div className="setup-section-heading">
+                      <div className="eyebrow">Current Run</div>
+                      <div className="summary-title">当前局面概览</div>
                     </div>
-                    <div className="summary-text">
-                      模型档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
+                    <div className="setup-section-summary-list">
+                      <div className="summary-text">
+                        规则：{selectedRule?.ruleTitle ?? "未选择规则"}
+                      </div>
+                      <div className="summary-text">
+                        剧本：{selectedStory?.title ?? "未选择剧本"}
+                      </div>
+                      <div className="summary-text">
+                        标签：{renderJoinedList(selectedStory?.tags ?? [])}
+                      </div>
+                      <div className="summary-text">
+                        主持风格：{selectedStory?.gmStyle ?? "待定"}
+                      </div>
                     </div>
-                    <div className="summary-text">实际模型：{resolvedModelName}</div>
-                  </div>
+                  </article>
                 </div>
 
               </section>
@@ -879,45 +1207,37 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="selection-column-header">
                   <div>
                     <div className="eyebrow">Companions</div>
-                    <h2>同行者</h2>
+                    <h2>同行者设置</h2>
                   </div>
-                  <button
-                    className="ghost-button pane-toggle-button"
-                    onClick={handleToggleRightCollapse}
-                    type="button"
-                  >
-                    收起
-                  </button>
+                  <div className="setup-pane-header-actions">
+                    <button
+                      className="ghost-button ghost-button-small pane-header-button"
+                      onClick={() => handleOpenSettingsDetail("companions")}
+                      type="button"
+                    >
+                      详情
+                    </button>
+                    <button
+                      className="ghost-button ghost-button-small pane-header-button pane-toggle-button"
+                      onClick={handleToggleRightCollapse}
+                      type="button"
+                    >
+                      收起
+                    </button>
+                  </div>
                 </div>
 
                 <div className="setup-pane-scroll">
-                  <div className="companion-list">
-                    <div className="companion-card">
-                      <div className="selection-card-title">AI 同伴入口</div>
+                  <article className="summary-card setup-section-card">
+                    <div className="setup-section-heading">
+                      <div className="eyebrow">Companions</div>
+                      <div className="summary-title">同行者设置</div>
                       <div className="summary-text">
-                        这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。
+                        这里集中显示 AI 同伴入口、扩展位和当前剧本的内容边界。
                       </div>
                     </div>
-
-                    <div className="companion-card">
-                      <div className="selection-card-title">添加同伴</div>
-                      <div className="summary-text">
-                        待开发：支持创建、编辑和删除 AI 玩家。
-                      </div>
-                      <button className="ghost-button" disabled type="button">
-                        + 添加同伴
-                      </button>
-                    </div>
-
-                    <div className="companion-card">
-                      <div className="selection-card-title">内容警告</div>
-                      <div className="summary-text">
-                        {renderJoinedList(
-                          selectedStory?.contentWarnings ?? selectedRule?.contentWarnings ?? []
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    {renderCompanionCards()}
+                  </article>
                 </div>
 
                 <div className="setup-pane-footer setup-pane-actions-footer">
@@ -949,6 +1269,59 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           )}
         </div>
       </form>
+
+      {isSettingsDetailOpen ? (
+        <div
+          aria-label="设置详情"
+          className="setup-detail-modal-backdrop"
+          onClick={handleCloseSettingsDetail}
+          role="dialog"
+        >
+          <div
+            className="setup-detail-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="setup-detail-modal-header">
+              <div>
+                <div className="eyebrow">Setup Detail</div>
+                <h2>
+                  {detailTabs.find((tab) => tab.value === activeDetailTab)?.label ?? "设置详情"}
+                </h2>
+                <div className="summary-text">
+                  {detailTabs.find((tab) => tab.value === activeDetailTab)?.description ?? ""}
+                </div>
+              </div>
+              <button
+                className="ghost-button ghost-button-small"
+                onClick={handleCloseSettingsDetail}
+                type="button"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="setup-detail-tabs" role="tablist" aria-label="设置分类">
+              {detailTabs.map((tab) => (
+                <button
+                  key={tab.value}
+                  aria-selected={tab.value === activeDetailTab}
+                  className={`setup-detail-tab ${
+                    tab.value === activeDetailTab ? "setup-detail-tab-active" : ""
+                  }`}
+                  onClick={() => setActiveDetailTab(tab.value)}
+                  role="tab"
+                  type="button"
+                >
+                  <span className="setup-detail-tab-label">{tab.label}</span>
+                  <span className="setup-detail-tab-copy">{tab.description}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="setup-detail-modal-body">{renderActiveDetailTab()}</div>
+          </div>
+        </div>
+      ) : null}
 
       {coverAsset && isCoverExpanded ? (
         <div
