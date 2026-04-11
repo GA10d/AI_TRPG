@@ -5,6 +5,8 @@ import type {
   CharacterConceptAssistMode,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
+  Message,
+  ReplayEvent,
   SaveBundle,
   SaveRuntimeConfig,
   SessionSnapshot
@@ -37,6 +39,34 @@ const initialStatus: StatusState = {
   message: "",
   tone: "neutral"
 };
+
+function createTemporaryId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function splitTextIntoRevealChunks(text: string): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const paragraphChunks = normalized
+    .split("\n")
+    .flatMap((paragraph) => {
+      const trimmedParagraph = paragraph.trim();
+      if (!trimmedParagraph) {
+        return ["\n"];
+      }
+
+      return trimmedParagraph.match(/.{1,18}(?:[锛屻€傦紒锛燂紱锛?.!?;:]|$)/gu) ?? [trimmedParagraph];
+    });
+
+  return paragraphChunks.filter(Boolean);
+}
 
 function normalizeRuntimeConfig(
   input: {
@@ -129,7 +159,10 @@ export function App() {
   const [openingPreviewLoading, setOpeningPreviewLoading] = useState(false);
   const [openingPreviewError, setOpeningPreviewError] = useState<string | null>(null);
   const [openingPreviewRegenerateNonce, setOpeningPreviewRegenerateNonce] = useState(0);
+  const [isBootstrappingSession, setIsBootstrappingSession] = useState(false);
   const lastHandledOpeningPreviewRegenerateNonceRef = useRef(0);
+  const stagedOpeningRevealTimerRef = useRef<number | null>(null);
+  const stagedSessionBootTokenRef = useRef(0);
 
   const {
     bootstrap,
@@ -142,6 +175,10 @@ export function App() {
     modelProfileId,
     runtimeModelConfig,
     profileRuntimeConfigs,
+    imageProfileId,
+    runtimeImageModelConfig,
+    imageProfileRuntimeConfigs,
+    imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -155,9 +192,12 @@ export function App() {
     setGmArchitecture,
     setModelAccessMode,
     setModelProfileId,
-    setRuntimeModelConfig,
     setProfileRuntimeConfig,
     clearProfileRuntimeConfigs,
+    setImageProfileId,
+    setImageProfileRuntimeConfig,
+    clearImageProfileRuntimeConfigs,
+    setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,
     setOpeningPreviewDeliveryMode,
@@ -324,6 +364,13 @@ export function App() {
     view
   ]);
 
+  useEffect(
+    () => () => {
+      clearStagedOpeningReveal();
+    },
+    []
+  );
+
   function buildSaveRuntimeConfig(
     profileIdOverride?: string
   ): SaveRuntimeConfig {
@@ -342,6 +389,11 @@ export function App() {
       modelProfileId,
       runtimeModelConfig,
       profileRuntimeConfigs,
+      imageProfileId,
+      runtimeImageModelConfig,
+      imageProfileRuntimeConfigs,
+      imagePromptTemplateConfig:
+        imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
       debugEnabled,
       logViewMode,
       openingPreviewDeliveryMode,
@@ -356,6 +408,191 @@ export function App() {
     persistStoredSnapshot(nextSnapshot);
   }
 
+  function clearStagedOpeningReveal(): void {
+    if (stagedOpeningRevealTimerRef.current !== null) {
+      window.clearInterval(stagedOpeningRevealTimerRef.current);
+      stagedOpeningRevealTimerRef.current = null;
+    }
+  }
+
+  function buildPendingSessionSnapshot(args: {
+    ruleTitle: string;
+    storyTitle: string;
+    revealText: string;
+  }): SessionSnapshot {
+    const timestamp = new Date().toISOString();
+    const sessionId = createTemporaryId("pending_session");
+    const playerParticipantId = createTemporaryId("pending_player");
+    const gmParticipantId = createTemporaryId("pending_gm");
+
+    const messages: Message[] = [
+      {
+        id: createTemporaryId("msg"),
+        round: 0,
+        createdAt: timestamp,
+        senderId: "system",
+        recipientIds: [playerParticipantId],
+        visibility: "system",
+        kind: "system",
+        content: `Session is being created for ${args.storyTitle} (${locale}).`,
+        tags: ["session_booting"]
+      },
+      {
+        id: createTemporaryId("msg"),
+        round: 0,
+        createdAt: timestamp,
+        senderId: gmParticipantId,
+        recipientIds: [playerParticipantId],
+        visibility: "public",
+        kind: "gm_narration",
+        content: "",
+        tags: ["opening", "pending_bootstrap"]
+      }
+    ];
+
+    const replay: ReplayEvent[] = [
+      {
+        id: createTemporaryId("evt"),
+        round: 0,
+        createdAt: timestamp,
+        actorId: "system",
+        type: "session_created",
+        displayLevel: "core",
+        summary: "Session bootstrap started",
+        payload: {
+          revealPreviewLength: args.revealText.length
+        }
+      }
+    ];
+
+    if (characterConcept.trim().length > 0) {
+      messages.splice(1, 0, {
+        id: createTemporaryId("msg"),
+        round: 0,
+        createdAt: timestamp,
+        senderId: playerParticipantId,
+        recipientIds: [gmParticipantId],
+        visibility: "public",
+        kind: "player_input",
+        content: characterConcept.trim(),
+        tags: ["player_info", "character_concept", "pending_bootstrap"]
+      });
+    }
+
+    return {
+      session: {
+        id: sessionId,
+        schemaVersion: "0.2.0",
+        status: "active",
+        playMode,
+        gmArchitecture,
+        modelAccessMode,
+        locale,
+        ruleId: ruleDirectoryName,
+        storyId: storyDirectoryName,
+        currentRound: 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        participants: [
+          {
+            id: playerParticipantId,
+            role: "human_player",
+            displayName: "鐜╁",
+            isAiControlled: false,
+            isLocalUser: true,
+            locale
+          },
+          {
+            id: gmParticipantId,
+            role: "gm",
+            displayName: "主持人",
+            isAiControlled: true,
+            isLocalUser: false,
+            locale
+          }
+        ],
+        playerParticipantId,
+        settings: {
+          logViewMode,
+          debugEnabled,
+          promptDebugEnabled: false,
+          modelProfileId
+        },
+        gameState: {
+          phase: "playing",
+          endingState: null,
+          lastEndingJudgeResult: null
+        }
+      },
+      messages,
+      replay,
+      contentSummary: {
+        ruleTitle: args.ruleTitle,
+        storyTitle: args.storyTitle,
+        requestedLocale: locale,
+        resolvedLocale: locale,
+        ruleDirectoryName,
+        storyDirectoryName
+      }
+    };
+  }
+
+  function startStagedOpeningReveal(
+    pendingSnapshot: SessionSnapshot,
+    revealText: string
+  ): void {
+    clearStagedOpeningReveal();
+
+    const revealChunks = splitTextIntoRevealChunks(revealText);
+    if (!revealChunks.length) {
+      setSnapshot(pendingSnapshot);
+      return;
+    }
+
+    const bootToken = stagedSessionBootTokenRef.current;
+    let chunkIndex = 0;
+
+    setSnapshot(pendingSnapshot);
+
+    stagedOpeningRevealTimerRef.current = window.setInterval(() => {
+      if (stagedSessionBootTokenRef.current !== bootToken) {
+        clearStagedOpeningReveal();
+        return;
+      }
+
+      chunkIndex += 1;
+      const nextContent = revealChunks.slice(0, chunkIndex).join("");
+
+      setSnapshot((current) => {
+        if (!current || current.session.id !== pendingSnapshot.session.id) {
+          return current;
+        }
+
+        const nextMessages = current.messages.map((message, index, collection) =>
+          index === collection.length - 1
+            ? {
+                ...message,
+                content: nextContent
+              }
+            : message
+        );
+
+        return {
+          ...current,
+          session: {
+            ...current.session,
+            updatedAt: new Date().toISOString()
+          },
+          messages: nextMessages
+        };
+      });
+
+      if (chunkIndex >= revealChunks.length) {
+        clearStagedOpeningReveal();
+      }
+    }, 70);
+  }
+
   async function submitPlayerTurn(
     currentSnapshot: SessionSnapshot,
     playerInput: string,
@@ -367,7 +604,7 @@ export function App() {
   ): Promise<void> {
     setIsSubmittingTurn(true);
     setStatus({
-      message: options?.pendingMessage ?? "正在提交本轮行动...",
+      message: options?.pendingMessage ?? "姝ｅ湪鎻愪氦鏈疆琛屽姩...",
       tone: "neutral"
     });
 
@@ -418,13 +655,33 @@ export function App() {
     }
 
     setIsCreating(true);
+    setIsBootstrappingSession(true);
     setStatus({
-      message: "正在创建会话...",
+      message: "正在进入游戏并创建正式会话...",
       tone: "neutral"
     });
 
     try {
       saveDefaults();
+
+      const bootToken = stagedSessionBootTokenRef.current + 1;
+      stagedSessionBootTokenRef.current = bootToken;
+
+      const stagedRevealText =
+        openingPreviewText.trim() ||
+        selectedStory.intro?.trim() ||
+        selectedStory.coverQuote?.trim() ||
+        `${selectedStory.title} 的开场正在生成中……`;
+      const pendingSnapshot = buildPendingSessionSnapshot({
+        ruleTitle: selectedRule.ruleTitle,
+        storyTitle: selectedStory.title,
+        revealText: stagedRevealText
+      });
+
+      setTurnInput("");
+      setView("game");
+      startStagedOpeningReveal(pendingSnapshot, stagedRevealText);
+
       const nextSnapshot = await createSession({
         ruleDirectoryName,
         storyDirectoryName,
@@ -439,27 +696,35 @@ export function App() {
         promptDebugEnabled: false,
         logViewMode
       });
+
+      if (stagedSessionBootTokenRef.current !== bootToken) {
+        return;
+      }
+
+      clearStagedOpeningReveal();
       commitSnapshot(nextSnapshot);
       beginFromSnapshot(
         nextSnapshot,
         buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
       );
-      setTurnInput("");
-      setView("game");
       setStatus({
         message:
           characterConcept.trim().length > 0
-            ? "会话创建成功，你的角色概念已记录在本局开场流程中。"
+            ? "会话创建成功，你的角色设定已带入正式开场。"
             : "会话创建成功。",
         tone: "neutral"
       });
     } catch (error) {
+      clearStagedOpeningReveal();
+      setSnapshot(null);
+      setView("game_setup");
       setStatus({
         message: error instanceof Error ? error.message : String(error),
         tone: "error"
       });
     } finally {
       setIsCreating(false);
+      setIsBootstrappingSession(false);
     }
   }
 
@@ -505,8 +770,8 @@ export function App() {
       return;
     }
 
-    await submitPlayerTurn(snapshot, "我掏出手枪自杀", {
-      pendingMessage: "正在触发 mock 结局测试...",
+    await submitPlayerTurn(snapshot, "鎴戞帍鍑烘墜鏋嚜鏉€", {
+      pendingMessage: "姝ｅ湪瑙﹀彂 mock 缁撳眬娴嬭瘯...",
       successMessage: "mock 结局测试已提交。",
       endingSuccessMessage: "mock 结局测试成功，当前会话已进入结局。"
     });
@@ -523,7 +788,7 @@ export function App() {
 
     setIsSaving(true);
     setStatus({
-      message: "正在创建本地存档...",
+      message: "姝ｅ湪鍒涘缓鏈湴瀛樻。...",
       tone: "neutral"
     });
 
@@ -552,7 +817,7 @@ export function App() {
   ): Promise<void> {
     setIsRestoring(true);
     setStatus({
-      message: "正在恢复存档...",
+      message: "姝ｅ湪鎭㈠瀛樻。...",
       tone: "neutral"
     });
 
@@ -602,7 +867,7 @@ export function App() {
 
     setIsRestoring(true);
     setStatus({
-      message: "正在恢复最近快照...",
+      message: "姝ｅ湪鎭㈠鏈€杩戝揩鐓?..",
       tone: "neutral"
     });
 
@@ -635,7 +900,7 @@ export function App() {
   }
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
-    return restoreFromSaveBundle(record.bundle, `已载入存档：${record.storyTitle}`);
+    return restoreFromSaveBundle(record.bundle, `宸茶浇鍏ュ瓨妗ｏ細${record.storyTitle}`);
   }
 
   async function handleContinueFromNode(nodeId: string): Promise<void> {
@@ -650,7 +915,7 @@ export function App() {
 
     setIsResumingBranch(true);
     setStatus({
-      message: "正在从历史节点恢复，并准备生成新的分支...",
+      message: "姝ｅ湪浠庡巻鍙茶妭鐐规仮澶嶏紝骞跺噯澶囩敓鎴愭柊鐨勫垎鏀?..",
       tone: "neutral"
     });
 
@@ -694,6 +959,9 @@ export function App() {
     setModelAccessMode(bootstrap.defaults.modelAccessMode);
     setModelProfileId(bootstrap.defaults.modelProfileId);
     clearProfileRuntimeConfigs();
+    setImageProfileId(bootstrap.defaults.imageProfileId);
+    clearImageProfileRuntimeConfigs();
+    setImagePromptTemplateConfig(bootstrap.imagePromptTemplateConfig);
     setLogViewMode(bootstrap.defaults.logViewMode);
     setOpeningPreviewDeliveryMode("stream");
     setDebugEnabled(true);
@@ -767,7 +1035,7 @@ export function App() {
 
     if (!openingText) {
       setStatus({
-        message: "请先等开场白生成完成，再使用 AI 生成或补全角色概念。",
+        message: "请先等开场预览生成完成，再使用 AI 生成或补全角色概念。",
         tone: "error"
       });
       return;
@@ -778,8 +1046,8 @@ export function App() {
     setStatus({
       message:
         nextMode === "generate"
-          ? "AI 正在根据开场白生成角色概念..."
-          : "AI 正在根据开场白补全角色概念...",
+          ? "AI 姝ｅ湪鏍规嵁寮€鍦虹櫧鐢熸垚瑙掕壊姒傚康..."
+          : "AI 姝ｅ湪鏍规嵁寮€鍦虹櫧琛ュ叏瑙掕壊姒傚康...",
       tone: "neutral"
     });
 
@@ -934,6 +1202,10 @@ export function App() {
           modelProfileId={modelProfileId}
           runtimeModelConfig={runtimeModelConfig}
           profileRuntimeConfigs={profileRuntimeConfigs}
+          imageProfileId={imageProfileId}
+          runtimeImageModelConfig={runtimeImageModelConfig}
+          imageProfileRuntimeConfigs={imageProfileRuntimeConfigs}
+          imagePromptTemplateConfig={imagePromptTemplateConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           showAiMetadata={showAiMetadata}
@@ -947,6 +1219,9 @@ export function App() {
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
           onProfileRuntimeConfigChange={setProfileRuntimeConfig}
+          onImageProfileIdChange={setImageProfileId}
+          onImageProfileRuntimeConfigChange={setImageProfileRuntimeConfig}
+          onImagePromptTemplateConfigChange={setImagePromptTemplateConfig}
           onDebugEnabledChange={setDebugEnabled}
           onShowAiMetadataChange={setShowAiMetadata}
           onMenuFontSizeChange={setMenuFontSize}
@@ -970,13 +1245,22 @@ export function App() {
           snapshot={snapshot}
           activeGraphBundle={activeGraphBundle}
           turnInput={turnInput}
+          isBootstrappingSession={isBootstrappingSession}
           isSubmittingTurn={isSubmittingTurn}
           isSaving={isSaving}
+          savedGames={savedGames}
+          isRestoring={isRestoring}
           isResumingBranch={isResumingBranch}
           showAiMetadata={showAiMetadata}
           markdownFontSize={markdownFontSize}
+          imageProfileId={imageProfileId}
+          runtimeImageModelConfig={runtimeImageModelConfig}
+          imagePromptTemplateConfig={
+            imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig ?? null
+          }
           onBack={() => setView("menu")}
           onContinueFromNode={handleContinueFromNode}
+          onLoadSavedGame={handleLoadSavedGame}
           onQuickEndingTest={handleQuickEndingTest}
           onSaveGame={handleSaveGame}
           onTurnInputChange={setTurnInput}

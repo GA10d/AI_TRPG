@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import type {
   BootstrapResponse,
   CreateSessionRequest,
+  ImagePromptTemplateConfig,
+  RuntimeImageModelConfigInput,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchBootstrap } from "../lib/trpgApiClient.ts";
@@ -33,6 +35,12 @@ const EMPTY_RUNTIME_MODEL_CONFIG: RuntimeModelConfigInput = {
   model: ""
 };
 
+const EMPTY_RUNTIME_IMAGE_MODEL_CONFIG: RuntimeImageModelConfigInput = {
+  apiKey: "",
+  baseUrl: "",
+  model: ""
+};
+
 function sanitizeRuntimeModelConfig(
   runtimeModelConfig: RuntimeModelConfigInput | undefined
 ): RuntimeModelConfigInput {
@@ -51,6 +59,26 @@ function isRuntimeModelConfigEmpty(runtimeModelConfig: RuntimeModelConfigInput):
   );
 }
 
+function sanitizeRuntimeImageModelConfig(
+  runtimeImageModelConfig: RuntimeImageModelConfigInput | undefined
+): RuntimeImageModelConfigInput {
+  return {
+    apiKey: runtimeImageModelConfig?.apiKey?.trim() || "",
+    baseUrl: runtimeImageModelConfig?.baseUrl?.trim() || "",
+    model: runtimeImageModelConfig?.model?.trim() || ""
+  };
+}
+
+function isRuntimeImageModelConfigEmpty(
+  runtimeImageModelConfig: RuntimeImageModelConfigInput
+): boolean {
+  return (
+    !runtimeImageModelConfig.apiKey &&
+    !runtimeImageModelConfig.baseUrl &&
+    !runtimeImageModelConfig.model
+  );
+}
+
 function sanitizeProfileRuntimeConfigs(
   profileRuntimeConfigs: Record<string, RuntimeModelConfigInput> | undefined
 ): Record<string, RuntimeModelConfigInput> {
@@ -59,6 +87,21 @@ function sanitizeProfileRuntimeConfigs(
   for (const [profileId, runtimeModelConfig] of Object.entries(profileRuntimeConfigs ?? {})) {
     const sanitizedConfig = sanitizeRuntimeModelConfig(runtimeModelConfig);
     if (!isRuntimeModelConfigEmpty(sanitizedConfig)) {
+      nextConfigs[profileId] = sanitizedConfig;
+    }
+  }
+
+  return nextConfigs;
+}
+
+function sanitizeImageProfileRuntimeConfigs(
+  profileRuntimeConfigs: Record<string, RuntimeImageModelConfigInput> | undefined
+): Record<string, RuntimeImageModelConfigInput> {
+  const nextConfigs: Record<string, RuntimeImageModelConfigInput> = {};
+
+  for (const [profileId, runtimeImageModelConfig] of Object.entries(profileRuntimeConfigs ?? {})) {
+    const sanitizedConfig = sanitizeRuntimeImageModelConfig(runtimeImageModelConfig);
+    if (!isRuntimeImageModelConfigEmpty(sanitizedConfig)) {
       nextConfigs[profileId] = sanitizedConfig;
     }
   }
@@ -81,6 +124,26 @@ function upsertProfileRuntimeConfig(
     delete nextConfigs[profileId];
   } else {
     nextConfigs[profileId] = runtimeModelConfig;
+  }
+
+  return nextConfigs;
+}
+
+function upsertImageProfileRuntimeConfig(
+  previousConfigs: Record<string, RuntimeImageModelConfigInput>,
+  profileId: string,
+  runtimeImageModelConfig: RuntimeImageModelConfigInput
+): Record<string, RuntimeImageModelConfigInput> {
+  if (!profileId) {
+    return previousConfigs;
+  }
+
+  const nextConfigs = { ...previousConfigs };
+
+  if (isRuntimeImageModelConfigEmpty(runtimeImageModelConfig)) {
+    delete nextConfigs[profileId];
+  } else {
+    nextConfigs[profileId] = runtimeImageModelConfig;
   }
 
   return nextConfigs;
@@ -113,6 +176,75 @@ function resolveModelProfileId(
   return matchingProfiles[0]?.id ?? bootstrap.defaults.modelProfileId;
 }
 
+function resolveImageProfileId(
+  bootstrap: BootstrapResponse,
+  preferredProfileId: string | undefined
+): string {
+  if (preferredProfileId && bootstrap.imageProfiles.some((item) => item.id === preferredProfileId)) {
+    return preferredProfileId;
+  }
+
+  return bootstrap.imageProfiles[0]?.id ?? bootstrap.defaults.imageProfileId;
+}
+
+function normalizeImagePromptTemplateRecord(
+  baseRecord: Record<string, string>,
+  overrideRecord: Record<string, string> | undefined
+): Record<string, string> {
+  const nextRecord: Record<string, string> = { ...baseRecord };
+
+  for (const [key, value] of Object.entries(overrideRecord ?? {})) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      nextRecord[key] = value.trim();
+    }
+  }
+
+  return nextRecord;
+}
+
+function sanitizeImagePromptTemplateConfig(
+  baseConfig: ImagePromptTemplateConfig,
+  overrideConfig: ImagePromptTemplateConfig | undefined
+): ImagePromptTemplateConfig {
+  const defaultTrigger =
+    overrideConfig?.defaultTrigger === "character_portrait" ||
+    overrideConfig?.defaultTrigger === "npc_intro" ||
+    overrideConfig?.defaultTrigger === "scene_shift"
+      ? overrideConfig.defaultTrigger
+      : overrideConfig?.defaultTrigger === "manual"
+        ? "manual"
+        : baseConfig.defaultTrigger;
+
+  return {
+    version: overrideConfig?.version ?? baseConfig.version,
+    defaultTheme: overrideConfig?.defaultTheme?.trim() || baseConfig.defaultTheme,
+    defaultTrigger,
+    fallbackTriggerTemplate:
+      overrideConfig?.fallbackTriggerTemplate?.trim() || baseConfig.fallbackTriggerTemplate,
+    themes: normalizeImagePromptTemplateRecord(baseConfig.themes, overrideConfig?.themes),
+    triggerTemplates: {
+      manual:
+        overrideConfig?.triggerTemplates?.manual?.trim() ||
+        baseConfig.triggerTemplates.manual,
+      character_portrait:
+        overrideConfig?.triggerTemplates?.character_portrait?.trim() ||
+        baseConfig.triggerTemplates.character_portrait,
+      npc_intro:
+        overrideConfig?.triggerTemplates?.npc_intro?.trim() ||
+        baseConfig.triggerTemplates.npc_intro,
+      scene_shift:
+        overrideConfig?.triggerTemplates?.scene_shift?.trim() ||
+        baseConfig.triggerTemplates.scene_shift
+    },
+    characterClauseTemplate:
+      overrideConfig?.characterClauseTemplate?.trim() || baseConfig.characterClauseTemplate,
+    characterJoinSeparator:
+      overrideConfig?.characterJoinSeparator ?? baseConfig.characterJoinSeparator,
+    characterEntryTemplate:
+      overrideConfig?.characterEntryTemplate?.trim() || baseConfig.characterEntryTemplate
+  };
+}
+
 export function useBootstrapState(args: UseBootstrapStateArgs) {
   const { onStatusChange } = args;
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
@@ -130,6 +262,14 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [profileRuntimeConfigs, setProfileRuntimeConfigs] = useState<
     Record<string, RuntimeModelConfigInput>
   >({});
+  const [imageProfileId, setImageProfileId] = useState("mock-image");
+  const [runtimeImageModelConfig, setRuntimeImageModelConfigState] =
+    useState<RuntimeImageModelConfigInput>(EMPTY_RUNTIME_IMAGE_MODEL_CONFIG);
+  const [imageProfileRuntimeConfigs, setImageProfileRuntimeConfigs] = useState<
+    Record<string, RuntimeImageModelConfigInput>
+  >({});
+  const [imagePromptTemplateConfig, setImagePromptTemplateConfig] =
+    useState<ImagePromptTemplateConfig | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(true);
   const [logViewMode, setLogViewMode] =
     useState<NonNullable<CreateSessionRequest["logViewMode"]>>("compact");
@@ -165,8 +305,18 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         const storedProfileRuntimeConfigs = sanitizeProfileRuntimeConfigs(
           storedDefaults?.profileRuntimeConfigs
         );
+        const storedImageProfileRuntimeConfigs = sanitizeImageProfileRuntimeConfigs(
+          storedDefaults?.imageProfileRuntimeConfigs
+        );
         const legacyRuntimeModelConfig = sanitizeRuntimeModelConfig(
           storedDefaults?.runtimeModelConfig
+        );
+        const legacyRuntimeImageModelConfig = sanitizeRuntimeImageModelConfig(
+          storedDefaults?.runtimeImageModelConfig
+        );
+        const resolvedImageProfileId = resolveImageProfileId(
+          data,
+          storedDefaults?.imageProfileId ?? data.defaults.imageProfileId
         );
 
         if (
@@ -174,6 +324,13 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
           !storedProfileRuntimeConfigs[resolvedProfileId]
         ) {
           storedProfileRuntimeConfigs[resolvedProfileId] = legacyRuntimeModelConfig;
+        }
+
+        if (
+          !isRuntimeImageModelConfigEmpty(legacyRuntimeImageModelConfig) &&
+          !storedImageProfileRuntimeConfigs[resolvedImageProfileId]
+        ) {
+          storedImageProfileRuntimeConfigs[resolvedImageProfileId] = legacyRuntimeImageModelConfig;
         }
 
         setBootstrap(data);
@@ -205,6 +362,18 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         setProfileRuntimeConfigs(storedProfileRuntimeConfigs);
         setRuntimeModelConfigState(
           storedProfileRuntimeConfigs[resolvedProfileId] ?? EMPTY_RUNTIME_MODEL_CONFIG
+        );
+        setImageProfileId(resolvedImageProfileId);
+        setImageProfileRuntimeConfigs(storedImageProfileRuntimeConfigs);
+        setRuntimeImageModelConfigState(
+          storedImageProfileRuntimeConfigs[resolvedImageProfileId] ??
+            EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
+        );
+        setImagePromptTemplateConfig(
+          sanitizeImagePromptTemplateConfig(
+            data.imagePromptTemplateConfig,
+            storedDefaults?.imagePromptTemplateConfig
+          )
         );
         setDebugEnabled(storedDefaults?.debugEnabled ?? true);
         setLogViewMode(
@@ -293,6 +462,15 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     }
   }, [modelProfileId, profileRuntimeConfigs, runtimeModelConfig]);
 
+  useEffect(() => {
+    const nextRuntimeImageModelConfig =
+      imageProfileRuntimeConfigs[imageProfileId] ?? EMPTY_RUNTIME_IMAGE_MODEL_CONFIG;
+
+    if (!areRuntimeModelConfigsEqual(runtimeImageModelConfig, nextRuntimeImageModelConfig)) {
+      setRuntimeImageModelConfigState(nextRuntimeImageModelConfig);
+    }
+  }, [imageProfileId, imageProfileRuntimeConfigs, runtimeImageModelConfig]);
+
   function setRuntimeModelConfig(value: RuntimeModelConfigInput): void {
     const sanitizedConfig = sanitizeRuntimeModelConfig(value);
     setRuntimeModelConfigState(sanitizedConfig);
@@ -320,6 +498,33 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setRuntimeModelConfigState(EMPTY_RUNTIME_MODEL_CONFIG);
   }
 
+  function setRuntimeImageModelConfig(value: RuntimeImageModelConfigInput): void {
+    const sanitizedConfig = sanitizeRuntimeImageModelConfig(value);
+    setRuntimeImageModelConfigState(sanitizedConfig);
+    setImageProfileRuntimeConfigs((previousConfigs) =>
+      upsertImageProfileRuntimeConfig(previousConfigs, imageProfileId, sanitizedConfig)
+    );
+  }
+
+  function setImageProfileRuntimeConfig(
+    profileId: string,
+    value: RuntimeImageModelConfigInput
+  ): void {
+    const sanitizedConfig = sanitizeRuntimeImageModelConfig(value);
+    setImageProfileRuntimeConfigs((previousConfigs) =>
+      upsertImageProfileRuntimeConfig(previousConfigs, profileId, sanitizedConfig)
+    );
+
+    if (profileId === imageProfileId) {
+      setRuntimeImageModelConfigState(sanitizedConfig);
+    }
+  }
+
+  function clearImageProfileRuntimeConfigs(): void {
+    setImageProfileRuntimeConfigs({});
+    setRuntimeImageModelConfigState(EMPTY_RUNTIME_IMAGE_MODEL_CONFIG);
+  }
+
   return {
     bootstrap,
     ruleDirectoryName,
@@ -331,6 +536,10 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     modelProfileId,
     runtimeModelConfig,
     profileRuntimeConfigs,
+    imageProfileId,
+    runtimeImageModelConfig,
+    imageProfileRuntimeConfigs,
+    imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -347,6 +556,11 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setRuntimeModelConfig,
     setProfileRuntimeConfig,
     clearProfileRuntimeConfigs,
+    setImageProfileId,
+    setRuntimeImageModelConfig,
+    setImageProfileRuntimeConfig,
+    clearImageProfileRuntimeConfigs,
+    setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,
     setOpeningPreviewDeliveryMode,

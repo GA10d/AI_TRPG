@@ -15,19 +15,28 @@ import type {
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
+  ImageGenerationRequest,
   LoadSaveRequest,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
 import {
   loadContentCatalog,
-  loadPlayableContentBundle
+  loadPlayableContentBundle,
+  loadStoryNpcRoster
 } from "./content/index.ts";
+import {
+  listImageProfileSummaries
+} from "./image_generation/config.ts";
+import {
+  generateImage,
+  loadImagePromptTemplateConfig
+} from "./image_generation/service.ts";
 import {
   buildDefaultCreateSessionRequest,
   createSaveBundleForSession,
   createSessionSnapshot,
   loadSessionFromSaveBundle,
-  submitMockTurn
+  submitTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
 import {
@@ -154,8 +163,11 @@ async function serveApiOnlyHint(response: ServerResponse): Promise<void> {
   );
 }
 
-function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): BootstrapResponse {
+async function buildBootstrapResponse(
+  catalog: BootstrapResponse["catalog"]
+): Promise<BootstrapResponse> {
   const serverProxyStatus = getServerProxyStatus();
+  const imagePromptTemplateConfig = await loadImagePromptTemplateConfig();
 
   return {
     defaults: {
@@ -164,6 +176,7 @@ function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): Bootstra
       gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
       modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
       modelProfileId: PHASE1_DEFAULTS.modelProfileId,
+      imageProfileId: PHASE1_DEFAULTS.imageProfileId,
       logViewMode: PHASE1_DEFAULTS.logViewMode
     },
     languages: listEnabledLanguages().map((item) => toLanguageOptionPayload(item.code)),
@@ -180,6 +193,8 @@ function buildBootstrapResponse(catalog: BootstrapResponse["catalog"]): Bootstra
     })),
     modelProfiles: listModelProfileSummaries(),
     serverProxyStatus,
+    imageProfiles: listImageProfileSummaries(),
+    imagePromptTemplateConfig,
     catalog
   };
 }
@@ -204,7 +219,7 @@ async function handleApiRequest(
 
   if (url.pathname === "/api/bootstrap" && request.method === "GET") {
     const catalog = await loadContentCatalog(contentRoot);
-    sendJson(response, 200, buildBootstrapResponse(catalog));
+    sendJson(response, 200, await buildBootstrapResponse(catalog));
     return true;
   }
 
@@ -336,6 +351,34 @@ async function handleApiRequest(
     return true;
   }
 
+  if (url.pathname === "/api/npcs" && request.method === "GET") {
+    const ruleDirectoryName = url.searchParams.get("ruleDirectoryName")?.trim() ?? "";
+    const storyDirectoryName = url.searchParams.get("storyDirectoryName")?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName) {
+      sendJson(response, 400, {
+        error: "INVALID_NPC_REQUEST",
+        message: "ruleDirectoryName and storyDirectoryName are required."
+      });
+      return true;
+    }
+
+    const roster = await loadStoryNpcRoster(
+      contentRoot,
+      ruleDirectoryName,
+      storyDirectoryName
+    );
+    sendJson(response, 200, roster);
+    return true;
+  }
+
+  if (url.pathname === "/api/images/generate" && request.method === "POST") {
+    const payload = await readJsonBody<ImageGenerationRequest>(request);
+    const result = await generateImage(payload);
+    sendJson(response, 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/saves/load" && request.method === "POST") {
     const payload = await readJsonBody<LoadSaveRequest>(request);
     const snapshot = loadSessionFromSaveBundle(payload.saveBundle, store);
@@ -346,7 +389,7 @@ async function handleApiRequest(
   if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/turns") && request.method === "POST") {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns", "");
     const payload = await readJsonBody<SubmitTurnRequest>(request);
-    const snapshot = await submitMockTurn(sessionId, payload, store);
+    const snapshot = await submitTurn(sessionId, payload, store);
 
     if (!snapshot) {
       sendJson(response, 404, {

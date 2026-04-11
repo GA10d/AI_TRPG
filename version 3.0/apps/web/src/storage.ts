@@ -1,6 +1,8 @@
 import type {
   CreateSessionRequest,
+  ImagePromptTemplateConfig,
   RuntimeModelConfigInput,
+  RuntimeImageModelConfigInput,
   SaveBundle,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
@@ -22,6 +24,10 @@ export type StoredWebDefaults = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   profileRuntimeConfigs?: Record<string, RuntimeModelConfigInput>;
+  imageProfileId?: string;
+  runtimeImageModelConfig?: RuntimeImageModelConfigInput;
+  imageProfileRuntimeConfigs?: Record<string, RuntimeImageModelConfigInput>;
+  imagePromptTemplateConfig?: ImagePromptTemplateConfig;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;

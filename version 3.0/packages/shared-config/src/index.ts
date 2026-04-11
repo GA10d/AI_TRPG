@@ -1,7 +1,9 @@
 import { DEFAULT_LOCALE } from "./languages.ts";
+import { getDefaultImageProfileId } from "./image_profiles.ts";
 import { getDefaultModelProfileId } from "./model_profiles.ts";
 
 export * from "./languages.ts";
+export * from "./image_profiles.ts";
 export * from "./model_profiles.ts";
 export * from "./model_pricing.ts";
 
@@ -64,6 +66,7 @@ export const PHASE1_DEFAULTS = {
   gmArchitecture: "single_agent",
   modelAccessMode: "mock",
   modelProfileId: getDefaultModelProfileId("mock"),
+  imageProfileId: getDefaultImageProfileId(),
   locale: DEFAULT_LOCALE,
   logViewMode: DEFAULT_LOG_VIEW_MODE
 } as const;

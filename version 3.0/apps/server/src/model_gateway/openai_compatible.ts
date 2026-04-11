@@ -1465,15 +1465,14 @@ export async function generateTurnNarrationViaServerProxy(
     meta: {
       provider: `${config.providerLabel}:${config.model}`,
       mode: "server_proxy",
-      model: config.model,
-      durationMs: completion.durationMs,
-      estimatedCost: estimateModelUsageCost({
         model: config.model,
+        durationMs: completion.durationMs,
+        estimatedCost: estimateModelUsageCost({
+          model: config.model,
+          usage: completion.usage
+        }),
         usage: completion.usage
-      }),
-      usage: completion.usage
-    },
-    adjudication: null
+    }
   };
 }
 

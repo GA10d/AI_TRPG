@@ -29,6 +29,18 @@ export type OpeningGenerationStreamOptions = {
   signal?: AbortSignal;
 };
 
+export type InitialSessionNarrationInput = {
+  accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+  locale: LocaleCode;
+  ruleTitle: string;
+  ruleText: string;
+  storyTitle: string;
+  storyText: string;
+  playerInfo: string;
+};
+
 export type TurnNarrationInput = {
   accessMode: ModelAccessMode;
   modelProfileId?: string;
@@ -45,7 +57,23 @@ export type TurnNarrationOutput = {
   provider: string;
   mode: ModelAccessMode;
   meta: AiGenerationMetadata;
-  adjudication?: EndingAdjudication | null;
+};
+
+export type EndingJudgeInput = {
+  accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+  locale: LocaleCode;
+  round: number;
+  narrationText: string;
+};
+
+export type EndingJudgeOutput = {
+  adjudication: EndingAdjudication;
+  provider: string;
+  mode: ModelAccessMode;
+  meta: AiGenerationMetadata;
+  rawText: string;
 };
 
 export type PromptedTextGenerationInput = {
@@ -70,7 +98,11 @@ export interface ModelGateway {
     input: OpeningGenerationInput,
     options?: OpeningGenerationStreamOptions
   ): Promise<OpeningGenerationOutput>;
+  generateInitialSessionNarration(
+    input: InitialSessionNarrationInput
+  ): Promise<TurnNarrationOutput>;
   generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput>;
+  judgeEnding(input: EndingJudgeInput): Promise<EndingJudgeOutput>;
   generatePromptedText(
     input: PromptedTextGenerationInput
   ): Promise<PromptedTextGenerationOutput>;

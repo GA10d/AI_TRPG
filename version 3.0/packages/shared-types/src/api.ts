@@ -20,6 +20,30 @@ export type RuntimeModelConfigInput = {
   model?: string;
 };
 
+export type RuntimeImageModelConfigInput = {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+};
+
+export type ImagePromptTrigger =
+  | "manual"
+  | "character_portrait"
+  | "npc_intro"
+  | "scene_shift";
+
+export type ImagePromptTemplateConfig = {
+  version: number;
+  defaultTheme: string;
+  defaultTrigger: ImagePromptTrigger;
+  fallbackTriggerTemplate: string;
+  themes: Record<string, string>;
+  triggerTemplates: Record<ImagePromptTrigger, string>;
+  characterClauseTemplate: string;
+  characterJoinSeparator: string;
+  characterEntryTemplate: string;
+};
+
 export type CreateSessionRequest = {
   ruleDirectoryName: string;
   storyDirectoryName: string;
@@ -122,6 +146,72 @@ export type ServerProxyStatus = {
   message: string;
 };
 
+export type ImageModelFeatureSummary = {
+  key: string;
+  label: string;
+  supported: boolean;
+  model: string | null;
+  url: string | null;
+};
+
+export type ImageProfileSummary = {
+  id: string;
+  name: string;
+  code: string;
+  providerFamily: string;
+  dependence: "Mock" | "OpenAI" | "Google";
+  description: string;
+  urlRequirements: boolean;
+  baseUrl: string | null;
+  baseModel: string | null;
+  chargeUrl: string;
+  docsUrl: string;
+  envKeyCandidates: string[];
+  allowsCustomApiKey: boolean;
+  allowsCustomBaseUrl: boolean;
+  allowsCustomModel: boolean;
+  configured: boolean;
+  available: boolean;
+  missingEnvKeys: string[];
+  message: string;
+  featureDetails: ImageModelFeatureSummary[];
+};
+
+export type ImageCharacterReference = {
+  name: string;
+  appearance: string;
+  portraitUrl?: string;
+};
+
+export type ImageGenerationRequest = {
+  prompt: string;
+  trigger: ImagePromptTrigger;
+  theme?: string;
+  sceneId: string;
+  characters?: ImageCharacterReference[];
+  allowFallback?: boolean;
+  imageProfileId?: string;
+  runtimeImageModelConfig?: RuntimeImageModelConfigInput;
+  promptTemplateConfig?: ImagePromptTemplateConfig;
+};
+
+export type ImageGenerationResponse = {
+  imageUrl: string;
+  revisedPrompt: string;
+  provider: string;
+  cached: boolean;
+  mimeType?: string | null;
+  outputPath?: string | null;
+};
+
+export type NpcRosterEntry = {
+  id: string;
+  name: string;
+  summary: string;
+  promptText: string;
+  portraitAssetUrl?: string | null;
+};
+
 export type BootstrapResponse = {
   defaults: {
     locale: LocaleCode;
@@ -129,6 +219,7 @@ export type BootstrapResponse = {
     gmArchitecture: GmArchitecture;
     modelAccessMode: ModelAccessMode;
     modelProfileId: string;
+    imageProfileId: string;
     logViewMode: "all" | "compact" | "hidden";
   };
   languages: Array<{
@@ -147,5 +238,7 @@ export type BootstrapResponse = {
   }>;
   modelProfiles: ModelProfileSummary[];
   serverProxyStatus: ServerProxyStatus;
+  imageProfiles: ImageProfileSummary[];
+  imagePromptTemplateConfig: ImagePromptTemplateConfig;
   catalog: ContentCatalogEntry[];
 };

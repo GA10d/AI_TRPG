@@ -6,6 +6,9 @@ import type {
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  NpcRosterEntry,
   SaveBundle,
   SessionSnapshot,
   SubmitTurnRequest
@@ -236,6 +239,40 @@ export async function assistCharacterConcept(
       );
     }
 
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchNpcRoster(
+  ruleDirectoryName: string,
+  storyDirectoryName: string
+): Promise<NpcRosterEntry[]> {
+  try {
+    const searchParams = new URLSearchParams({
+      ruleDirectoryName,
+      storyDirectoryName
+    });
+    const response = await fetch(`/api/npcs?${searchParams.toString()}`);
+    return parseJson<NpcRosterEntry[]>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function generateSceneImage(
+  payload: ImageGenerationRequest
+): Promise<ImageGenerationResponse> {
+  try {
+    const response = await fetch("/api/images/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<ImageGenerationResponse>(response);
+  } catch (error) {
     throw normalizeNetworkError(error);
   }
 }

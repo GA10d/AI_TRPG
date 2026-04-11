@@ -142,6 +142,32 @@ export function buildMockOpeningText(
   ].join("\n\n");
 }
 
+export function buildMockInitialNarration(
+  storyTitle: string,
+  playerInfo: string,
+  locale: string
+): string {
+  const cleanedPlayerInfo = playerInfo.replace(/\s+/g, " ").trim();
+
+  if (isEnglishLocale(locale)) {
+    return [
+      `[Mock GM] ${storyTitle} is ready.`,
+      cleanedPlayerInfo
+        ? `Player setup: ${cleanedPlayerInfo}`
+        : "No explicit player setup was provided before the session started.",
+      "The first playable scene is now live. Describe what you do next."
+    ].join("\n\n");
+  }
+
+  return [
+    `【Mock 主持】《${storyTitle}》已经开场。`,
+    cleanedPlayerInfo
+      ? `玩家设定：${cleanedPlayerInfo}`
+      : "开局前没有填写额外的玩家背景文本。",
+    "第一个可操作场景已经展开。请直接描述你接下来要做什么。"
+  ].join("\n\n");
+}
+
 export function buildMockTurnOutcome(
   playerInput: string,
   locale: string,
@@ -201,6 +227,34 @@ export function buildMockTurnOutcome(
       "当前 MVP 的 mock 处理会优先保留对话链路，并在命中预设关键词时返回最小结局裁定。"
     ].join("\n\n"),
     adjudication: null
+  };
+}
+
+export function buildMockEndingJudgeFromNarration(
+  narrationText: string
+): EndingAdjudication {
+  const normalized = narrationText.toLowerCase();
+
+  if (normalized.includes("ending unlocked") || normalized.includes("已解锁结局")) {
+    return {
+      isGameOver: true,
+      adjudicationSource: "mock",
+      endingState: {
+        endingId: "mock_detected_ending",
+        endingType: "emergent",
+        title: normalized.includes("已解锁结局") ? "已触发结局" : "Ending Detected",
+        summary: normalized.includes("已解锁结局")
+          ? "Mock 结局判定器从本轮叙事中识别到了明确结局。"
+          : "The mock ending judge detected a clear ending from the narrator reply.",
+        confirmedAtRound: 0
+      }
+    };
+  }
+
+  return {
+    isGameOver: false,
+    adjudicationSource: "mock",
+    endingState: null
   };
 }
 

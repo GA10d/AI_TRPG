@@ -18,7 +18,6 @@ import type {
 import { buildSystemCreatedMessage } from "../mock/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
-import { resolveStoryOpening } from "../opening/service.ts";
 import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
 
 function nowIso(): string {
@@ -121,10 +120,17 @@ export async function createSessionSnapshot(
   const modelProfileId =
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
   const characterConcept = request.characterConcept?.trim() ?? "";
-  const openingResult = await resolveStoryOpening(bundle, {
-    modelAccessMode: request.modelAccessMode,
+  const modelGateway = getModelGateway(request.modelAccessMode);
+  const openingResult = await modelGateway.generateInitialSessionNarration({
+    accessMode: request.modelAccessMode,
     modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig,
+    locale: bundle.resolvedLocale,
+    ruleTitle,
+    ruleText: bundle.rule.rule.content,
+    storyTitle,
+    storyText: bundle.story.story.content,
+    playerInfo: characterConcept
   });
 
   const session: Session = {
@@ -167,7 +173,8 @@ export async function createSessionSnapshot(
     },
     gameState: {
       phase: "playing",
-      endingState: null
+      endingState: null,
+      lastEndingJudgeResult: null
     }
   };
 
@@ -177,22 +184,7 @@ export async function createSessionSnapshot(
       storyTitle,
       String(bundle.resolvedLocale),
       timestamp
-    ),
-    {
-      id: `msg_${randomUUID()}`,
-      round: 0,
-      createdAt: timestamp,
-      senderId: gmParticipantId,
-      recipientIds: [playerParticipantId],
-    visibility: "public",
-    kind: "gm_narration",
-    content: openingResult.text,
-    aiMetadata: openingResult.meta,
-    tags: [
-      "opening",
-      `provider:${openingResult.provider}`
-      ]
-    }
+    )
   ];
 
   if (characterConcept.length > 0) {
@@ -205,9 +197,22 @@ export async function createSessionSnapshot(
       visibility: "public",
       kind: "player_input",
       content: characterConcept,
-      tags: ["character_concept"]
+      tags: ["player_info", "character_concept"]
     });
   }
+
+  messages.push({
+    id: `msg_${randomUUID()}`,
+    round: 0,
+    createdAt: timestamp,
+    senderId: gmParticipantId,
+    recipientIds: [playerParticipantId],
+    visibility: "public",
+    kind: "gm_narration",
+    content: openingResult.text,
+    aiMetadata: openingResult.meta,
+    tags: ["opening", `provider:${openingResult.provider}`]
+  });
 
   const replay: ReplayEvent[] = [
     {
@@ -235,20 +240,6 @@ export async function createSessionSnapshot(
       payload: {
         messageId: messages[0]?.id ?? null
       }
-    },
-    {
-      id: `evt_${randomUUID()}`,
-      round: 0,
-      createdAt: timestamp,
-      actorId: gmParticipantId,
-      type: "gm_response_received",
-      displayLevel: "core",
-      summary: "Opening narration generated",
-      payload: {
-        messageId: messages[1]?.id ?? null,
-        mode: request.modelAccessMode,
-        provider: openingResult.provider
-      }
     }
   ];
 
@@ -260,12 +251,27 @@ export async function createSessionSnapshot(
       actorId: playerParticipantId,
       type: "message_created",
       displayLevel: "detail",
-      summary: "Player character concept recorded",
+      summary: "Player setup recorded",
       payload: {
-        messageId: messages.at(-1)?.id ?? null
+        messageId: messages[1]?.id ?? null
       }
     });
   }
+
+  replay.push({
+    id: `evt_${randomUUID()}`,
+    round: 0,
+    createdAt: timestamp,
+    actorId: gmParticipantId,
+    type: "gm_response_received",
+    displayLevel: "core",
+    summary: "Opening narration generated",
+    payload: {
+      messageId: messages.at(-1)?.id ?? null,
+      mode: request.modelAccessMode,
+      provider: openingResult.provider
+    }
+  });
 
   const snapshot: SessionSnapshot = {
     session,
@@ -275,7 +281,9 @@ export async function createSessionSnapshot(
       ruleTitle,
       storyTitle,
       requestedLocale: request.locale,
-      resolvedLocale: bundle.resolvedLocale
+      resolvedLocale: bundle.resolvedLocale,
+      ruleDirectoryName: request.ruleDirectoryName,
+      storyDirectoryName: request.storyDirectoryName
     }
   };
 
@@ -302,7 +310,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
   };
 }
 
-export async function submitMockTurn(
+export async function submitTurn(
   sessionId: string,
   request: SubmitTurnRequest,
   store: InMemorySessionStore
@@ -361,6 +369,15 @@ export async function submitMockTurn(
     round: nextRound,
     conversationContext: buildConversationContext(current.messages)
   });
+  const endingJudge = await modelGateway.judgeEnding({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId:
+      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
+    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    locale: current.session.locale,
+    round: nextRound,
+    narrationText: turnNarration.text
+  });
 
   const gmMessage: Message = {
     id: `msg_${randomUUID()}`,
@@ -378,7 +395,7 @@ export async function submitMockTurn(
     ]
   };
 
-  const endingAdjudication = turnNarration.adjudication ?? null;
+  const endingAdjudication = endingJudge.adjudication ?? null;
   const replayEntries: ReplayEvent[] = [
     {
       id: `evt_${randomUUID()}`,
@@ -415,7 +432,9 @@ export async function submitMockTurn(
       payload: {
         messageId: gmMessage.id,
         provider: turnNarration.provider,
-        mode: turnNarration.mode
+        mode: turnNarration.mode,
+        endingJudgeProvider: endingJudge.provider,
+        endingJudgeRawText: endingJudge.rawText
       }
     }
   ];
@@ -453,6 +472,7 @@ export async function submitMockTurn(
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? "ended"
             : "playing",
+        lastEndingJudgeResult: endingAdjudication,
         endingState:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? endingAdjudication.endingState

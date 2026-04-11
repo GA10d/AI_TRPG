@@ -1,8 +1,8 @@
-import { useState } from "react";
-
 import type {
   BootstrapResponse,
   CreateSessionRequest,
+  ImagePromptTemplateConfig,
+  RuntimeImageModelConfigInput,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import {
@@ -22,6 +22,10 @@ type SettingsScreenProps = {
   modelProfileId: string;
   runtimeModelConfig: RuntimeModelConfigInput;
   profileRuntimeConfigs: Record<string, RuntimeModelConfigInput>;
+  imageProfileId: string;
+  runtimeImageModelConfig: RuntimeImageModelConfigInput;
+  imageProfileRuntimeConfigs: Record<string, RuntimeImageModelConfigInput>;
+  imagePromptTemplateConfig: ImagePromptTemplateConfig | null;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   showAiMetadata: boolean;
@@ -35,6 +39,12 @@ type SettingsScreenProps = {
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
   onModelProfileIdChange: (value: string) => void;
   onProfileRuntimeConfigChange: (profileId: string, value: RuntimeModelConfigInput) => void;
+  onImageProfileIdChange: (value: string) => void;
+  onImageProfileRuntimeConfigChange: (
+    profileId: string,
+    value: RuntimeImageModelConfigInput
+  ) => void;
+  onImagePromptTemplateConfigChange: (value: ImagePromptTemplateConfig) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onShowAiMetadataChange: (value: boolean) => void;
   onMenuFontSizeChange: (value: import("../ui.ts").MenuFontSizePreset) => void;
@@ -49,17 +59,21 @@ const EMPTY_RUNTIME_MODEL_CONFIG: RuntimeModelConfigInput = {
   model: ""
 };
 
-function hasProfileOverride(runtimeModelConfig: RuntimeModelConfigInput): boolean {
-  return Boolean(
-    runtimeModelConfig.apiKey?.trim() ||
-      runtimeModelConfig.baseUrl?.trim() ||
-      runtimeModelConfig.model?.trim()
-  );
-}
+const EMPTY_RUNTIME_IMAGE_MODEL_CONFIG: RuntimeImageModelConfigInput = {
+  apiKey: "",
+  baseUrl: "",
+  model: ""
+};
+
+const IMAGE_TRIGGER_OPTIONS = [
+  { value: "manual", label: "手动生成" },
+  { value: "character_portrait", label: "角色立绘" },
+  { value: "npc_intro", label: "NPC 展示" },
+  { value: "scene_shift", label: "场景切换" }
+] as const;
 
 function getEffectiveRuntimeConfig(
-  profile: BootstrapResponse["modelProfiles"][number],
-  runtimeModelConfig: RuntimeModelConfigInput | undefined
+  runtimeModelConfig: RuntimeModelConfigInput | RuntimeImageModelConfigInput | undefined
 ): RuntimeModelConfigInput {
   return {
     apiKey: runtimeModelConfig?.apiKey?.trim() || "",
@@ -68,64 +82,20 @@ function getEffectiveRuntimeConfig(
   };
 }
 
-function resolveProfileModel(
-  profile: BootstrapResponse["modelProfiles"][number],
-  runtimeModelConfig: RuntimeModelConfigInput
+function resolveConfigStatus(
+  configured: boolean,
+  runtimeConfig: RuntimeModelConfigInput,
+  isMock = false
 ): string {
-  return runtimeModelConfig.model || profile.baseModel || "未设置";
-}
-
-function resolveProfileBaseUrl(
-  profile: BootstrapResponse["modelProfiles"][number],
-  runtimeModelConfig: RuntimeModelConfigInput
-): string {
-  if (profile.accessMode === "mock") {
-    return "本地 mock，无需 Base URL";
-  }
-
-  return runtimeModelConfig.baseUrl || profile.baseUrl || "未设置";
-}
-
-function resolveApiKeyStatus(
-  profile: BootstrapResponse["modelProfiles"][number],
-  runtimeModelConfig: RuntimeModelConfigInput
-): string {
-  if (profile.accessMode === "mock") {
-    return "不需要";
-  }
-
-  if (runtimeModelConfig.apiKey) {
-    return "已填写本地覆盖";
-  }
-
-  return profile.configured ? "已配置" : "未配置";
-}
-
-function resolveOpeningTransport(
-  profile: BootstrapResponse["modelProfiles"][number]
-): string {
-  const fileUploadFeature = profile.featureDetails.find(
-    (feature) => feature.key === "file_upload"
-  );
-
-  return fileUploadFeature?.supported
-    ? "Beginning：rule / story 走文件上传，prompt_beginning 走文本。"
-    : "Beginning：rule / story 与 prompt_beginning 都走纯文本。";
-}
-
-function resolveProfileStatus(
-  profile: BootstrapResponse["modelProfiles"][number],
-  runtimeModelConfig: RuntimeModelConfigInput
-): string {
-  if (profile.accessMode === "mock") {
+  if (isMock) {
     return "内置可用";
   }
 
-  if (runtimeModelConfig.apiKey || runtimeModelConfig.baseUrl || runtimeModelConfig.model) {
+  if (runtimeConfig.apiKey || runtimeConfig.baseUrl || runtimeConfig.model) {
     return "已填写本地覆盖";
   }
 
-  return profile.configured ? "已配置" : "未配置";
+  return configured ? "已配置" : "未配置";
 }
 
 export function SettingsScreen(props: SettingsScreenProps) {
@@ -138,6 +108,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
     modelProfileId,
     runtimeModelConfig,
     profileRuntimeConfigs,
+    imageProfileId,
+    runtimeImageModelConfig,
+    imageProfileRuntimeConfigs,
+    imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
     showAiMetadata,
@@ -151,55 +125,89 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onModelAccessModeChange,
     onModelProfileIdChange,
     onProfileRuntimeConfigChange,
+    onImageProfileIdChange,
+    onImageProfileRuntimeConfigChange,
+    onImagePromptTemplateConfigChange,
     onDebugEnabledChange,
     onShowAiMetadataChange,
     onMenuFontSizeChange,
     onLogViewModeChange
   } = props;
 
-  const allProfiles = bootstrap?.modelProfiles ?? [];
-  const selectedProfile =
-    allProfiles.find((item) => item.id === modelProfileId) ?? allProfiles[0] ?? null;
-  const [isModelManagerOpen, setIsModelManagerOpen] = useState(false);
-  const [editingProfileId, setEditingProfileId] = useState(modelProfileId);
+  const selectedTextProfile =
+    bootstrap?.modelProfiles.find((item) => item.id === modelProfileId) ?? null;
+  const selectedImageProfile =
+    bootstrap?.imageProfiles.find((item) => item.id === imageProfileId) ?? null;
+  const effectiveTextRuntimeConfig = getEffectiveRuntimeConfig(
+    profileRuntimeConfigs[modelProfileId] ?? runtimeModelConfig
+  );
+  const effectiveImageRuntimeConfig = getEffectiveRuntimeConfig(
+    imageProfileRuntimeConfigs[imageProfileId] ?? runtimeImageModelConfig
+  );
+  const resolvedImagePromptTemplateConfig =
+    imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig ?? null;
 
-  const editingProfile =
-    allProfiles.find((item) => item.id === editingProfileId) ?? selectedProfile ?? null;
-  const editingProfileRuntimeConfig = editingProfile
-    ? getEffectiveRuntimeConfig(
-        editingProfile,
-        profileRuntimeConfigs[editingProfile.id] ??
-          (editingProfile.id === modelProfileId ? runtimeModelConfig : EMPTY_RUNTIME_MODEL_CONFIG)
-      )
-    : EMPTY_RUNTIME_MODEL_CONFIG;
-  const configuredProfilesCount = allProfiles.filter((profile) => {
-    const profileRuntimeConfig = getEffectiveRuntimeConfig(
-      profile,
-      profileRuntimeConfigs[profile.id] ??
-        (profile.id === modelProfileId ? runtimeModelConfig : EMPTY_RUNTIME_MODEL_CONFIG)
-    );
-
-    return profile.configured || profile.accessMode === "mock" || hasProfileOverride(profileRuntimeConfig);
-  }).length;
-
-  function handleOpenModelManager(): void {
-    setEditingProfileId(selectedProfile?.id ?? allProfiles[0]?.id ?? "");
-    setIsModelManagerOpen(true);
-  }
-
-  function handleSetProfileAsDefault(profile: BootstrapResponse["modelProfiles"][number]): void {
-    onModelAccessModeChange(profile.accessMode);
-    onModelProfileIdChange(profile.id);
-  }
-
-  function updateEditingProfileRuntimeConfig(patch: Partial<RuntimeModelConfigInput>): void {
-    if (!editingProfile) {
+  function updateTextRuntimeConfig(patch: Partial<RuntimeModelConfigInput>): void {
+    if (!selectedTextProfile) {
       return;
     }
 
-    onProfileRuntimeConfigChange(editingProfile.id, {
-      ...editingProfileRuntimeConfig,
+    onProfileRuntimeConfigChange(selectedTextProfile.id, {
+      ...effectiveTextRuntimeConfig,
       ...patch
+    });
+  }
+
+  function updateImageRuntimeConfig(patch: Partial<RuntimeImageModelConfigInput>): void {
+    if (!selectedImageProfile) {
+      return;
+    }
+
+    onImageProfileRuntimeConfigChange(selectedImageProfile.id, {
+      ...effectiveImageRuntimeConfig,
+      ...patch
+    });
+  }
+
+  function updateImagePromptConfig(
+    patch: Partial<ImagePromptTemplateConfig>
+  ): void {
+    if (!resolvedImagePromptTemplateConfig) {
+      return;
+    }
+
+    onImagePromptTemplateConfigChange({
+      ...resolvedImagePromptTemplateConfig,
+      ...patch
+    });
+  }
+
+  function updateThemeStyle(themeKey: string, value: string): void {
+    if (!resolvedImagePromptTemplateConfig) {
+      return;
+    }
+
+    updateImagePromptConfig({
+      themes: {
+        ...resolvedImagePromptTemplateConfig.themes,
+        [themeKey]: value
+      }
+    });
+  }
+
+  function updateTriggerTemplate(
+    trigger: keyof ImagePromptTemplateConfig["triggerTemplates"],
+    value: string
+  ): void {
+    if (!resolvedImagePromptTemplateConfig) {
+      return;
+    }
+
+    updateImagePromptConfig({
+      triggerTemplates: {
+        ...resolvedImagePromptTemplateConfig.triggerTemplates,
+        [trigger]: value
+      }
     });
   }
 
@@ -207,193 +215,535 @@ export function SettingsScreen(props: SettingsScreenProps) {
     <section className="panel page-panel">
       <ScreenHeader
         title="设置"
-        description="这里保存的是默认值，之后开始新游戏时会自动带入。"
+        description="这里保存的是默认值。文本模型、图片模型和文生图模板都会在后续新游戏中自动带入。"
         onBack={onBack}
       />
 
       <form className="form-grid" onSubmit={onSubmit}>
-        <div className="grid-two">
-          <label className="field">
-            <span>默认语言</span>
-            <select
-              value={locale}
-              onChange={(event) => onLocaleChange(event.target.value as CreateSessionRequest["locale"])}
-            >
-              {bootstrap?.languages.map((language) => (
-                <option key={language.code} value={language.code}>
-                  {language.nativeLabel} / {language.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <section className="summary-card">
+          <div className="selection-column-header">
+            <div>
+              <div className="eyebrow">General</div>
+              <div className="summary-title">基础偏好</div>
+            </div>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>默认语言</span>
+              <select
+                value={locale}
+                onChange={(event) => onLocaleChange(event.target.value as CreateSessionRequest["locale"])}
+              >
+                {bootstrap?.languages.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.nativeLabel} / {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>默认游戏模式</span>
+              <select
+                value={playMode}
+                onChange={(event) =>
+                  onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
+                }
+              >
+                {PLAY_MODE_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>默认主持架构</span>
+              <select
+                value={gmArchitecture}
+                onChange={(event) =>
+                  onGmArchitectureChange(event.target.value as CreateSessionRequest["gmArchitecture"])
+                }
+              >
+                {GM_ARCHITECTURE_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>默认日志显示</span>
+              <select
+                value={logViewMode}
+                onChange={(event) =>
+                  onLogViewModeChange(
+                    event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
+                  )
+                }
+              >
+                {LOG_VIEW_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>菜单字号</span>
+              <select
+                value={menuFontSize}
+                onChange={(event) =>
+                  onMenuFontSizeChange(
+                    event.target.value as import("../ui.ts").MenuFontSizePreset
+                  )
+                }
+              >
+                {MENU_FONT_SIZE_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="summary-card">
+              <div className="field checkbox-field">
+                <span>调试选项</span>
+                <label className="toggle-row">
+                  <input
+                    checked={debugEnabled}
+                    onChange={(event) => onDebugEnabledChange(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>默认开启调试信息</span>
+                </label>
+                <label className="toggle-row">
+                  <input
+                    checked={showAiMetadata}
+                    onChange={(event) => onShowAiMetadataChange(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>显示 AI 耗时、Token 与费用</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="summary-card">
+          <div className="selection-column-header">
+            <div>
+              <div className="eyebrow">Text Model</div>
+              <div className="summary-title">文本模型配置</div>
+              <div className="summary-text">
+                当前默认：
+                {selectedTextProfile?.name ?? "未选择"} /{" "}
+                {selectedTextProfile
+                  ? resolveConfigStatus(
+                      selectedTextProfile.configured,
+                      effectiveTextRuntimeConfig,
+                      selectedTextProfile.accessMode === "mock"
+                    )
+                  : "未配置"}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>模型接入模式</span>
+              <select
+                value={modelAccessMode}
+                onChange={(event) =>
+                  onModelAccessModeChange(event.target.value as CreateSessionRequest["modelAccessMode"])
+                }
+              >
+                {bootstrap?.modelAccessModes.map((mode) => (
+                  <option key={mode.code} value={mode.code}>
+                    {mode.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>默认文本模型档案</span>
+              <select
+                value={modelProfileId}
+                onChange={(event) => onModelProfileIdChange(event.target.value)}
+              >
+                {bootstrap?.modelProfiles
+                  .filter((profile) => profile.accessMode === modelAccessMode)
+                  .map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>API Key 覆盖</span>
+              <input
+                autoComplete="new-password"
+                className="text-input"
+                placeholder="留空则读取本地 .env"
+                type="password"
+                value={effectiveTextRuntimeConfig.apiKey}
+                onChange={(event) =>
+                  updateTextRuntimeConfig({
+                    apiKey: event.target.value
+                  })
+                }
+              />
+            </label>
+
+            <label className="field">
+              <span>模型名覆盖</span>
+              <input
+                className="text-input"
+                placeholder={selectedTextProfile?.baseModel ?? "留空使用默认模型"}
+                type="text"
+                value={effectiveTextRuntimeConfig.model}
+                onChange={(event) =>
+                  updateTextRuntimeConfig({
+                    model: event.target.value
+                  })
+                }
+              />
+            </label>
+          </div>
 
           <label className="field">
-            <span>默认模型模式</span>
-            <select
-              value={modelAccessMode}
+            <span>Base URL 覆盖</span>
+            <input
+              className="text-input"
+              placeholder={selectedTextProfile?.baseUrl ?? "留空使用默认 Base URL"}
+              type="text"
+              value={effectiveTextRuntimeConfig.baseUrl}
               onChange={(event) =>
-                onModelAccessModeChange(event.target.value as CreateSessionRequest["modelAccessMode"])
+                updateTextRuntimeConfig({
+                  baseUrl: event.target.value
+                })
               }
-            >
-              {bootstrap?.modelAccessModes.map((mode) => (
-                <option key={mode.code} value={mode.code}>
-                  {mode.label} - {mode.description}
-                </option>
-              ))}
-            </select>
+            />
           </label>
-        </div>
 
-        <div className="grid-two">
-          <label className="field">
-            <span>默认模型档案</span>
-            <select
-              value={selectedProfile?.id ?? modelProfileId}
-              onChange={(event) => onModelProfileIdChange(event.target.value)}
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              onClick={() =>
+                selectedTextProfile
+                  ? onProfileRuntimeConfigChange(selectedTextProfile.id, EMPTY_RUNTIME_MODEL_CONFIG)
+                  : undefined
+              }
+              type="button"
             >
-              {allProfiles
-                .filter((profile) => profile.accessMode === modelAccessMode)
-                .map((profile) => (
+              清空当前文本模型覆盖
+            </button>
+          </div>
+
+          {selectedTextProfile ? (
+            <div className="model-capability-list">
+              {selectedTextProfile.featureDetails.map((feature) => (
+                <div
+                  className={`model-capability-item ${
+                    feature.supported
+                      ? "model-capability-item-supported"
+                      : "model-capability-item-unsupported"
+                  }`}
+                  key={`${selectedTextProfile.id}:${feature.key}`}
+                >
+                  <div className="model-capability-row">
+                    <span className="model-capability-label">{feature.label}</span>
+                    <span className="model-capability-state">
+                      {feature.supported ? "支持" : "不支持"}
+                    </span>
+                  </div>
+                  <div className="model-capability-meta">
+                    {selectedTextProfile.message}
+                    {feature.model ? ` / 参考模型：${feature.model}` : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="summary-card">
+          <div className="selection-column-header">
+            <div>
+              <div className="eyebrow">Image Model</div>
+              <div className="summary-title">文生图 Provider 配置</div>
+              <div className="summary-text">
+                当前默认：
+                {selectedImageProfile?.name ?? "未选择"} /{" "}
+                {selectedImageProfile
+                  ? resolveConfigStatus(
+                      selectedImageProfile.configured,
+                      effectiveImageRuntimeConfig,
+                      selectedImageProfile.dependence === "Mock"
+                    )
+                  : "未配置"}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>默认图片模型档案</span>
+              <select
+                value={imageProfileId}
+                onChange={(event) => onImageProfileIdChange(event.target.value)}
+              >
+                {bootstrap?.imageProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.name}
                   </option>
                 ))}
-            </select>
-          </label>
+              </select>
+            </label>
 
-          <label className="field">
-            <span>默认游戏模式</span>
-            <select
-              value={playMode}
-              onChange={(event) =>
-                onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
+            <label className="field">
+              <span>图片模型名覆盖</span>
+              <input
+                className="text-input"
+                placeholder={selectedImageProfile?.baseModel ?? "留空使用默认模型"}
+                type="text"
+                value={effectiveImageRuntimeConfig.model}
+                onChange={(event) =>
+                  updateImageRuntimeConfig({
+                    model: event.target.value
+                  })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="grid-two">
+            <label className="field">
+              <span>图片 API Key 覆盖</span>
+              <input
+                autoComplete="new-password"
+                className="text-input"
+                placeholder="留空则读取本地 .env"
+                type="password"
+                value={effectiveImageRuntimeConfig.apiKey}
+                onChange={(event) =>
+                  updateImageRuntimeConfig({
+                    apiKey: event.target.value
+                  })
+                }
+              />
+            </label>
+
+            <label className="field">
+              <span>图片 Base URL 覆盖</span>
+              <input
+                className="text-input"
+                placeholder={selectedImageProfile?.baseUrl ?? "留空使用默认 Base URL"}
+                type="text"
+                value={effectiveImageRuntimeConfig.baseUrl}
+                onChange={(event) =>
+                  updateImageRuntimeConfig({
+                    baseUrl: event.target.value
+                  })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="button-row">
+            <button
+              className="ghost-button"
+              onClick={() =>
+                selectedImageProfile
+                  ? onImageProfileRuntimeConfigChange(
+                      selectedImageProfile.id,
+                      EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
+                    )
+                  : undefined
               }
+              type="button"
             >
-              {PLAY_MODE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="grid-two">
-          <label className="field">
-            <span>默认主持架构</span>
-            <select
-              value={gmArchitecture}
-              onChange={(event) =>
-                onGmArchitectureChange(event.target.value as CreateSessionRequest["gmArchitecture"])
-              }
-            >
-              {GM_ARCHITECTURE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>默认日志显示</span>
-            <select
-              value={logViewMode}
-              onChange={(event) =>
-                onLogViewModeChange(
-                  event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
-                )
-              }
-            >
-              {LOG_VIEW_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="grid-two">
-          <label className="field">
-            <span>菜单字号</span>
-            <select
-              value={menuFontSize}
-              onChange={(event) =>
-                onMenuFontSizeChange(
-                  event.target.value as import("../ui.ts").MenuFontSizePreset
-                )
-              }
-            >
-              {MENU_FONT_SIZE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <div className="field-hint">控制主菜单和各界面常规 UI 文字的大小。</div>
-          </label>
-        </div>
-
-        <label className="field checkbox-field">
-          <span>调试开关</span>
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={debugEnabled}
-              onChange={(event) => onDebugEnabledChange(event.target.checked)}
-            />
-            <span>默认开启调试日志</span>
-          </label>
-        </label>
-
-        <label className="field checkbox-field">
-          <span>AI 生成信息</span>
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={showAiMetadata}
-              onChange={(event) => onShowAiMetadataChange(event.target.checked)}
-            />
-            <span>
-              {showAiMetadata
-                ? "显示耗时 / token / 费用信息"
-                : "隐藏耗时 / token / 费用信息"}
-            </span>
-          </label>
-        </label>
-
-        <section className="summary-card settings-model-entry">
-          <div className="settings-model-entry-head">
-            <div>
-              <div className="eyebrow">Model Config</div>
-              <div className="summary-title">配置模型信息</div>
-              <div className="summary-text">
-                当前默认：{selectedProfile?.name ?? "未选择模型"} / 已管理 {configuredProfilesCount} /{" "}
-                {allProfiles.length} 个模型档案
-              </div>
-            </div>
-
-            <button className="ghost-button" onClick={handleOpenModelManager} type="button">
-              查看
+              清空当前图片模型覆盖
             </button>
           </div>
 
-          <div className="settings-model-entry-grid">
-            <div className="summary-text">
-              当前模型：{selectedProfile ? resolveProfileModel(selectedProfile, runtimeModelConfig) : "未设置"}
+          {selectedImageProfile ? (
+            <div className="model-capability-list">
+              {selectedImageProfile.featureDetails.map((feature) => (
+                <div
+                  className={`model-capability-item ${
+                    feature.supported
+                      ? "model-capability-item-supported"
+                      : "model-capability-item-unsupported"
+                  }`}
+                  key={`${selectedImageProfile.id}:${feature.key}`}
+                >
+                  <div className="model-capability-row">
+                    <span className="model-capability-label">{feature.label}</span>
+                    <span className="model-capability-state">
+                      {feature.supported ? "支持" : "不支持"}
+                    </span>
+                  </div>
+                  <div className="model-capability-meta">
+                    {selectedImageProfile.message}
+                    {feature.model ? ` / 参考模型：${feature.model}` : ""}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="summary-text">
-              API Key：{selectedProfile ? resolveApiKeyStatus(selectedProfile, runtimeModelConfig) : "未设置"}
-            </div>
-            <div className="summary-text">
-              文件输入：{selectedProfile?.featureDetails.find((feature) => feature.key === "file_upload")?.supported ? "支持" : "不支持"}
-            </div>
-            <div className="summary-text">
-              深度思考：{selectedProfile?.featureDetails.find((feature) => feature.key === "deep_think")?.supported ? "支持" : "不支持"}
-            </div>
-          </div>
+          ) : null}
         </section>
+
+        {resolvedImagePromptTemplateConfig ? (
+          <section className="summary-card">
+            <div className="selection-column-header">
+              <div>
+                <div className="eyebrow">Image Prompt</div>
+                <div className="summary-title">文生图模板</div>
+                <div className="summary-text">
+                  这里配置不同场景下的通用模板，实际生成时会与业务 prompt 自动拼接。
+                </div>
+              </div>
+            </div>
+
+            <div className="grid-two">
+              <label className="field">
+                <span>默认主题</span>
+                <input
+                  className="text-input"
+                  type="text"
+                  value={resolvedImagePromptTemplateConfig.defaultTheme}
+                  onChange={(event) =>
+                    updateImagePromptConfig({
+                      defaultTheme: event.target.value
+                    })
+                  }
+                />
+              </label>
+
+              <label className="field">
+                <span>默认触发器</span>
+                <select
+                  value={resolvedImagePromptTemplateConfig.defaultTrigger}
+                  onChange={(event) =>
+                    updateImagePromptConfig({
+                      defaultTrigger:
+                        event.target.value as ImagePromptTemplateConfig["defaultTrigger"]
+                    })
+                  }
+                >
+                  {IMAGE_TRIGGER_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="field">
+              <span>兜底模板</span>
+              <textarea
+                rows={4}
+                value={resolvedImagePromptTemplateConfig.fallbackTriggerTemplate}
+                onChange={(event) =>
+                  updateImagePromptConfig({
+                    fallbackTriggerTemplate: event.target.value
+                  })
+                }
+              />
+            </label>
+
+            <div className="grid-two">
+              {Object.entries(resolvedImagePromptTemplateConfig.themes).map(([themeKey, themeStyle]) => (
+                <label className="field" key={themeKey}>
+                  <span>主题样式: {themeKey}</span>
+                  <textarea
+                    rows={4}
+                    value={themeStyle}
+                    onChange={(event) => updateThemeStyle(themeKey, event.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="grid-two">
+              {Object.entries(resolvedImagePromptTemplateConfig.triggerTemplates).map(
+                ([triggerKey, templateValue]) => (
+                  <label className="field" key={triggerKey}>
+                    <span>触发器模板: {triggerKey}</span>
+                    <textarea
+                      rows={5}
+                      value={templateValue}
+                      onChange={(event) =>
+                        updateTriggerTemplate(
+                          triggerKey as keyof ImagePromptTemplateConfig["triggerTemplates"],
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                )
+              )}
+            </div>
+
+            <div className="grid-two">
+              <label className="field">
+                <span>角色拼接模板</span>
+                <textarea
+                  rows={4}
+                  value={resolvedImagePromptTemplateConfig.characterClauseTemplate}
+                  onChange={(event) =>
+                    updateImagePromptConfig({
+                      characterClauseTemplate: event.target.value
+                    })
+                  }
+                />
+              </label>
+
+              <label className="field">
+                <span>角色条目模板</span>
+                <textarea
+                  rows={4}
+                  value={resolvedImagePromptTemplateConfig.characterEntryTemplate}
+                  onChange={(event) =>
+                    updateImagePromptConfig({
+                      characterEntryTemplate: event.target.value
+                    })
+                  }
+                />
+              </label>
+            </div>
+
+            <label className="field">
+              <span>角色连接符</span>
+              <input
+                className="text-input"
+                type="text"
+                value={resolvedImagePromptTemplateConfig.characterJoinSeparator}
+                onChange={(event) =>
+                  updateImagePromptConfig({
+                    characterJoinSeparator: event.target.value
+                  })
+                }
+              />
+            </label>
+          </section>
+        ) : null}
 
         <div className="button-row">
           <button className="primary-button" type="submit">
@@ -404,245 +754,6 @@ export function SettingsScreen(props: SettingsScreenProps) {
           </button>
         </div>
       </form>
-
-      {isModelManagerOpen && editingProfile ? (
-        <div
-          className="settings-model-modal-backdrop"
-          onClick={() => setIsModelManagerOpen(false)}
-        >
-          <div
-            className="settings-model-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="settings-model-modal-header">
-              <div>
-                <div className="eyebrow">Model Config</div>
-                <h2>配置模型信息</h2>
-                <div className="summary-text">
-                  在这里查看模型能力，并为未配置或已配置的模型填写本地覆盖参数。
-                </div>
-              </div>
-
-              <button
-                className="ghost-button"
-                onClick={() => setIsModelManagerOpen(false)}
-                type="button"
-              >
-                关闭
-              </button>
-            </div>
-
-            <div className="settings-model-modal-body">
-              <aside className="settings-model-sidebar">
-                <div className="settings-model-sidebar-title">模型列表</div>
-                <div className="settings-model-list">
-                  {allProfiles.map((profile) => {
-                    const profileRuntimeConfig = getEffectiveRuntimeConfig(
-                      profile,
-                      profileRuntimeConfigs[profile.id] ??
-                        (profile.id === modelProfileId
-                          ? runtimeModelConfig
-                          : EMPTY_RUNTIME_MODEL_CONFIG)
-                    );
-
-                    return (
-                      <button
-                        className={`settings-model-list-item ${
-                          profile.id === editingProfile.id
-                            ? "settings-model-list-item-active"
-                            : ""
-                        }`}
-                        key={profile.id}
-                        onClick={() => setEditingProfileId(profile.id)}
-                        type="button"
-                      >
-                        <div className="settings-model-list-item-top">
-                          <span className="summary-title">{profile.name}</span>
-                          <span className="flag-chip">
-                            {profile.id === modelProfileId ? "当前默认" : resolveProfileStatus(profile, profileRuntimeConfig)}
-                          </span>
-                        </div>
-                        <div className="summary-text">
-                          {profile.accessMode} / {profile.dependence}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </aside>
-
-              <section className="settings-model-detail">
-                <article className="summary-card settings-model-card">
-                  <div className="settings-model-card-top">
-                    <div>
-                      <div className="summary-title">{editingProfile.name}</div>
-                      <div className="summary-text">
-                        {editingProfile.accessMode} / {editingProfile.dependence}
-                      </div>
-                    </div>
-
-                    <div className="flag-list">
-                      {editingProfile.id === modelProfileId ? (
-                        <span className="flag-chip">当前默认</span>
-                      ) : (
-                        <button
-                          className="ghost-button ghost-button-small"
-                          onClick={() => handleSetProfileAsDefault(editingProfile)}
-                          type="button"
-                        >
-                          设为默认
-                        </button>
-                      )}
-                      <span className="flag-chip">
-                        {resolveProfileStatus(editingProfile, editingProfileRuntimeConfig)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="settings-model-meta">
-                    <div className="summary-text">
-                      模型：{resolveProfileModel(editingProfile, editingProfileRuntimeConfig)}
-                    </div>
-                    <div className="summary-text">
-                      Base URL：{resolveProfileBaseUrl(editingProfile, editingProfileRuntimeConfig)}
-                    </div>
-                    <div className="summary-text">
-                      API Key：{resolveApiKeyStatus(editingProfile, editingProfileRuntimeConfig)}
-                    </div>
-                    <div className="summary-text">{resolveOpeningTransport(editingProfile)}</div>
-                    <div className="summary-text">{editingProfile.message}</div>
-                    {editingProfile.missingEnvKeys.length ? (
-                      <div className="summary-text">
-                        缺少环境变量：{editingProfile.missingEnvKeys.join("、")}
-                      </div>
-                    ) : null}
-                  </div>
-                </article>
-
-                <article className="summary-card settings-model-editor">
-                  <div className="selection-column-header">
-                    <div>
-                      <div className="eyebrow">Overrides</div>
-                      <div className="summary-title">本地覆盖参数</div>
-                    </div>
-                  </div>
-
-                  {editingProfile.accessMode === "mock" ? (
-                    <div className="hint-text">
-                      Mock Local 是内置模型，不需要额外配置 API Key、Base URL 或模型名。
-                    </div>
-                  ) : (
-                    <div className="settings-model-editor-grid">
-                      <label className="field">
-                        <span>API Key 覆盖</span>
-                        <input
-                          autoComplete="new-password"
-                          className="text-input"
-                          type="password"
-                          placeholder="留空则读取本地 .env"
-                          value={editingProfileRuntimeConfig.apiKey}
-                          onChange={(event) =>
-                            updateEditingProfileRuntimeConfig({
-                              apiKey: event.target.value
-                            })
-                          }
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>模型名覆盖</span>
-                        <input
-                          className="text-input"
-                          type="text"
-                          placeholder={editingProfile.baseModel ?? "留空则使用档案默认模型"}
-                          value={editingProfileRuntimeConfig.model}
-                          onChange={(event) =>
-                            updateEditingProfileRuntimeConfig({
-                              model: event.target.value
-                            })
-                          }
-                        />
-                      </label>
-
-                      <label className="field settings-model-editor-field-full">
-                        <span>Base URL 覆盖</span>
-                        <input
-                          className="text-input"
-                          type="text"
-                          placeholder={editingProfile.baseUrl ?? "留空则使用档案默认 Base URL"}
-                          value={editingProfileRuntimeConfig.baseUrl}
-                          onChange={(event) =>
-                            updateEditingProfileRuntimeConfig({
-                              baseUrl: event.target.value
-                            })
-                          }
-                        />
-                      </label>
-
-                      <div className="settings-model-editor-actions">
-                        <button
-                          className="ghost-button"
-                          onClick={() =>
-                            onProfileRuntimeConfigChange(editingProfile.id, EMPTY_RUNTIME_MODEL_CONFIG)
-                          }
-                          type="button"
-                        >
-                          清空此模型覆盖
-                        </button>
-                      </div>
-
-                      <div className="hint-text settings-model-editor-field-full">
-                        这里保存的是浏览器本地覆盖参数。留空时，后端会回退到
-                        `version 3.0/.env` 或模型档案中的默认配置。
-                      </div>
-                    </div>
-                  )}
-                </article>
-
-                <article className="summary-card settings-model-card">
-                  <div className="selection-column-header">
-                    <div>
-                      <div className="eyebrow">Capabilities</div>
-                      <div className="summary-title">模型能力</div>
-                    </div>
-                  </div>
-
-                  <div className="model-capability-list">
-                    {editingProfile.featureDetails.map((feature) => (
-                      <div
-                        className={`model-capability-item ${
-                          feature.supported
-                            ? "model-capability-item-supported"
-                            : "model-capability-item-unsupported"
-                        }`}
-                        key={`${editingProfile.id}:${feature.key}`}
-                      >
-                        <div className="model-capability-row">
-                          <span className="model-capability-label">{feature.label}</span>
-                          <span className="model-capability-state">
-                            {feature.supported ? "支持" : "不支持"}
-                          </span>
-                        </div>
-                        <div className="model-capability-meta">
-                          {feature.model ? `参考模型：${feature.model}` : "未标注具体模型"}
-                          {feature.url ? (
-                            <>
-                              {" · "}
-                              <a href={feature.url} rel="noreferrer" target="_blank">
-                                官方说明
-                              </a>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              </section>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

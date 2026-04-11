@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "defaultTheme": "parchment",
+  "defaultTrigger": "manual",
+  "fallbackTriggerTemplate": "{basePrompt}, {castClause} TRPG illustration, {themeStyle}, no text, no watermark",
+  "themes": {
+    "parchment": "realistic travel-journal illustration, earthy tone, cinematic natural light",
+    "nightwatch": "dark tactical control room style, sharp contour, low-key contrast",
+    "neon": "high contrast neon cyberpunk style, dramatic perspective, dense atmosphere"
+  },
+  "triggerTemplates": {
+    "manual": "{basePrompt}, {castClause} TRPG illustration, {themeStyle}, no text, no watermark",
+    "character_portrait": "TRPG character portrait sheet, vertical composition, portrait orientation 2:3, full body, clean silhouette, {basePrompt}, {themeStyle}, no text, no watermark",
+    "npc_intro": "TRPG NPC portrait card, half body, {basePrompt}, {castClause} {themeStyle}, no text, no watermark",
+    "scene_shift": "TRPG exploration environment wide shot, {basePrompt}, {castClause} {themeStyle}, no text, no watermark"
+  },
+  "characterClauseTemplate": "Keep recurring character consistency. Include these characters in-frame where suitable: {joinedCharacters}.",
+  "characterJoinSeparator": "; ",
+  "characterEntryTemplate": "{name}({appearance})"
+}

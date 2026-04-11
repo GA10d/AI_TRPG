@@ -105,6 +105,7 @@ export type SessionSettings = {
 export type GameState = {
   phase?: "setup" | "playing" | "ending" | "ended";
   endingState?: EndingState | null;
+  lastEndingJudgeResult?: EndingAdjudication | null;
 };
 
 export type Session = {
@@ -168,6 +169,8 @@ export type SessionContentSummary = {
   storyTitle: string;
   requestedLocale: LocaleCode;
   resolvedLocale: LocaleCode;
+  ruleDirectoryName?: string;
+  storyDirectoryName?: string;
 };
 
 export type SaveRuntimeConfig = {

@@ -1692,6 +1692,201 @@ pre {
   font-family: "Cascadia Code", "Consolas", monospace;
 }
 
+.game-shell {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  min-height: calc(100vh - 20px);
+  height: calc(100vh - 20px);
+  max-height: calc(100vh - 20px);
+  overflow: hidden;
+}
+
+.game-hero,
+.game-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.game-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.game-main {
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+  overflow: hidden;
+}
+
+.game-focus-panel,
+.game-history-panel,
+.game-composer,
+.game-npc-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.game-focus-panel {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(122, 50, 32, 0.08), transparent 34%),
+    rgba(255, 255, 255, 0.76);
+}
+
+.game-focus-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-focus-markdown {
+  font-size: clamp(18px, 1.2vw + 12px, 26px);
+  line-height: 1.9;
+}
+
+.game-history-panel {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.game-history-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-history-list,
+.game-save-list {
+  min-height: 0;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.game-history-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+}
+
+.game-history-item-player {
+  background: rgba(255, 252, 247, 0.94);
+}
+
+.game-history-item-gm {
+  background: rgba(246, 238, 231, 0.92);
+}
+
+.game-history-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.game-composer {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 246, 0.95), rgba(248, 241, 234, 0.98)),
+    rgba(255, 255, 255, 0.82);
+}
+
+.game-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(28, 15, 10, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.game-drawer-panel {
+  width: min(860px, 100vw);
+  height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(122, 50, 32, 0.08), transparent 32%),
+    rgba(251, 247, 240, 0.98);
+  border-left: 1px solid rgba(92, 57, 30, 0.14);
+  box-shadow: -20px 0 48px rgba(44, 23, 18, 0.16);
+}
+
+.game-drawer-body {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-drawer-body > .grid-two,
+.game-drawer-body > .summary-card,
+.game-drawer-body > .playthrough-panel {
+  align-self: start;
+}
+
+.game-drawer-body > .summary-card:last-child {
+  min-height: 0;
+}
+
+.game-npc-layout {
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+
+.game-npc-list {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-npc-detail {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-npc-portrait {
+  min-height: 320px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(95, 33, 18, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(122, 50, 32, 0.14), transparent 28%),
+    linear-gradient(160deg, rgba(54, 27, 20, 0.94), rgba(31, 15, 12, 0.98));
+}
+
+.game-npc-portrait img {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  object-fit: cover;
+}
+
 @media (max-width: 1280px) {
   .setup-layout,
   .meta-grid {
@@ -1759,7 +1954,10 @@ pre {
   .button-row,
   .record-header,
   .selection-column-header,
-  .story-detail-footer {
+  .story-detail-footer,
+  .game-hero,
+  .game-panel-head,
+  .game-history-meta {
     flex-direction: column;
   }
 
@@ -1872,5 +2070,22 @@ pre {
   .settings-model-sidebar,
   .settings-model-detail {
     padding-right: 0;
+  }
+
+  .game-main,
+  .game-npc-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .game-shell {
+    min-height: calc(100vh - 20px);
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .game-drawer-panel {
+    width: 100vw;
+    padding: 18px;
   }
 }

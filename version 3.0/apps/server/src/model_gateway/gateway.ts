@@ -1,15 +1,24 @@
 import type { ModelAccessMode } from "../../../../packages/shared-types/src/index.ts";
 import {
+  buildMockEndingJudgeFromNarration,
+  buildMockInitialNarration,
   buildMockOpeningText,
   buildMockTurnOutcome
 } from "../mock/index.ts";
 import {
   generateOpeningViaServerProxy,
   generatePromptedTextViaServerProxy,
-  streamOpeningViaServerProxy,
-  generateTurnNarrationViaServerProxy
+  streamOpeningViaServerProxy
 } from "./openai_compatible.ts";
+import {
+  generateInitialSessionNarrationViaServerProxy,
+  generateTurnNarrationViaSingleAgentServerProxy,
+  judgeEndingViaServerProxy
+} from "./single_agent_proxy.ts";
 import type {
+  EndingJudgeInput,
+  EndingJudgeOutput,
+  InitialSessionNarrationInput,
   ModelGateway,
   OpeningGenerationInput,
   OpeningGenerationStreamOptions,
@@ -131,7 +140,78 @@ class MockModelGateway implements ModelGateway {
           promptCacheMissTokens: null
         }
       },
-      adjudication: outcome.adjudication
+    };
+  }
+
+  async generateInitialSessionNarration(
+    input: InitialSessionNarrationInput
+  ): Promise<TurnNarrationOutput> {
+    return {
+      text: buildMockInitialNarration(
+        input.storyTitle,
+        input.playerInfo,
+        String(input.locale)
+      ),
+      provider: "mock-local",
+      mode: "mock",
+      meta: {
+        provider: "mock-local",
+        mode: "mock",
+        model: "mock-local",
+        durationMs: 0,
+        estimatedCost: {
+          amount: 0,
+          currency: "USD",
+          pricingModel: "mock-local",
+          note: "Mock mode does not consume billable tokens."
+        },
+        usage: {
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null,
+          promptCacheHitTokens: null,
+          promptCacheMissTokens: null
+        }
+      }
+    };
+  }
+
+  async judgeEnding(input: EndingJudgeInput): Promise<EndingJudgeOutput> {
+    const adjudication = buildMockEndingJudgeFromNarration(input.narrationText);
+
+    return {
+      adjudication:
+        adjudication.endingState === null
+          ? adjudication
+          : {
+              ...adjudication,
+              endingState: {
+                ...adjudication.endingState,
+                confirmedAtRound: input.round
+              }
+            },
+      rawText: JSON.stringify(adjudication, null, 2),
+      provider: "mock-local",
+      mode: "mock",
+      meta: {
+        provider: "mock-local",
+        mode: "mock",
+        model: "mock-local",
+        durationMs: 0,
+        estimatedCost: {
+          amount: 0,
+          currency: "USD",
+          pricingModel: "mock-local",
+          note: "Mock mode does not consume billable tokens."
+        },
+        usage: {
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null,
+          promptCacheHitTokens: null,
+          promptCacheMissTokens: null
+        }
+      }
     };
   }
 
@@ -185,7 +265,17 @@ class ServerProxyModelGateway implements ModelGateway {
   }
 
   async generateTurnNarration(input: TurnNarrationInput): Promise<TurnNarrationOutput> {
-    return generateTurnNarrationViaServerProxy(input);
+    return generateTurnNarrationViaSingleAgentServerProxy(input);
+  }
+
+  async generateInitialSessionNarration(
+    input: InitialSessionNarrationInput
+  ): Promise<TurnNarrationOutput> {
+    return generateInitialSessionNarrationViaServerProxy(input);
+  }
+
+  async judgeEnding(input: EndingJudgeInput): Promise<EndingJudgeOutput> {
+    return judgeEndingViaServerProxy(input);
   }
 
   async generatePromptedText(
