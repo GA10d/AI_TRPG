@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useRef,
   useState,
@@ -410,7 +410,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const openingPreviewMetaLine =
     showAiMetadata && !openingPreviewLoading
       ? formatAiGenerationMeta(openingPreviewMeta) ||
-        (openingPreviewProvider ? `来源：${openingPreviewProvider}` : "")
+        (openingPreviewProvider ? `鏉ユ簮锛?{openingPreviewProvider}` : "")
       : "";
   const previewHeadline =
     selectedStory?.coverQuote?.trim() ||
@@ -451,7 +451,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               type="button"
             >
               <span className="collapsed-pane-toggle-label">CONFIG</span>
-              <span className="collapsed-pane-toggle-action">展开</span>
+              <span className="collapsed-pane-toggle-action">灞曞紑</span>
             </button>
           ) : (
             <>
@@ -459,14 +459,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="selection-column-header">
                   <div>
                     <div className="eyebrow">Global Config</div>
-                    <h2>全局配置</h2>
+                    <h2>鍏ㄥ眬閰嶇疆</h2>
                   </div>
                   <button
                     className="ghost-button pane-toggle-button"
                     onClick={handleToggleLeftCollapse}
                     type="button"
                   >
-                    收起
+                    鏀惰捣
                   </button>
                 </div>
 
@@ -659,6 +659,24 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       </div>
                     </SettingField>
                   ) : null}
+
+                  <div className="companion-card setup-config-summary-card">
+                    <div className="selection-card-title">当前配置</div>
+                    <div className="summary-text">
+                      {selectedRule?.ruleTitle ?? "未选择规则"} /{" "}
+                      {selectedStory?.title ?? "未选择剧本"}
+                    </div>
+                    <div className="summary-text">
+                      标签：{renderJoinedList(selectedStory?.tags ?? [])}
+                    </div>
+                    <div className="summary-text">
+                      主持风格：{selectedStory?.gmStyle ?? "待定"}
+                    </div>
+                    <div className="summary-text">
+                      模型档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
+                    </div>
+                    <div className="summary-text">实际模型：{resolvedModelName}</div>
+                  </div>
                 </div>
 
               </section>
@@ -790,28 +808,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="setup-pane-scroll">
                   <div className="companion-list">
                     <div className="companion-card">
-                      <div className="selection-card-title">当前配置</div>
-                      <div className="summary-text">
-                        {selectedRule?.ruleTitle ?? "未选择规则"} /{" "}
-                        {selectedStory?.title ?? "未选择剧本"}
-                      </div>
-                      <div className="summary-text">
-                        标签：{renderJoinedList(selectedStory?.tags ?? [])}
-                      </div>
-                      <div className="summary-text">
-                        主持风格：{selectedStory?.gmStyle ?? "待定"}
-                      </div>
-                      <div className="summary-text">
-                        模型档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
-                      </div>
-                      <div className="summary-text">实际模型：{resolvedModelName}</div>
-                    </div>
-
-                    <div className="companion-card">
                       <div className="selection-card-title">AI 同伴入口</div>
                       <div className="summary-text">
-                        这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2
-                        先保留页面结构和操作位置。
+                        这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。
                       </div>
                     </div>
 
