@@ -3,6 +3,7 @@ import { getDefaultModelProfileId } from "./model_profiles.ts";
 
 export * from "./languages.ts";
 export * from "./model_profiles.ts";
+export * from "./model_pricing.ts";
 
 export const DEFAULT_LOG_VIEW_MODE = "compact";
 

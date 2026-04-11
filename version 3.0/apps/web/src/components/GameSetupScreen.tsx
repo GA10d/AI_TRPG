@@ -19,9 +19,9 @@ import {
   GM_ARCHITECTURE_OPTIONS,
   LOG_VIEW_OPTIONS,
   MARKDOWN_FONT_SIZE_OPTIONS,
-  type MarkdownFontSizePreset,
   PLAY_MODE_OPTIONS,
-  renderJoinedList
+  renderJoinedList,
+  type MarkdownFontSizePreset
 } from "../ui.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
@@ -55,7 +55,6 @@ type GameSetupScreenProps = {
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
   onModelProfileIdChange: (value: string) => void;
-  onRuntimeModelConfigChange: (value: RuntimeModelConfigInput) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
@@ -76,7 +75,7 @@ type SetupLayoutState = {
 const SETUP_LAYOUT_STORAGE_KEY = "trpg3.gameSetupLayout";
 const LEFT_MIN_WIDTH = 280;
 const CENTER_MIN_WIDTH = 420;
-const RIGHT_MIN_WIDTH = 260;
+const RIGHT_MIN_WIDTH = 280;
 const COLLAPSED_WIDTH = 52;
 const SPLITTER_WIDTH = 14;
 const DEFAULT_LAYOUT: SetupLayoutState = {
@@ -264,7 +263,6 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onGmArchitectureChange,
     onModelAccessModeChange,
     onModelProfileIdChange,
-    onRuntimeModelConfigChange,
     onDebugEnabledChange,
     onLogViewModeChange,
     onMarkdownFontSizeChange,
@@ -408,9 +406,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     5
   );
   const previewMarkdownContent =
-    openingPreviewText.trim().length > 0
-      ? openingPreviewText
-      : previewLines.join("\n\n");
+    openingPreviewText.trim().length > 0 ? openingPreviewText : previewLines.join("\n\n");
   const openingPreviewMetaLine =
     showAiMetadata && !openingPreviewLoading
       ? formatAiGenerationMeta(openingPreviewMeta) ||
@@ -419,6 +415,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const previewHeadline =
     selectedStory?.coverQuote?.trim() ||
     clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120);
+  const resolvedModelName =
+    runtimeModelConfig.model?.trim() || selectedProfile?.baseModel || "未配置";
 
   const leftPaneStyle: CSSProperties = {
     width: layout.leftWidth,
@@ -514,44 +512,6 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </select>
                   </SettingField>
 
-                  {selectedProfile ? (
-                    <SettingField
-                      label="模型能力"
-                      hint="这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。"
-                    >
-                      <div className="model-capability-list">
-                        {selectedProfile.featureDetails.map((feature) => (
-                          <div
-                            key={feature.key}
-                            className={`model-capability-item ${
-                              feature.supported
-                                ? "model-capability-item-supported"
-                                : "model-capability-item-unsupported"
-                            }`}
-                          >
-                            <div className="model-capability-row">
-                              <span className="model-capability-label">{feature.label}</span>
-                              <span className="model-capability-state">
-                                {feature.supported ? "支持" : "不支持"}
-                              </span>
-                            </div>
-                            <div className="model-capability-meta">
-                              {feature.model ? `参考模型：${feature.model}` : "未标注具体模型"}
-                              {feature.url ? (
-                                <>
-                                  {" · "}
-                                  <a href={feature.url} rel="noreferrer" target="_blank">
-                                    官方说明
-                                  </a>
-                                </>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </SettingField>
-                  ) : null}
-
                   <SettingField
                     label="主持架构"
                     hint="为单 Agent / 多 Agent 主持预留统一入口。"
@@ -574,7 +534,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                   <SettingField
                     label="模型档案"
-                    hint="用于切换不同 provider 的默认模型档案。"
+                    hint="这里只负责选择本局要使用的模型档案。API Key、Base URL 和模型名请到“设置 -> 配置模型信息”里统一维护。"
                   >
                     <select
                       value={selectedProfile?.id ?? modelProfileId}
@@ -590,7 +550,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                   <SettingField
                     label="日志显示"
-                    hint="控制日志区域的细粒度，方便你游玩或排查。"
+                    hint="控制日志区域的细粒度，方便游玩或排查。"
                   >
                     <select
                       value={logViewMode}
@@ -646,62 +606,6 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </select>
                   </SettingField>
 
-                  {modelAccessMode === "server_proxy" ? (
-                    <>
-                      <SettingField label="API Key 覆盖" hint="留空时优先读取本地 .env。">
-                        <input
-                          autoComplete="new-password"
-                          className="text-input"
-                          placeholder="可选：覆盖当前档案的 API key"
-                          type="password"
-                          value={runtimeModelConfig.apiKey ?? ""}
-                          onChange={(event) =>
-                            onRuntimeModelConfigChange({
-                              ...runtimeModelConfig,
-                              apiKey: event.target.value
-                            })
-                          }
-                        />
-                      </SettingField>
-
-                      <SettingField
-                        label="模型名覆盖"
-                        hint="留空则使用模型档案的默认模型名。"
-                      >
-                        <input
-                          className="text-input"
-                          placeholder={selectedProfile?.baseModel ?? "输入模型名"}
-                          type="text"
-                          value={runtimeModelConfig.model ?? ""}
-                          onChange={(event) =>
-                            onRuntimeModelConfigChange({
-                              ...runtimeModelConfig,
-                              model: event.target.value
-                            })
-                          }
-                        />
-                      </SettingField>
-
-                      <SettingField
-                        label="Base URL 覆盖"
-                        hint="兼容 OpenAI 风格代理接口。"
-                      >
-                        <input
-                          className="text-input"
-                          placeholder={selectedProfile?.baseUrl ?? "输入 base URL"}
-                          type="text"
-                          value={runtimeModelConfig.baseUrl ?? ""}
-                          onChange={(event) =>
-                            onRuntimeModelConfigChange({
-                              ...runtimeModelConfig,
-                              baseUrl: event.target.value
-                            })
-                          }
-                        />
-                      </SettingField>
-                    </>
-                  ) : null}
-
                   <SettingField
                     label="调试模式"
                     hint="当前主要用于调试模型与运行时日志。"
@@ -715,7 +619,48 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       <span>{debugEnabled ? "开启" : "关闭"}</span>
                     </label>
                   </SettingField>
+
+                  {selectedProfile ? (
+                    <SettingField
+                      label="模型能力"
+                      hint="这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。"
+                    >
+                      <div className="model-capability-list">
+                        {selectedProfile.featureDetails.map((feature) => (
+                          <div
+                            key={feature.key}
+                            className={`model-capability-item ${
+                              feature.supported
+                                ? "model-capability-item-supported"
+                                : "model-capability-item-unsupported"
+                            }`}
+                          >
+                            <div className="model-capability-row">
+                              <span className="model-capability-label">{feature.label}</span>
+                              <span className="model-capability-state">
+                                {feature.supported ? "支持" : "不支持"}
+                              </span>
+                            </div>
+                            <div className="model-capability-meta">
+                              {feature.model
+                                ? `参考模型：${feature.model}`
+                                : "未标注具体模型"}
+                              {feature.url ? (
+                                <>
+                                  {" · "}
+                                  <a href={feature.url} rel="noreferrer" target="_blank">
+                                    官方说明
+                                  </a>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SettingField>
+                  ) : null}
                 </div>
+
               </section>
 
               <button
@@ -787,23 +732,23 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </p>
                   ) : null}
                 </div>
-
-                <div className="summary-card">
-                  <div className="meta-label">当前舞台</div>
-                  <div className="summary-text">
-                    {selectedRule?.ruleTitle ?? "未选择规则"} / {selectedStory?.title ?? "未选择剧本"}
-                  </div>
-                  <div className="summary-text">
-                    标签：{renderJoinedList(selectedStory?.tags ?? [])}
-                  </div>
-                  <div className="summary-text">
-                    主持风格：{selectedStory?.gmStyle ?? "待定"}
-                  </div>
-                  <div className="summary-text">
-                    模型状态：{selectedProfile?.message ?? selectedModelMode?.message ?? "未配置"}
-                  </div>
-                </div>
               </div>
+            </div>
+
+            <div className="character-setup-controls setup-pane-footer">
+              <div className="companion-card character-setup-copy">
+                <div className="eyebrow">Character Setup</div>
+                <h2>你是谁？</h2>
+                <p className="summary-text">
+                  这里先保留玩家角色概念输入，后续再接 AI 补全和角色卡结构化输出。
+                </p>
+              </div>
+              <textarea
+                className="character-setup-input"
+                placeholder="例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。"
+                value={characterConcept}
+                onChange={(event) => onCharacterConceptChange(event.target.value)}
+              />
             </div>
           </section>
 
@@ -845,12 +790,31 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="setup-pane-scroll">
                   <div className="companion-list">
                     <div className="companion-card">
+                      <div className="selection-card-title">当前配置</div>
+                      <div className="summary-text">
+                        {selectedRule?.ruleTitle ?? "未选择规则"} /{" "}
+                        {selectedStory?.title ?? "未选择剧本"}
+                      </div>
+                      <div className="summary-text">
+                        标签：{renderJoinedList(selectedStory?.tags ?? [])}
+                      </div>
+                      <div className="summary-text">
+                        主持风格：{selectedStory?.gmStyle ?? "待定"}
+                      </div>
+                      <div className="summary-text">
+                        模型档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
+                      </div>
+                      <div className="summary-text">实际模型：{resolvedModelName}</div>
+                    </div>
+
+                    <div className="companion-card">
                       <div className="selection-card-title">AI 同伴入口</div>
                       <div className="summary-text">
                         这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2
                         先保留页面结构和操作位置。
                       </div>
                     </div>
+
                     <div className="companion-card">
                       <div className="selection-card-title">添加同伴</div>
                       <div className="summary-text">
@@ -860,6 +824,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                         + 添加同伴
                       </button>
                     </div>
+
                     <div className="companion-card">
                       <div className="selection-card-title">内容警告</div>
                       <div className="summary-text">
@@ -870,40 +835,22 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </div>
                   </div>
                 </div>
+
+                <div className="setup-pane-footer setup-pane-actions-footer">
+                  <button className="ghost-button" disabled type="button">
+                    AI 补全（待开发）
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={isCreating || !profileReady || !selectedStory}
+                    type="submit"
+                  >
+                    {isCreating ? "正在创建会话..." : "开始游戏"}
+                  </button>
+                </div>
               </section>
             </>
           )}
-        </div>
-
-        <div className="character-setup-bar">
-          <div className="character-setup-copy">
-            <div className="eyebrow">Character Setup</div>
-            <h2>你是谁？</h2>
-            <p className="summary-text">
-              这一栏先保留玩家角色概念输入，后续再接 AI 补全和角色卡结构化输出。
-            </p>
-          </div>
-
-          <div className="character-setup-controls">
-            <textarea
-              className="character-setup-input"
-              placeholder="例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。"
-              value={characterConcept}
-              onChange={(event) => onCharacterConceptChange(event.target.value)}
-            />
-            <div className="button-row">
-              <button className="ghost-button" disabled type="button">
-                AI 补全（待开发）
-              </button>
-              <button
-                className="primary-button"
-                disabled={isCreating || !profileReady || !selectedStory}
-                type="submit"
-              >
-                {isCreating ? "正在创建会话..." : "开始游戏"}
-              </button>
-            </div>
-          </div>
         </div>
       </form>
 

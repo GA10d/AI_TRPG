@@ -224,8 +224,9 @@ export function formatAiGenerationMeta(meta: AiGenerationMetadata | null | undef
   if (typeof meta.usage?.totalTokens === "number") {
     segments.push(`Tokens：${meta.usage.totalTokens}`);
   }
-  if (typeof meta.estimatedCostUsd === "number") {
-    segments.push(`费用：$${meta.estimatedCostUsd.toFixed(6)}`);
+  if (meta.estimatedCost) {
+    const currencySymbol = meta.estimatedCost.currency === "CNY" ? "¥" : "$";
+    segments.push(`费用：${currencySymbol}${meta.estimatedCost.amount.toFixed(6)}`);
   } else {
     segments.push("费用：待补充");
   }

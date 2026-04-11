@@ -30,11 +30,18 @@ class MockModelGateway implements ModelGateway {
         mode: "mock",
         model: "mock-local",
         durationMs: 0,
-        estimatedCostUsd: 0,
+        estimatedCost: {
+          amount: 0,
+          currency: "USD",
+          pricingModel: "mock-local",
+          note: "Mock mode does not consume billable tokens."
+        },
         usage: {
           promptTokens: null,
           completionTokens: null,
-          totalTokens: null
+          totalTokens: null,
+          promptCacheHitTokens: null,
+          promptCacheMissTokens: null
         }
       }
     };
@@ -56,11 +63,18 @@ class MockModelGateway implements ModelGateway {
         mode: "mock",
         model: "mock-local",
         durationMs: 0,
-        estimatedCostUsd: 0,
+        estimatedCost: {
+          amount: 0,
+          currency: "USD",
+          pricingModel: "mock-local",
+          note: "Mock mode does not consume billable tokens."
+        },
         usage: {
           promptTokens: null,
           completionTokens: null,
-          totalTokens: null
+          totalTokens: null,
+          promptCacheHitTokens: null,
+          promptCacheMissTokens: null
         }
       },
       adjudication: outcome.adjudication

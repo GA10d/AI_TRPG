@@ -3,7 +3,12 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildLanguageSystemPrompt } from "../../../../packages/shared-config/src/index.ts";
+import {
+  buildLanguageSystemPrompt,
+  estimateModelUsageCost,
+  fromLocaleCode
+} from "../../../../packages/shared-config/src/index.ts";
+import type { AiGenerationUsage } from "../../../../packages/shared-types/src/index.ts";
 import type {
   OpeningGenerationInput,
   OpeningGenerationOutput,
@@ -92,11 +97,7 @@ type GeminiFileUploadResponse = {
 type ChatCompletionResult = {
   text: string;
   durationMs: number;
-  usage: {
-    promptTokens: number | null;
-    completionTokens: number | null;
-    totalTokens: number | null;
-  };
+  usage: AiGenerationUsage;
 };
 
 type UploadedGeminiFile = {
@@ -149,11 +150,13 @@ function buildOpeningTaskText(input: OpeningGenerationInput): string {
 
 async function buildOpeningMessages(input: OpeningGenerationInput): Promise<ChatMessage[]> {
   const openingSystemPrompt = await loadBeginningSystemPrompt();
+  const languageDefinition = fromLocaleCode(input.locale);
+  const openingLanguageLine = `请严格以${languageDefinition.nativeName}（${languageDefinition.code}）回答。`;
 
   return [
     {
       role: "system",
-      content: openingSystemPrompt
+      content: [openingSystemPrompt, openingLanguageLine].filter(Boolean).join("\n")
     },
     {
       role: "user",
@@ -256,12 +259,37 @@ function normalizeGeminiOutput(data: GeminiGenerateContentResponse): string {
 }
 
 function buildOpenAiUsage(data: ChatCompletionResponse | ResponsesApiResponse) {
+  const promptTokens =
+    data.usage?.prompt_tokens ?? data.usage?.input_tokens ?? null;
+  const completionTokens =
+    data.usage?.completion_tokens ?? data.usage?.output_tokens ?? null;
+  const promptCacheHitTokens =
+    (data.usage as { prompt_cache_hit_tokens?: number } | undefined)?.prompt_cache_hit_tokens ??
+    (
+      data.usage as {
+        input_tokens_details?: { cached_tokens?: number };
+        prompt_tokens_details?: { cached_tokens?: number };
+      } | undefined
+    )?.input_tokens_details?.cached_tokens ??
+    (
+      data.usage as {
+        input_tokens_details?: { cached_tokens?: number };
+        prompt_tokens_details?: { cached_tokens?: number };
+      } | undefined
+    )?.prompt_tokens_details?.cached_tokens ??
+    null;
+  const promptCacheMissTokens =
+    (data.usage as { prompt_cache_miss_tokens?: number } | undefined)?.prompt_cache_miss_tokens ??
+    (typeof promptTokens === "number" && typeof promptCacheHitTokens === "number"
+      ? Math.max(0, promptTokens - promptCacheHitTokens)
+      : null);
+
   return {
-    promptTokens:
-      data.usage?.prompt_tokens ?? data.usage?.input_tokens ?? null,
-    completionTokens:
-      data.usage?.completion_tokens ?? data.usage?.output_tokens ?? null,
-    totalTokens: data.usage?.total_tokens ?? null
+    promptTokens,
+    completionTokens,
+    totalTokens: data.usage?.total_tokens ?? null,
+    promptCacheHitTokens,
+    promptCacheMissTokens
   };
 }
 
@@ -269,7 +297,9 @@ function buildGeminiUsage(data: GeminiGenerateContentResponse) {
   return {
     promptTokens: data.usageMetadata?.promptTokenCount ?? null,
     completionTokens: data.usageMetadata?.candidatesTokenCount ?? null,
-    totalTokens: data.usageMetadata?.totalTokenCount ?? null
+    totalTokens: data.usageMetadata?.totalTokenCount ?? null,
+    promptCacheHitTokens: null,
+    promptCacheMissTokens: null
   };
 }
 
@@ -701,7 +731,10 @@ export async function generateOpeningViaServerProxy(
       mode: "server_proxy",
       model: config.model,
       durationMs: completion.durationMs,
-      estimatedCostUsd: null,
+      estimatedCost: estimateModelUsageCost({
+        model: config.model,
+        usage: completion.usage
+      }),
       usage: completion.usage
     }
   };
@@ -724,7 +757,10 @@ export async function generateTurnNarrationViaServerProxy(
       mode: "server_proxy",
       model: config.model,
       durationMs: completion.durationMs,
-      estimatedCostUsd: null,
+      estimatedCost: estimateModelUsageCost({
+        model: config.model,
+        usage: completion.usage
+      }),
       usage: completion.usage
     },
     adjudication: null

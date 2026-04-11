@@ -16,6 +16,16 @@ export type AiGenerationUsage = {
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
+  promptCacheHitTokens?: number | null;
+  promptCacheMissTokens?: number | null;
+};
+
+export type AiGenerationCost = {
+  amount: number;
+  currency: "USD" | "CNY";
+  pricingModel?: string | null;
+  sourceUrl?: string | null;
+  note?: string | null;
 };
 
 export type AiGenerationMetadata = {
@@ -23,7 +33,7 @@ export type AiGenerationMetadata = {
   mode: ModelAccessMode;
   model?: string | null;
   durationMs?: number | null;
-  estimatedCostUsd?: number | null;
+  estimatedCost?: AiGenerationCost | null;
   usage?: AiGenerationUsage | null;
 };
 

@@ -55,7 +55,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     accessMode: "mock",
     providerFamily: "mock",
     dependence: "Mock",
-    description: "本地假数据模式，用于开发和基础流程验证。",
+    description: "本地假数据模式，用于开发、调试和基础流程验证。",
     urlRequirements: false,
     baseUrl: null,
     baseModel: null,
@@ -192,6 +192,43 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     }
   },
   {
+    id: "doubao",
+    order: 35,
+    name: "Doubao",
+    code: "doubao",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible",
+    dependence: "OpenAI",
+    description: "使用火山引擎方舟（Doubao / Ark）的 OpenAI-compatible 接口。",
+    urlRequirements: true,
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    baseModel: "doubao-seed-1-6-251015",
+    chargeUrl: "https://console.volcengine.com/ark",
+    docsUrl: "https://www.volcengine.com/docs/82379/1099522",
+    envKeyCandidates: [
+      "DOUBAO_API_KEY",
+      "TRPG_DOUBAO_API_KEY",
+      "ARK_API_KEY",
+      "TRPG_SERVER_PROXY_API_KEY"
+    ],
+    modelEnvKeyCandidates: ["TRPG_DOUBAO_MODEL", "TRPG_SERVER_PROXY_MODEL"],
+    baseUrlEnvKeyCandidates: ["TRPG_DOUBAO_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      mini_version: { supported: false, model: null, url: null },
+      deep_think: {
+        supported: true,
+        model: "doubao-seed-1-6-251015",
+        url: "https://www.volcengine.com/docs/6492/2192012"
+      },
+      json_output: { supported: true, model: null, url: null },
+      tool_calls: { supported: true, model: null, url: null },
+      file_upload: { supported: false, model: null, url: null }
+    }
+  },
+  {
     id: "custom-openai-compatible",
     order: 40,
     name: "Custom OpenAI-Compatible",
@@ -199,17 +236,13 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     accessMode: "server_proxy",
     providerFamily: "openai-compatible",
     dependence: "OpenAI",
-    description: "给 Doubao 等兼容 OpenAI 协议的服务预留自定义入口。",
+    description: "为其他兼容 OpenAI 协议的服务预留自定义入口。",
     urlRequirements: true,
     baseUrl: null,
     baseModel: null,
     chargeUrl: "",
     docsUrl: "",
-    envKeyCandidates: [
-      "TRPG_CUSTOM_OPENAI_API_KEY",
-      "DOUBAO_API_KEY",
-      "TRPG_SERVER_PROXY_API_KEY"
-    ],
+    envKeyCandidates: ["TRPG_CUSTOM_OPENAI_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
     modelEnvKeyCandidates: ["TRPG_CUSTOM_OPENAI_MODEL", "TRPG_SERVER_PROXY_MODEL"],
     baseUrlEnvKeyCandidates: ["TRPG_CUSTOM_OPENAI_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
     allowsCustomApiKey: true,

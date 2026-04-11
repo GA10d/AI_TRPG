@@ -764,7 +764,6 @@ export function App() {
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
-          onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}

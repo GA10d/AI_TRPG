@@ -260,15 +260,23 @@ async function findCatalogAssets(
     "image.png",
     "image.jpg",
     "image.jpeg",
-    "image.webp"
+    "image.webp",
+    "art_assets/cover.png",
+    "art_assets/cover.jpg",
+    "art_assets/cover.jpeg",
+    "art_assets/cover.webp",
+    "art_assets/image.png",
+    "art_assets/image.jpg",
+    "art_assets/image.jpeg",
+    "art_assets/image.webp"
   ];
 
-  for (const fileName of candidateFiles) {
-    if (await pathExists(join(packageDir, fileName))) {
+  for (const relativePath of candidateFiles) {
+    if (await pathExists(join(packageDir, relativePath))) {
       return [
         {
           type: "cover",
-          url: `${assetUrlPrefix}/${fileName}`
+          url: `${assetUrlPrefix}/${relativePath}`
         }
       ];
     }
