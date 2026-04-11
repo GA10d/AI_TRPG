@@ -79,6 +79,86 @@ export const LOG_VIEW_OPTIONS: Array<{
   }
 ];
 
+export type MarkdownFontSizePreset =
+  | "standard"
+  | "large"
+  | "xlarge"
+  | "xxlarge";
+
+export type MenuFontSizePreset =
+  | "standard"
+  | "large"
+  | "xlarge"
+  | "xxlarge";
+
+export const MARKDOWN_FONT_SIZE_OPTIONS: Array<{
+  value: MarkdownFontSizePreset;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "standard",
+    label: "标准（16px）",
+    description: "适合桌面端默认阅读。"
+  },
+  {
+    value: "large",
+    label: "偏大（18px）",
+    description: "正文更舒展，适合长段落阅读。"
+  },
+  {
+    value: "xlarge",
+    label: "大字（20px）",
+    description: "适合更重视可读性的阅读体验。"
+  },
+  {
+    value: "xxlarge",
+    label: "超大（22px）",
+    description: "适合远距离观看或高缩放场景。"
+  }
+];
+
+export const MENU_FONT_SIZE_OPTIONS: Array<{
+  value: MenuFontSizePreset;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "standard",
+    label: "标准（100%）",
+    description: "保持默认菜单与界面字号。"
+  },
+  {
+    value: "large",
+    label: "偏大（110%）",
+    description: "让菜单按钮、标题和说明字更易读。"
+  },
+  {
+    value: "xlarge",
+    label: "大字（120%）",
+    description: "适合偏好更明显字号层级的界面阅读。"
+  },
+  {
+    value: "xxlarge",
+    label: "超大（130%）",
+    description: "适合远距离观看或高分辨率大屏。"
+  }
+];
+
+export function getMenuFontScale(value: MenuFontSizePreset): number {
+  switch (value) {
+    case "large":
+      return 1.1;
+    case "xlarge":
+      return 1.2;
+    case "xxlarge":
+      return 1.3;
+    case "standard":
+    default:
+      return 1;
+  }
+}
+
 export function pickOption<T extends string>(
   value: T | undefined,
   allowed: readonly T[],

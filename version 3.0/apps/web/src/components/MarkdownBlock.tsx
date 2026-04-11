@@ -1,8 +1,11 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
+
+import type { MarkdownFontSizePreset } from "../ui.ts";
 
 type MarkdownBlockProps = {
   content: string;
   className?: string;
+  fontSizePreset?: MarkdownFontSizePreset;
 };
 
 type MarkdownBlockItem =
@@ -19,6 +22,46 @@ type MarkdownBlockItem =
       type: "list";
       items: string[];
     };
+
+const MARKDOWN_TYPOGRAPHY: Record<
+  MarkdownFontSizePreset,
+  {
+    body: number;
+    lineHeight: number;
+    headingPrimary: number;
+    headingSecondary: number;
+    listIndent: number;
+  }
+> = {
+  standard: {
+    body: 16,
+    lineHeight: 1.78,
+    headingPrimary: 25,
+    headingSecondary: 20,
+    listIndent: 20
+  },
+  large: {
+    body: 18,
+    lineHeight: 1.82,
+    headingPrimary: 28,
+    headingSecondary: 22,
+    listIndent: 22
+  },
+  xlarge: {
+    body: 20,
+    lineHeight: 1.86,
+    headingPrimary: 31,
+    headingSecondary: 24,
+    listIndent: 24
+  },
+  xxlarge: {
+    body: 22,
+    lineHeight: 1.9,
+    headingPrimary: 34,
+    headingSecondary: 27,
+    listIndent: 26
+  }
+};
 
 function pushParagraph(
   blocks: MarkdownBlockItem[],
@@ -118,11 +161,19 @@ function renderInlineMarkdown(content: string, keyPrefix: string): ReactNode[] {
 }
 
 export function MarkdownBlock(props: MarkdownBlockProps) {
-  const { content, className } = props;
+  const { content, className, fontSizePreset = "large" } = props;
   const blocks = parseMarkdownBlocks(content);
+  const typography = MARKDOWN_TYPOGRAPHY[fontSizePreset];
+  const typographyStyle = {
+    "--md-body-size": `${typography.body}px`,
+    "--md-line-height": String(typography.lineHeight),
+    "--md-heading-primary-size": `${typography.headingPrimary}px`,
+    "--md-heading-secondary-size": `${typography.headingSecondary}px`,
+    "--md-list-indent": `${typography.listIndent}px`
+  } as CSSProperties;
 
   return (
-    <div className={className}>
+    <div className={className} style={typographyStyle}>
       {blocks.map((block, index) => {
         const key = `${block.type}-${index}`;
 

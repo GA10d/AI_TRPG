@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,11 +15,7 @@ import { getServerProxyConfig, type ServerProxyConfig } from "./config.ts";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../..");
 const beginningPromptDir = join(projectRoot, "apps", "prompt", "beginning");
-const promptFileExtensions = new Set([
-  ".txt",
-  ".md",
-  ".markdown"
-]);
+const promptFileExtensions = new Set([".txt", ".md", ".markdown"]);
 
 let cachedBeginningSystemPrompt: string | null = null;
 
@@ -43,6 +40,55 @@ type ChatCompletionResponse = {
   };
 };
 
+type ResponsesApiResponse = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+  error?: {
+    message?: string;
+  };
+};
+
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+  error?: {
+    message?: string;
+  };
+};
+
+type GeminiFileUploadResponse = {
+  file?: {
+    name?: string;
+    uri?: string;
+    mimeType?: string;
+  };
+  error?: {
+    message?: string;
+  };
+};
+
 type ChatCompletionResult = {
   text: string;
   durationMs: number;
@@ -51,6 +97,12 @@ type ChatCompletionResult = {
     completionTokens: number | null;
     totalTokens: number | null;
   };
+};
+
+type UploadedGeminiFile = {
+  name: string;
+  uri: string;
+  mimeType: string;
 };
 
 async function loadBeginningSystemPrompt(): Promise<string> {
@@ -63,19 +115,36 @@ async function loadBeginningSystemPrompt(): Promise<string> {
     .sort((left, right) => left.localeCompare(right, "en"));
 
   if (fileNames.length === 0) {
-    throw new Error("apps/prompt/beginning 涓嬫病鏈夊彲鐢ㄧ殑绯荤粺鎻愮ず鏂囦欢銆?");
+    throw new Error("apps/prompt/beginning does not contain any prompt files.");
   }
 
   const contents = await Promise.all(
     fileNames.map((fileName) =>
-      readFile(join(beginningPromptDir, fileName), "utf8").then((content) =>
-        content.trim()
-      )
+      readFile(join(beginningPromptDir, fileName), "utf8").then((content) => content.trim())
     )
   );
 
   cachedBeginningSystemPrompt = contents.filter(Boolean).join("\n\n");
   return cachedBeginningSystemPrompt;
+}
+
+function buildOpeningTaskText(input: OpeningGenerationInput): string {
+  return [
+    `Target language: ${input.locale}`,
+    buildLanguageSystemPrompt(input.locale),
+    "",
+    `Rule title: ${input.ruleTitle}`,
+    `Story title: ${input.storyTitle}`,
+    "Two files are attached in this request:",
+    "- rule.txt contains the complete rule text.",
+    "- story.txt contains the complete story text.",
+    "",
+    "Task:",
+    "Generate the opening preview text shown before the session starts.",
+    "Keep the output immersive and player-facing.",
+    "Do not reveal hidden spoilers unless they are necessary for the immediate setup.",
+    "Return only the opening preview text."
+  ].join("\n");
 }
 
 async function buildOpeningMessages(input: OpeningGenerationInput): Promise<ChatMessage[]> {
@@ -88,32 +157,17 @@ async function buildOpeningMessages(input: OpeningGenerationInput): Promise<Chat
     },
     {
       role: "user",
-      content: [
-        `Rule title: ${input.ruleTitle}`,
-        "Rule content:",
-        input.ruleText
-      ].join("\n")
+      content: [`Rule title: ${input.ruleTitle}`, "Rule content:", input.ruleText].join("\n")
     },
     {
       role: "assistant",
-      content: [
-        `Story title: ${input.storyTitle}`,
-        "Story content:",
-        input.storyText
-      ].join("\n")
+      content: [`Story title: ${input.storyTitle}`, "Story content:", input.storyText].join(
+        "\n"
+      )
     },
     {
       role: "user",
-      content: [
-        `Target language: ${input.locale}`,
-        buildLanguageSystemPrompt(input.locale),
-        "",
-        "Task:",
-        "Generate the opening preview text shown before the session starts.",
-        "Keep the output immersive and player-facing.",
-        "Do not reveal hidden spoilers unless they are necessary for the immediate setup.",
-        "Return only the opening preview text."
-      ].join("\n")
+      content: buildOpeningTaskText(input)
     }
   ];
 }
@@ -176,6 +230,57 @@ function normalizeContent(rawContent: unknown): string {
   return "";
 }
 
+function normalizeResponsesOutput(data: ResponsesApiResponse): string {
+  if (typeof data.output_text === "string" && data.output_text.trim().length > 0) {
+    return data.output_text.trim();
+  }
+
+  return (
+    data.output
+      ?.flatMap((item) => item.content ?? [])
+      .map((part) => part.text?.trim() ?? "")
+      .filter(Boolean)
+      .join("\n")
+      .trim() ?? ""
+  );
+}
+
+function normalizeGeminiOutput(data: GeminiGenerateContentResponse): string {
+  return (
+    data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text?.trim() ?? "")
+      .filter(Boolean)
+      .join("\n")
+      .trim() ?? ""
+  );
+}
+
+function buildOpenAiUsage(data: ChatCompletionResponse | ResponsesApiResponse) {
+  return {
+    promptTokens:
+      data.usage?.prompt_tokens ?? data.usage?.input_tokens ?? null,
+    completionTokens:
+      data.usage?.completion_tokens ?? data.usage?.output_tokens ?? null,
+    totalTokens: data.usage?.total_tokens ?? null
+  };
+}
+
+function buildGeminiUsage(data: GeminiGenerateContentResponse) {
+  return {
+    promptTokens: data.usageMetadata?.promptTokenCount ?? null,
+    completionTokens: data.usageMetadata?.candidatesTokenCount ?? null,
+    totalTokens: data.usageMetadata?.totalTokenCount ?? null
+  };
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
 async function callChatCompletion(
   config: ServerProxyConfig,
   messages: ChatMessage[]
@@ -208,8 +313,7 @@ async function callChatCompletion(
     const data = (await response.json()) as ChatCompletionResponse;
     if (!response.ok) {
       throw new Error(
-        data.error?.message ??
-          `server_proxy request failed with HTTP ${response.status}.`
+        data.error?.message ?? `server_proxy request failed with HTTP ${response.status}.`
       );
     }
 
@@ -221,14 +325,358 @@ async function callChatCompletion(
     return {
       text,
       durationMs: Date.now() - startedAt,
-      usage: {
-        promptTokens: data.usage?.prompt_tokens ?? null,
-        completionTokens: data.usage?.completion_tokens ?? null,
-        totalTokens: data.usage?.total_tokens ?? null
-      }
+      usage: buildOpenAiUsage(data)
     };
   } finally {
     clearTimeout(timeoutHandle);
+  }
+}
+
+async function uploadOpenAiUserFile(
+  config: ServerProxyConfig,
+  fileName: string,
+  content: string
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("purpose", "user_data");
+  formData.append(
+    "file",
+    new Blob([content], {
+      type: "text/plain"
+    }),
+    fileName
+  );
+
+  const response = await fetch(`${config.baseUrl}/files`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`
+    },
+    body: formData
+  });
+
+  const payload = (await response.json()) as { id?: string; error?: { message?: string } };
+  if (!response.ok || !payload.id) {
+    throw new Error(
+      payload.error?.message ?? `OpenAI file upload failed with HTTP ${response.status}.`
+    );
+  }
+
+  return payload.id;
+}
+
+async function deleteOpenAiUserFile(
+  config: ServerProxyConfig,
+  fileId: string | null
+): Promise<void> {
+  if (!fileId) {
+    return;
+  }
+
+  try {
+    await fetch(`${config.baseUrl}/files/${fileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`
+      }
+    });
+  } catch {
+    // Ignore cleanup failures. Uploaded files expire automatically on the provider side.
+  }
+}
+
+async function callOpenAiResponsesWithFiles(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  openingSystemPrompt: string,
+  ruleFileId: string,
+  storyFileId: string
+): Promise<ChatCompletionResult> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), config.timeoutMs);
+  const startedAt = Date.now();
+
+  try {
+    const payload: Record<string, unknown> = {
+      model: config.model,
+      instructions: openingSystemPrompt,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildOpeningTaskText(input)
+            },
+            {
+              type: "input_file",
+              file_id: ruleFileId
+            },
+            {
+              type: "input_file",
+              file_id: storyFileId
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${config.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    const data = (await response.json()) as ResponsesApiResponse;
+    if (!response.ok) {
+      throw new Error(
+        data.error?.message ?? `OpenAI responses request failed with HTTP ${response.status}.`
+      );
+    }
+
+    const text = normalizeResponsesOutput(data);
+    if (!text) {
+      throw new Error("OpenAI responses request returned an empty opening preview.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: buildOpenAiUsage(data)
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
+function getGeminiApiRoot(config: ServerProxyConfig): string {
+  return config.baseUrl.replace(/\/v1beta\/openai$/u, "");
+}
+
+async function uploadGeminiUserFile(
+  config: ServerProxyConfig,
+  fileName: string,
+  content: string
+): Promise<UploadedGeminiFile> {
+  const apiRoot = getGeminiApiRoot(config);
+  const bytes = Buffer.from(content, "utf8");
+  const startResponse = await fetch(`${apiRoot}/upload/v1beta/files`, {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": config.apiKey,
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(bytes.byteLength),
+      "X-Goog-Upload-Header-Content-Type": "text/plain",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      file: {
+        display_name: fileName
+      }
+    })
+  });
+
+  if (!startResponse.ok) {
+    throw new Error(
+      `Gemini file upload start failed with HTTP ${startResponse.status}: ${await readResponseText(startResponse)}`
+    );
+  }
+
+  const uploadUrl = startResponse.headers.get("x-goog-upload-url");
+  if (!uploadUrl) {
+    throw new Error("Gemini file upload did not return an upload URL.");
+  }
+
+  const finalizeResponse = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Length": String(bytes.byteLength),
+      "X-Goog-Upload-Offset": "0",
+      "X-Goog-Upload-Command": "upload, finalize"
+    },
+    body: bytes
+  });
+
+  const payload = (await finalizeResponse.json()) as GeminiFileUploadResponse;
+  const uploadedFile = payload.file;
+  if (!finalizeResponse.ok || !uploadedFile?.name || !uploadedFile.uri) {
+    throw new Error(
+      payload.error?.message ??
+        `Gemini file upload failed with HTTP ${finalizeResponse.status}.`
+    );
+  }
+
+  return {
+    name: uploadedFile.name,
+    uri: uploadedFile.uri,
+    mimeType: uploadedFile.mimeType ?? "text/plain"
+  };
+}
+
+async function deleteGeminiUserFile(
+  config: ServerProxyConfig,
+  fileName: string | null
+): Promise<void> {
+  if (!fileName) {
+    return;
+  }
+
+  try {
+    const apiRoot = getGeminiApiRoot(config);
+    await fetch(`${apiRoot}/v1beta/files/${fileName}`, {
+      method: "DELETE",
+      headers: {
+        "x-goog-api-key": config.apiKey
+      }
+    });
+  } catch {
+    // Ignore cleanup failures. Gemini also expires uploaded files automatically.
+  }
+}
+
+async function callGeminiGenerateContentWithFiles(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput,
+  openingSystemPrompt: string,
+  ruleFile: UploadedGeminiFile,
+  storyFile: UploadedGeminiFile
+): Promise<ChatCompletionResult> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), config.timeoutMs);
+  const startedAt = Date.now();
+
+  try {
+    const apiRoot = getGeminiApiRoot(config);
+    const response = await fetch(
+      `${apiRoot}/v1beta/models/${config.model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": config.apiKey
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: openingSystemPrompt
+              }
+            ]
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: buildOpeningTaskText(input)
+                },
+                {
+                  file_data: {
+                    mime_type: ruleFile.mimeType,
+                    file_uri: ruleFile.uri
+                  }
+                },
+                {
+                  file_data: {
+                    mime_type: storyFile.mimeType,
+                    file_uri: storyFile.uri
+                  }
+                }
+              ]
+            }
+          ]
+        }),
+        signal: controller.signal
+      }
+    );
+
+    const data = (await response.json()) as GeminiGenerateContentResponse;
+    if (!response.ok) {
+      throw new Error(
+        data.error?.message ?? `Gemini generateContent failed with HTTP ${response.status}.`
+      );
+    }
+
+    const text = normalizeGeminiOutput(data);
+    if (!text) {
+      throw new Error("Gemini generateContent returned an empty opening preview.");
+    }
+
+    return {
+      text,
+      durationMs: Date.now() - startedAt,
+      usage: buildGeminiUsage(data)
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
+async function callOpeningWithUploadedFiles(
+  config: ServerProxyConfig,
+  input: OpeningGenerationInput
+): Promise<ChatCompletionResult> {
+  const openingSystemPrompt = await loadBeginningSystemPrompt();
+
+  if (config.dependence === "Google") {
+    let uploadedRuleFile: UploadedGeminiFile | null = null;
+    let uploadedStoryFile: UploadedGeminiFile | null = null;
+
+    try {
+      uploadedRuleFile = await uploadGeminiUserFile(
+        config,
+        "rule.txt",
+        [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n")
+      );
+      uploadedStoryFile = await uploadGeminiUserFile(
+        config,
+        "story.txt",
+        [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+      );
+
+      return await callGeminiGenerateContentWithFiles(
+        config,
+        input,
+        openingSystemPrompt,
+        uploadedRuleFile,
+        uploadedStoryFile
+      );
+    } finally {
+      await deleteGeminiUserFile(config, uploadedStoryFile?.name ?? null);
+      await deleteGeminiUserFile(config, uploadedRuleFile?.name ?? null);
+    }
+  }
+
+  let ruleFileId: string | null = null;
+  let storyFileId: string | null = null;
+
+  try {
+    ruleFileId = await uploadOpenAiUserFile(
+      config,
+      "rule.txt",
+      [`Rule title: ${input.ruleTitle}`, "", input.ruleText].join("\n")
+    );
+    storyFileId = await uploadOpenAiUserFile(
+      config,
+      "story.txt",
+      [`Story title: ${input.storyTitle}`, "", input.storyText].join("\n")
+    );
+
+    return await callOpenAiResponsesWithFiles(
+      config,
+      input,
+      openingSystemPrompt,
+      ruleFileId,
+      storyFileId
+    );
+  } finally {
+    await deleteOpenAiUserFile(config, storyFileId);
+    await deleteOpenAiUserFile(config, ruleFileId);
   }
 }
 
@@ -239,7 +687,11 @@ export async function generateOpeningViaServerProxy(
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig
   });
-  const completion = await callChatCompletion(config, await buildOpeningMessages(input));
+
+  const completion = config.features.file_upload.supported
+    ? await callOpeningWithUploadedFiles(config, input)
+    : await callChatCompletion(config, await buildOpeningMessages(input));
+
   return {
     text: completion.text,
     provider: `${config.providerLabel}:${config.model}`,

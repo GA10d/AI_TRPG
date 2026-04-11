@@ -6,6 +6,8 @@ import {
   getDefaultModelProfileId,
   getModelProfile,
   listModelProfiles,
+  MODEL_FEATURE_LABELS,
+  type ModelFeatureKey,
   type ModelProfileDefinition
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
@@ -19,6 +21,7 @@ export type ServerProxyDependence = "OpenAI" | "Google";
 export type ServerProxyConfig = {
   profileId: string;
   profileName: string;
+  profileCode: string;
   dependence: ServerProxyDependence;
   baseUrl: string;
   apiKey: string;
@@ -27,6 +30,7 @@ export type ServerProxyConfig = {
   maxTokens: number | null;
   timeoutMs: number;
   providerLabel: string;
+  features: ModelProfileDefinition["features"];
 };
 
 let envLoaded = false;
@@ -236,11 +240,26 @@ function buildProfileMessage(
   return `${profile.name} 尚未配置完整。缺少：${missingKeys.join(", ")}`;
 }
 
+function buildFeatureDetails(
+  profile: ModelProfileDefinition
+): ModelProfileSummary["featureDetails"] {
+  return (Object.entries(profile.features) as Array<
+    [ModelFeatureKey, ModelProfileDefinition["features"][ModelFeatureKey]]
+  >).map(([featureKey, featureConfig]) => ({
+    key: featureKey,
+    label: MODEL_FEATURE_LABELS[featureKey],
+    supported: featureConfig.supported,
+    model: featureConfig.model,
+    url: featureConfig.url
+  }));
+}
+
 export function listModelProfileSummaries(): ModelProfileSummary[] {
   return listModelProfiles().map((profile) => {
     const missingKeys =
       profile.accessMode === "server_proxy" ? buildMissingKeys(profile) : [];
     const configured = profile.accessMode === "mock" ? true : missingKeys.length === 0;
+    const featureDetails = buildFeatureDetails(profile);
 
     return {
       id: profile.id,
@@ -258,9 +277,10 @@ export function listModelProfileSummaries(): ModelProfileSummary[] {
       chargeUrl: profile.chargeUrl,
       docsUrl: profile.docsUrl,
       envKeyCandidates: profile.envKeyCandidates,
-      supportsFeatures: Object.entries(profile.features)
-        .filter(([, featureConfig]) => featureConfig.supported)
-        .map(([featureKey]) => featureKey),
+      supportsFeatures: featureDetails
+        .filter((feature) => feature.supported)
+        .map((feature) => feature.key),
+      featureDetails,
       allowsCustomApiKey: profile.allowsCustomApiKey,
       allowsCustomBaseUrl: profile.allowsCustomBaseUrl,
       allowsCustomModel: profile.allowsCustomModel,
@@ -312,6 +332,7 @@ export function getServerProxyConfig(input: {
   return {
     profileId: profile.id,
     profileName: profile.name,
+    profileCode: profile.code,
     dependence: normalizeDependence(profile),
     baseUrl,
     apiKey,
@@ -319,6 +340,7 @@ export function getServerProxyConfig(input: {
     temperature: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TEMPERATURE"), 0.7),
     maxTokens: parseOptionalNumber(envFirst("TRPG_SERVER_PROXY_MAX_TOKENS")),
     timeoutMs: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"), 60_000),
-    providerLabel: resolveProviderLabel(profile)
+    providerLabel: resolveProviderLabel(profile),
+    features: profile.features
   };
 }

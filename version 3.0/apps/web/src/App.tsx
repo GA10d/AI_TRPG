@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import type {
   AiGenerationMetadata,
@@ -26,7 +26,7 @@ import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { StorySelectPage } from "./pages/StorySelectPage.tsx";
 import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
-import { type AppView, type StatusState } from "./ui.ts";
+import { getMenuFontScale, type AppView, type StatusState } from "./ui.ts";
 
 const initialStatus: StatusState = {
   message: "",
@@ -121,9 +121,12 @@ export function App() {
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
+    profileRuntimeConfigs,
     debugEnabled,
     logViewMode,
     showAiMetadata,
+    markdownFontSize,
+    menuFontSize,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setLocale,
@@ -132,9 +135,13 @@ export function App() {
     setModelAccessMode,
     setModelProfileId,
     setRuntimeModelConfig,
+    setProfileRuntimeConfig,
+    clearProfileRuntimeConfigs,
     setDebugEnabled,
     setLogViewMode,
-    setShowAiMetadata
+    setShowAiMetadata,
+    setMarkdownFontSize,
+    setMenuFontSize
   } = useBootstrapState({
     onStatusChange: setStatus
   });
@@ -281,9 +288,12 @@ export function App() {
       modelAccessMode,
       modelProfileId,
       runtimeModelConfig,
+      profileRuntimeConfigs,
       debugEnabled,
       logViewMode,
-      showAiMetadata
+      showAiMetadata,
+      markdownFontSize,
+      menuFontSize
     });
   }
 
@@ -628,14 +638,12 @@ export function App() {
     setGmArchitecture(bootstrap.defaults.gmArchitecture);
     setModelAccessMode(bootstrap.defaults.modelAccessMode);
     setModelProfileId(bootstrap.defaults.modelProfileId);
-    setRuntimeModelConfig({
-      apiKey: "",
-      baseUrl: "",
-      model: ""
-    });
+    clearProfileRuntimeConfigs();
     setLogViewMode(bootstrap.defaults.logViewMode);
     setDebugEnabled(true);
     setShowAiMetadata(true);
+    setMarkdownFontSize("large");
+    setMenuFontSize("standard");
     setStatus({
       message: "已恢复默认设置。",
       tone: "neutral"
@@ -747,6 +755,7 @@ export function App() {
           openingPreviewLoading={openingPreviewLoading}
           openingPreviewError={openingPreviewError}
           showAiMetadata={showAiMetadata}
+          markdownFontSize={markdownFontSize}
           onBack={() => setView("story_select")}
           onClose={() => setView("menu")}
           onSubmit={handleCreateSession}
@@ -758,6 +767,7 @@ export function App() {
           onRuntimeModelConfigChange={setRuntimeModelConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
+          onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}
         />
       );
@@ -798,9 +808,11 @@ export function App() {
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
           runtimeModelConfig={runtimeModelConfig}
+          profileRuntimeConfigs={profileRuntimeConfigs}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           showAiMetadata={showAiMetadata}
+          menuFontSize={menuFontSize}
           onBack={() => setView("menu")}
           onSubmit={handleSaveSettings}
           onReset={handleResetSettings}
@@ -809,9 +821,10 @@ export function App() {
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
-          onRuntimeModelConfigChange={setRuntimeModelConfig}
+          onProfileRuntimeConfigChange={setProfileRuntimeConfig}
           onDebugEnabledChange={setDebugEnabled}
           onShowAiMetadataChange={setShowAiMetadata}
+          onMenuFontSizeChange={setMenuFontSize}
           onLogViewModeChange={setLogViewMode}
         />
       );
@@ -836,6 +849,7 @@ export function App() {
           isSaving={isSaving}
           isResumingBranch={isResumingBranch}
           showAiMetadata={showAiMetadata}
+          markdownFontSize={markdownFontSize}
           onBack={() => setView("menu")}
           onContinueFromNode={handleContinueFromNode}
           onQuickEndingTest={handleQuickEndingTest}
@@ -866,7 +880,10 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
+    >
       {content}
       {status.message ? (
         <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>

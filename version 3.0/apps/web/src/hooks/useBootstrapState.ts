@@ -10,13 +10,23 @@ import { loadStoredWebDefaults } from "../storage.ts";
 import {
   GM_ARCHITECTURE_OPTIONS,
   LOG_VIEW_OPTIONS,
+  MARKDOWN_FONT_SIZE_OPTIONS,
+  MENU_FONT_SIZE_OPTIONS,
   PLAY_MODE_OPTIONS,
+  type MarkdownFontSizePreset,
+  type MenuFontSizePreset,
   type StatusState,
   pickOption
 } from "../ui.ts";
 
 type UseBootstrapStateArgs = {
   onStatusChange: (status: StatusState) => void;
+};
+
+const EMPTY_RUNTIME_MODEL_CONFIG: RuntimeModelConfigInput = {
+  apiKey: "",
+  baseUrl: "",
+  model: ""
 };
 
 function sanitizeRuntimeModelConfig(
@@ -27,6 +37,60 @@ function sanitizeRuntimeModelConfig(
     baseUrl: runtimeModelConfig?.baseUrl?.trim() || "",
     model: runtimeModelConfig?.model?.trim() || ""
   };
+}
+
+function isRuntimeModelConfigEmpty(runtimeModelConfig: RuntimeModelConfigInput): boolean {
+  return (
+    !runtimeModelConfig.apiKey &&
+    !runtimeModelConfig.baseUrl &&
+    !runtimeModelConfig.model
+  );
+}
+
+function sanitizeProfileRuntimeConfigs(
+  profileRuntimeConfigs: Record<string, RuntimeModelConfigInput> | undefined
+): Record<string, RuntimeModelConfigInput> {
+  const nextConfigs: Record<string, RuntimeModelConfigInput> = {};
+
+  for (const [profileId, runtimeModelConfig] of Object.entries(profileRuntimeConfigs ?? {})) {
+    const sanitizedConfig = sanitizeRuntimeModelConfig(runtimeModelConfig);
+    if (!isRuntimeModelConfigEmpty(sanitizedConfig)) {
+      nextConfigs[profileId] = sanitizedConfig;
+    }
+  }
+
+  return nextConfigs;
+}
+
+function upsertProfileRuntimeConfig(
+  previousConfigs: Record<string, RuntimeModelConfigInput>,
+  profileId: string,
+  runtimeModelConfig: RuntimeModelConfigInput
+): Record<string, RuntimeModelConfigInput> {
+  if (!profileId) {
+    return previousConfigs;
+  }
+
+  const nextConfigs = { ...previousConfigs };
+
+  if (isRuntimeModelConfigEmpty(runtimeModelConfig)) {
+    delete nextConfigs[profileId];
+  } else {
+    nextConfigs[profileId] = runtimeModelConfig;
+  }
+
+  return nextConfigs;
+}
+
+function areRuntimeModelConfigsEqual(
+  left: RuntimeModelConfigInput,
+  right: RuntimeModelConfigInput
+): boolean {
+  return (
+    left.apiKey === right.apiKey &&
+    left.baseUrl === right.baseUrl &&
+    left.model === right.model
+  );
 }
 
 function resolveModelProfileId(
@@ -57,15 +121,19 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [modelAccessMode, setModelAccessMode] =
     useState<CreateSessionRequest["modelAccessMode"]>("mock");
   const [modelProfileId, setModelProfileId] = useState("mock-local");
-  const [runtimeModelConfig, setRuntimeModelConfig] = useState<RuntimeModelConfigInput>({
-    apiKey: "",
-    baseUrl: "",
-    model: ""
-  });
+  const [runtimeModelConfig, setRuntimeModelConfigState] =
+    useState<RuntimeModelConfigInput>(EMPTY_RUNTIME_MODEL_CONFIG);
+  const [profileRuntimeConfigs, setProfileRuntimeConfigs] = useState<
+    Record<string, RuntimeModelConfigInput>
+  >({});
   const [debugEnabled, setDebugEnabled] = useState(true);
   const [logViewMode, setLogViewMode] =
     useState<NonNullable<CreateSessionRequest["logViewMode"]>>("compact");
   const [showAiMetadata, setShowAiMetadata] = useState(true);
+  const [markdownFontSize, setMarkdownFontSize] =
+    useState<MarkdownFontSizePreset>("large");
+  const [menuFontSize, setMenuFontSize] =
+    useState<MenuFontSizePreset>("standard");
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +156,19 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
           resolvedAccessMode,
           storedDefaults?.modelProfileId ?? data.defaults.modelProfileId
         );
+        const storedProfileRuntimeConfigs = sanitizeProfileRuntimeConfigs(
+          storedDefaults?.profileRuntimeConfigs
+        );
+        const legacyRuntimeModelConfig = sanitizeRuntimeModelConfig(
+          storedDefaults?.runtimeModelConfig
+        );
+
+        if (
+          !isRuntimeModelConfigEmpty(legacyRuntimeModelConfig) &&
+          !storedProfileRuntimeConfigs[resolvedProfileId]
+        ) {
+          storedProfileRuntimeConfigs[resolvedProfileId] = legacyRuntimeModelConfig;
+        }
 
         setBootstrap(data);
         setRuleDirectoryName(data.catalog[0]?.directoryName ?? "");
@@ -115,7 +196,10 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         );
         setModelAccessMode(resolvedAccessMode);
         setModelProfileId(resolvedProfileId);
-        setRuntimeModelConfig(sanitizeRuntimeModelConfig(storedDefaults?.runtimeModelConfig));
+        setProfileRuntimeConfigs(storedProfileRuntimeConfigs);
+        setRuntimeModelConfigState(
+          storedProfileRuntimeConfigs[resolvedProfileId] ?? EMPTY_RUNTIME_MODEL_CONFIG
+        );
         setDebugEnabled(storedDefaults?.debugEnabled ?? true);
         setLogViewMode(
           pickOption(
@@ -125,6 +209,20 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
           )
         );
         setShowAiMetadata(storedDefaults?.showAiMetadata ?? true);
+        setMarkdownFontSize(
+          pickOption(
+            storedDefaults?.markdownFontSize,
+            MARKDOWN_FONT_SIZE_OPTIONS.map((item) => item.value),
+            "large"
+          )
+        );
+        setMenuFontSize(
+          pickOption(
+            storedDefaults?.menuFontSize,
+            MENU_FONT_SIZE_OPTIONS.map((item) => item.value),
+            "standard"
+          )
+        );
       } catch (error) {
         if (cancelled) {
           return;
@@ -173,6 +271,42 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     }
   }, [bootstrap, modelAccessMode, modelProfileId]);
 
+  useEffect(() => {
+    const nextRuntimeModelConfig =
+      profileRuntimeConfigs[modelProfileId] ?? EMPTY_RUNTIME_MODEL_CONFIG;
+
+    if (!areRuntimeModelConfigsEqual(runtimeModelConfig, nextRuntimeModelConfig)) {
+      setRuntimeModelConfigState(nextRuntimeModelConfig);
+    }
+  }, [modelProfileId, profileRuntimeConfigs, runtimeModelConfig]);
+
+  function setRuntimeModelConfig(value: RuntimeModelConfigInput): void {
+    const sanitizedConfig = sanitizeRuntimeModelConfig(value);
+    setRuntimeModelConfigState(sanitizedConfig);
+    setProfileRuntimeConfigs((previousConfigs) =>
+      upsertProfileRuntimeConfig(previousConfigs, modelProfileId, sanitizedConfig)
+    );
+  }
+
+  function setProfileRuntimeConfig(
+    profileId: string,
+    value: RuntimeModelConfigInput
+  ): void {
+    const sanitizedConfig = sanitizeRuntimeModelConfig(value);
+    setProfileRuntimeConfigs((previousConfigs) =>
+      upsertProfileRuntimeConfig(previousConfigs, profileId, sanitizedConfig)
+    );
+
+    if (profileId === modelProfileId) {
+      setRuntimeModelConfigState(sanitizedConfig);
+    }
+  }
+
+  function clearProfileRuntimeConfigs(): void {
+    setProfileRuntimeConfigs({});
+    setRuntimeModelConfigState(EMPTY_RUNTIME_MODEL_CONFIG);
+  }
+
   return {
     bootstrap,
     ruleDirectoryName,
@@ -183,9 +317,12 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
+    profileRuntimeConfigs,
     debugEnabled,
     logViewMode,
     showAiMetadata,
+    markdownFontSize,
+    menuFontSize,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setLocale,
@@ -194,8 +331,12 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setModelAccessMode,
     setModelProfileId,
     setRuntimeModelConfig,
+    setProfileRuntimeConfig,
+    clearProfileRuntimeConfigs,
     setDebugEnabled,
     setLogViewMode,
-    setShowAiMetadata
+    setShowAiMetadata,
+    setMarkdownFontSize,
+    setMenuFontSize
   };
 }

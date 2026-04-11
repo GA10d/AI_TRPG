@@ -4,12 +4,21 @@ export type ModelFeatureKey =
   | "mini_version"
   | "deep_think"
   | "json_output"
-  | "tool_calls";
+  | "tool_calls"
+  | "file_upload";
 
 export type ModelFeatureConfig = {
   supported: boolean;
   model: string | null;
   url: string | null;
+};
+
+export const MODEL_FEATURE_LABELS: Record<ModelFeatureKey, string> = {
+  mini_version: "轻量版",
+  deep_think: "深度思考",
+  json_output: "结构化 JSON",
+  tool_calls: "工具调用",
+  file_upload: "文件上传"
 };
 
 export type ProviderDependence = "Mock" | "OpenAI" | "Google";
@@ -62,7 +71,8 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
       mini_version: { supported: true, model: null, url: null },
       deep_think: { supported: true, model: null, url: null },
       json_output: { supported: true, model: null, url: null },
-      tool_calls: { supported: false, model: null, url: null }
+      tool_calls: { supported: false, model: null, url: null },
+      file_upload: { supported: false, model: null, url: null }
     }
   },
   {
@@ -87,9 +97,18 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     allowsCustomModel: true,
     features: {
       mini_version: { supported: true, model: "gpt-5-nano", url: null },
-      deep_think: { supported: true, model: "gpt-5.2", url: null },
+      deep_think: {
+        supported: true,
+        model: "gpt-5.2",
+        url: "https://platform.openai.com/docs/guides/reasoning"
+      },
       json_output: { supported: true, model: "gpt-5.2", url: null },
-      tool_calls: { supported: true, model: "gpt-5.2", url: null }
+      tool_calls: { supported: true, model: "gpt-5.2", url: null },
+      file_upload: {
+        supported: true,
+        model: "gpt-5.2",
+        url: "https://platform.openai.com/docs/guides/pdf-files"
+      }
     }
   },
   {
@@ -117,7 +136,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
       deep_think: {
         supported: true,
         model: "deepseek-reasoner",
-        url: "https://api.deepseek.com"
+        url: "https://api-docs.deepseek.com/guides/thinking_mode"
       },
       json_output: {
         supported: true,
@@ -128,7 +147,8 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
         supported: true,
         model: "deepseek-chat",
         url: "https://api.deepseek.com"
-      }
+      },
+      file_upload: { supported: false, model: null, url: null }
     }
   },
   {
@@ -157,9 +177,18 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     allowsCustomModel: true,
     features: {
       mini_version: { supported: true, model: "gemini-2.5-flash", url: null },
-      deep_think: { supported: true, model: "gemini-2.5-pro", url: null },
+      deep_think: {
+        supported: true,
+        model: "gemini-2.5-pro",
+        url: "https://ai.google.dev/gemini-api/docs/thinking"
+      },
       json_output: { supported: true, model: "gemini-2.5-pro", url: null },
-      tool_calls: { supported: true, model: "gemini-2.5-pro", url: null }
+      tool_calls: { supported: true, model: "gemini-2.5-pro", url: null },
+      file_upload: {
+        supported: true,
+        model: "gemini-2.5-pro",
+        url: "https://ai.google.dev/gemini-api/docs/files"
+      }
     }
   },
   {
@@ -190,7 +219,8 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
       mini_version: { supported: false, model: null, url: null },
       deep_think: { supported: false, model: null, url: null },
       json_output: { supported: true, model: null, url: null },
-      tool_calls: { supported: false, model: null, url: null }
+      tool_calls: { supported: false, model: null, url: null },
+      file_upload: { supported: false, model: null, url: null }
     }
   }
 ];

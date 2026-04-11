@@ -2,49 +2,116 @@ import { createServer } from "node:http";
 
 import { getModelGateway } from "../model_gateway/index.ts";
 
+async function readRequestBody(request: Parameters<typeof createServer>[0]): Promise<Buffer> {
+  const bodyChunks: Buffer[] = [];
+  for await (const chunk of request) {
+    bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(bodyChunks);
+}
+
 async function main(): Promise<void> {
   const port = 4460;
+  const uploadedFiles = new Map<string, string>();
+  let fileCounter = 0;
 
   const fakeModelServer = createServer(async (request, response) => {
-    if (request.method !== "POST" || request.url !== "/chat/completions") {
-      response.writeHead(404, {
+    if (request.method === "POST" && request.url === "/files") {
+      const fileId = `file-${++fileCounter}`;
+      uploadedFiles.set(fileId, `uploaded-content-${fileId}`);
+      response.writeHead(200, {
         "Content-Type": "application/json; charset=utf-8"
       });
-      response.end(JSON.stringify({ error: { message: "Not Found" } }));
+      response.end(JSON.stringify({ id: fileId }));
       return;
     }
 
-    const bodyChunks: Buffer[] = [];
-    for await (const chunk of request) {
-      bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (request.method === "DELETE" && request.url?.startsWith("/files/")) {
+      const fileId = request.url.split("/").at(-1) ?? "";
+      uploadedFiles.delete(fileId);
+      response.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8"
+      });
+      response.end(JSON.stringify({ deleted: true }));
+      return;
     }
 
-    const payload = JSON.parse(Buffer.concat(bodyChunks).toString("utf8")) as {
-      messages?: Array<{ role?: string; content?: string }>;
-    };
-    const finalUserPrompt = payload.messages?.at(-1)?.content ?? "no prompt";
+    if (request.method === "POST" && request.url === "/responses") {
+      const body = await readRequestBody(request);
+      const payload = JSON.parse(body.toString("utf8")) as {
+        instructions?: string;
+        input?: Array<{
+          content?: Array<{
+            type?: string;
+            text?: string;
+            file_id?: string;
+          }>;
+        }>;
+      };
+      const userContent = payload.input?.[0]?.content ?? [];
+      const promptText =
+        userContent.find((item) => item.type === "input_text")?.text ?? "no prompt";
+      const fileRefs = userContent
+        .filter((item) => item.type === "input_file")
+        .map((item) => item.file_id ?? "missing-file-id")
+        .join(", ");
 
-    response.writeHead(200, {
+      response.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8"
+      });
+      response.end(
+        JSON.stringify({
+          output_text: `FAKE_RESPONSES_OPENING\n${String(payload.instructions ?? "").slice(0, 40)}\n${promptText.slice(0, 80)}\nfiles=${fileRefs}`,
+          usage: {
+            input_tokens: 120,
+            output_tokens: 32,
+            total_tokens: 152
+          }
+        })
+      );
+      return;
+    }
+
+    if (request.method === "POST" && request.url === "/chat/completions") {
+      const body = await readRequestBody(request);
+      const payload = JSON.parse(body.toString("utf8")) as {
+        messages?: Array<{ role?: string; content?: string }>;
+      };
+      const finalUserPrompt = payload.messages?.at(-1)?.content ?? "no prompt";
+
+      response.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8"
+      });
+      response.end(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: `FAKE_SERVER_PROXY_RESPONSE\n${finalUserPrompt.slice(0, 120)}`
+              }
+            }
+          ],
+          usage: {
+            prompt_tokens: 88,
+            completion_tokens: 21,
+            total_tokens: 109
+          }
+        })
+      );
+      return;
+    }
+
+    response.writeHead(404, {
       "Content-Type": "application/json; charset=utf-8"
     });
-    response.end(
-      JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: `FAKE_SERVER_PROXY_RESPONSE\n${finalUserPrompt.slice(0, 120)}`
-            }
-          }
-        ]
-      })
-    );
+    response.end(JSON.stringify({ error: { message: "Not Found" } }));
   });
 
   await new Promise<void>((resolve) => {
     fakeModelServer.listen(port, "127.0.0.1", () => resolve());
   });
 
-  process.env.TRPG_SERVER_PROXY_DEPENDENCE = "OpenAI";
   process.env.TRPG_SERVER_PROXY_BASE_URL = `http://127.0.0.1:${port}`;
   process.env.TRPG_SERVER_PROXY_MODEL = "fake-openai-compatible-model";
   process.env.TRPG_SERVER_PROXY_API_KEY = "fake-test-key";
@@ -53,12 +120,16 @@ async function main(): Promise<void> {
     const gateway = getModelGateway("server_proxy");
     const opening = await gateway.generateOpening({
       accessMode: "server_proxy",
+      modelProfileId: "chatgpt",
       locale: "zh-CN",
+      ruleTitle: "Rule Alpha",
+      ruleText: "Rule full text for smoke testing.",
       storyTitle: "The Silence",
-      storyIntro: "A summer camp hides a long-buried recording."
+      storyText: "Story full text for smoke testing."
     });
     const turn = await gateway.generateTurnNarration({
       accessMode: "server_proxy",
+      modelProfileId: "chatgpt",
       locale: "zh-CN",
       storyTitle: "The Silence",
       playerInput: "I inspect the projector room.",

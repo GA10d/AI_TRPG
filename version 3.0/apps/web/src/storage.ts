@@ -4,6 +4,7 @@ import type {
   SaveBundle,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
+import type { MarkdownFontSizePreset, MenuFontSizePreset } from "./ui.ts";
 
 const RECENT_SNAPSHOT_STORAGE_KEY = "trpg3.recentSnapshot";
 const SESSION_RECORDS_STORAGE_KEY = "trpg3.sessionRecords";
@@ -19,9 +20,12 @@ export type StoredWebDefaults = {
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
+  profileRuntimeConfigs?: Record<string, RuntimeModelConfigInput>;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   showAiMetadata: boolean;
+  markdownFontSize: MarkdownFontSizePreset;
+  menuFontSize: MenuFontSizePreset;
 };
 
 export type SessionRecord = {

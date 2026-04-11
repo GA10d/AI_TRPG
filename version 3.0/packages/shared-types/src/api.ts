@@ -63,6 +63,14 @@ export type CreateSaveResponse = {
   saveBundle: SaveBundle;
 };
 
+export type ModelFeatureSummary = {
+  key: string;
+  label: string;
+  supported: boolean;
+  model: string | null;
+  url: string | null;
+};
+
 export type ModelProfileSummary = {
   id: string;
   name: string;
@@ -78,6 +86,7 @@ export type ModelProfileSummary = {
   docsUrl: string;
   envKeyCandidates: string[];
   supportsFeatures: string[];
+  featureDetails: ModelFeatureSummary[];
   allowsCustomApiKey: boolean;
   allowsCustomBaseUrl: boolean;
   allowsCustomModel: boolean;

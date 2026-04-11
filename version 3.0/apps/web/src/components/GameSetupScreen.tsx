@@ -18,6 +18,8 @@ import {
   formatAiGenerationMeta,
   GM_ARCHITECTURE_OPTIONS,
   LOG_VIEW_OPTIONS,
+  MARKDOWN_FONT_SIZE_OPTIONS,
+  type MarkdownFontSizePreset,
   PLAY_MODE_OPTIONS,
   renderJoinedList
 } from "../ui.ts";
@@ -36,6 +38,7 @@ type GameSetupScreenProps = {
   runtimeModelConfig: RuntimeModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
+  markdownFontSize: MarkdownFontSizePreset;
   characterConcept: string;
   isCreating: boolean;
   openingPreviewText: string;
@@ -57,6 +60,7 @@ type GameSetupScreenProps = {
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
+  onMarkdownFontSizeChange: (value: MarkdownFontSizePreset) => void;
   onCharacterConceptChange: (value: string) => void;
 };
 
@@ -243,6 +247,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     runtimeModelConfig,
     debugEnabled,
     logViewMode,
+    markdownFontSize,
     characterConcept,
     isCreating,
     openingPreviewText,
@@ -262,6 +267,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onRuntimeModelConfigChange,
     onDebugEnabledChange,
     onLogViewModeChange,
+    onMarkdownFontSizeChange,
     onCharacterConceptChange
   } = props;
 
@@ -508,6 +514,44 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     </select>
                   </SettingField>
 
+                  {selectedProfile ? (
+                    <SettingField
+                      label="模型能力"
+                      hint="这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。"
+                    >
+                      <div className="model-capability-list">
+                        {selectedProfile.featureDetails.map((feature) => (
+                          <div
+                            key={feature.key}
+                            className={`model-capability-item ${
+                              feature.supported
+                                ? "model-capability-item-supported"
+                                : "model-capability-item-unsupported"
+                            }`}
+                          >
+                            <div className="model-capability-row">
+                              <span className="model-capability-label">{feature.label}</span>
+                              <span className="model-capability-state">
+                                {feature.supported ? "支持" : "不支持"}
+                              </span>
+                            </div>
+                            <div className="model-capability-meta">
+                              {feature.model ? `参考模型：${feature.model}` : "未标注具体模型"}
+                              {feature.url ? (
+                                <>
+                                  {" · "}
+                                  <a href={feature.url} rel="noreferrer" target="_blank">
+                                    官方说明
+                                  </a>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SettingField>
+                  ) : null}
+
                   <SettingField
                     label="主持架构"
                     hint="为单 Agent / 多 Agent 主持预留统一入口。"
@@ -557,6 +601,26 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       }
                     >
                       {LOG_VIEW_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </SettingField>
+
+                  <SettingField
+                    label="Markdown 字号"
+                    hint="控制 AI 正文、标题和列表的渲染大小。"
+                  >
+                    <select
+                      value={markdownFontSize}
+                      onChange={(event) =>
+                        onMarkdownFontSizeChange(
+                          event.target.value as MarkdownFontSizePreset
+                        )
+                      }
+                    >
+                      {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
@@ -711,6 +775,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     <MarkdownBlock
                       className="story-markdown-block opening-markdown setup-preview-markdown"
                       content={previewMarkdownContent}
+                      fontSizePreset={markdownFontSize}
                     />
                   )}
                   {openingPreviewMetaLine ? (

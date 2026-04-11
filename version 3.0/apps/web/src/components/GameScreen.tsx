@@ -4,7 +4,10 @@ import type {
   PlaythroughGraphBundle,
   SessionSnapshot
 } from "../../../../packages/shared-types/src/index.ts";
-import { formatAiGenerationMeta } from "../ui.ts";
+import {
+  formatAiGenerationMeta,
+  type MarkdownFontSizePreset
+} from "../ui.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { PlaythroughGraphPanel } from "./PlaythroughGraphPanel.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
@@ -17,6 +20,7 @@ type GameScreenProps = {
   isSaving: boolean;
   isResumingBranch: boolean;
   showAiMetadata: boolean;
+  markdownFontSize: MarkdownFontSizePreset;
   onBack: () => void;
   onContinueFromNode: (nodeId: string) => Promise<void>;
   onQuickEndingTest: () => Promise<void>;
@@ -34,6 +38,7 @@ export function GameScreen(props: GameScreenProps) {
     isSaving,
     isResumingBranch,
     showAiMetadata,
+    markdownFontSize,
     onBack,
     onContinueFromNode,
     onQuickEndingTest,
@@ -103,6 +108,7 @@ export function GameScreen(props: GameScreenProps) {
           <MarkdownBlock
             className="story-markdown-block opening-markdown"
             content={openingMessage?.content ?? "暂未找到开场文本。"}
+            fontSizePreset={markdownFontSize}
           />
           {showAiMetadata && openingMessage?.aiMetadata ? (
             <div className="ai-meta-line">{formatAiGenerationMeta(openingMessage.aiMetadata)}</div>
@@ -160,6 +166,7 @@ export function GameScreen(props: GameScreenProps) {
                       <MarkdownBlock
                         className="story-markdown-block message-body message-body-markdown"
                         content={message.content}
+                        fontSizePreset={markdownFontSize}
                       />
                     ) : (
                       <div className="message-body">{message.content}</div>
