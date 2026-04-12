@@ -153,7 +153,7 @@ export function GameScreen(props: GameScreenProps) {
     if (!ruleDirectoryName || !storyDirectoryName) {
       setNpcRoster([]);
       setSelectedNpcId(null);
-      setNpcError("This save is missing content directory info, so NPC files cannot be loaded.");
+      setNpcError(text.gameScreen.missingNpcContentInfo);
       return;
     }
 

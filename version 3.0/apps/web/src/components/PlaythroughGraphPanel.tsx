@@ -11,6 +11,7 @@ import type {
   PlaythroughGraphBundle,
   PlaythroughNode
 } from "../../../../packages/shared-types/src/index.ts";
+import { useUiText } from "../locales/index.tsx";
 
 type PlaythroughGraphPanelProps = {
   graphBundle: PlaythroughGraphBundle | null;
@@ -80,24 +81,27 @@ function deriveDepth(
   return depth;
 }
 
-function buildNodeTitle(node: PlaythroughNode): string {
+function buildNodeTitle(
+  node: PlaythroughNode,
+  text: ReturnType<typeof useUiText>["playthroughGraph"]
+): string {
   if (node.nodeKind === "opening") {
-    return "开场";
+    return text.openingTitle;
   }
 
   if (node.nodeKind === "ending") {
-    return node.endingState?.title ?? `结局 / R${node.round}`;
+    return node.endingState?.title ?? text.endingTitle(node.round);
   }
 
   if (node.nodeKind === "debrief") {
-    return "复盘";
+    return text.debriefTitle;
   }
 
   if (node.nodeKind === "epilogue") {
-    return "后日谈";
+    return text.epilogueTitle;
   }
 
-  return `回合 ${node.round}`;
+  return text.roundTitle(node.round);
 }
 
 function canUseStorage(): boolean {
@@ -167,6 +171,7 @@ function mergeNodePositions(
 }
 
 export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
+  const text = useUiText().playthroughGraph;
   const {
     graphBundle,
     isResuming,
@@ -335,17 +340,17 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
     <section className={`summary-card playthrough-panel ${isExpanded ? "playthrough-panel-expanded" : "playthrough-panel-collapsed"}`}>
       <div className="record-header">
         <div>
-          <div className="meta-label">分支回溯树</div>
+          <div className="meta-label">{text.eyebrow}</div>
           <div className="summary-title">
-            已在结局后解锁，共 {graphBundle.graph.nodeCount} 个节点
+            {text.title(graphBundle.graph.nodeCount)}
           </div>
           <div className="summary-text">
-            现在可以直接拖动节点重排视图，连线会实时跟随更新。
+            {text.description}
           </div>
         </div>
         <div className="playthrough-panel-tools">
           <button
-            aria-label={isExpanded ? "收起分支回溯树" : "放大分支回溯树"}
+            aria-label={isExpanded ? text.collapseAriaLabel : text.expandAriaLabel}
             className="ghost-button playthrough-expand-button"
             onClick={() => setIsExpanded((current) => !current)}
             type="button"
@@ -353,15 +358,15 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
             <span aria-hidden="true" className="playthrough-expand-icon">
               {isExpanded ? "⊟" : "⊞"}
             </span>
-            <span>{isExpanded ? "收起" : "放大"}</span>
+            <span>{isExpanded ? text.collapseButton : text.expandButton}</span>
           </button>
 
           <div className="flag-list">
-          <span className="badge">主线 / 棕红</span>
-          <span className="badge">分支 / 青绿</span>
-          <span className="badge">结局后 / 紫色</span>
+            <span className="badge">{text.legendMainline}</span>
+            <span className="badge">{text.legendBranch}</span>
+            <span className="badge">{text.legendAfterEnding}</span>
+          </div>
         </div>
-      </div>
 
       </div>
 
@@ -422,14 +427,14 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
                   <span>{node.nodeKind}</span>
                   <span>R{node.round}</span>
                 </div>
-                <div className="playthrough-node-title">{buildNodeTitle(node)}</div>
+                <div className="playthrough-node-title">{buildNodeTitle(node, text)}</div>
                 <div className="playthrough-node-copy">
-                  {node.playerPreview ?? node.gmPreview ?? "该节点暂无额外摘要。"}
+                  {node.playerPreview ?? node.gmPreview ?? text.noExtraSummary}
                 </div>
                 <div className="playthrough-node-actions">
-                  {isCurrent ? <span className="flag-chip">当前节点</span> : null}
+                  {isCurrent ? <span className="flag-chip">{text.currentNode}</span> : null}
                   {node.terminalState.isTerminal ? (
-                    <span className="flag-chip">结局叶节点</span>
+                    <span className="flag-chip">{text.endingLeaf}</span>
                   ) : (
                     <button
                       className="ghost-button playthrough-node-button"
@@ -437,7 +442,7 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
                       onClick={() => void onContinueFromNode(node.id)}
                       type="button"
                     >
-                      {isResuming ? "恢复中..." : "从此继续"}
+                      {isResuming ? text.resumeBusy : text.continueFromHere}
                     </button>
                   )}
                 </div>

@@ -6,11 +6,12 @@ import type {
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import {
-  GM_ARCHITECTURE_OPTIONS,
-  LOG_VIEW_OPTIONS,
-  MENU_FONT_SIZE_OPTIONS,
-  PLAY_MODE_OPTIONS
+  getGmArchitectureOptions,
+  getLogViewOptions,
+  getMenuFontSizeOptions,
+  getPlayModeOptions
 } from "../ui.ts";
+import { useUiText, type UiText } from "../locales/index.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type SettingsScreenProps = {
@@ -65,13 +66,6 @@ const EMPTY_RUNTIME_IMAGE_MODEL_CONFIG: RuntimeImageModelConfigInput = {
   model: ""
 };
 
-const IMAGE_TRIGGER_OPTIONS = [
-  { value: "manual", label: "手动生成" },
-  { value: "character_portrait", label: "角色立绘" },
-  { value: "npc_intro", label: "NPC 展示" },
-  { value: "scene_shift", label: "场景切换" }
-] as const;
-
 function getEffectiveRuntimeConfig(
   runtimeModelConfig: RuntimeModelConfigInput | RuntimeImageModelConfigInput | undefined
 ): RuntimeModelConfigInput {
@@ -85,20 +79,28 @@ function getEffectiveRuntimeConfig(
 function resolveConfigStatus(
   configured: boolean,
   runtimeConfig: RuntimeModelConfigInput,
+  text: UiText["settingsScreen"],
   isMock = false
 ): string {
   if (isMock) {
-    return "内置可用";
+    return text.configStatusBuiltIn;
   }
 
   if (runtimeConfig.apiKey || runtimeConfig.baseUrl || runtimeConfig.model) {
-    return "已填写本地覆盖";
+    return text.configStatusLocalOverride;
   }
 
-  return configured ? "已配置" : "未配置";
+  return configured ? text.configStatusConfigured : text.configStatusMissing;
 }
 
 export function SettingsScreen(props: SettingsScreenProps) {
+  const text = useUiText();
+  const settingsText = text.settingsScreen;
+  const playModeOptions = getPlayModeOptions(text);
+  const gmArchitectureOptions = getGmArchitectureOptions(text);
+  const logViewOptions = getLogViewOptions(text);
+  const menuFontSizeOptions = getMenuFontSizeOptions(text);
+  const imageTriggerOptions = [...text.options.imageTriggers];
   const {
     bootstrap,
     locale,
@@ -214,8 +216,8 @@ export function SettingsScreen(props: SettingsScreenProps) {
   return (
     <section className="panel page-panel">
       <ScreenHeader
-        title="设置"
-        description="这里保存的是默认值。文本模型、图片模型和文生图模板都会在后续新游戏中自动带入。"
+        title={settingsText.title}
+        description={settingsText.description}
         onBack={onBack}
       />
 
@@ -223,14 +225,14 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <section className="summary-card">
           <div className="selection-column-header">
             <div>
-              <div className="eyebrow">General</div>
-              <div className="summary-title">基础偏好</div>
+              <div className="eyebrow">{settingsText.generalEyebrow}</div>
+              <div className="summary-title">{settingsText.generalTitle}</div>
             </div>
           </div>
 
           <div className="grid-two">
             <label className="field">
-              <span>默认语言</span>
+              <span>{settingsText.locale}</span>
               <select
                 value={locale}
                 onChange={(event) => onLocaleChange(event.target.value as CreateSessionRequest["locale"])}
@@ -244,14 +246,14 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>默认游戏模式</span>
+              <span>{settingsText.playMode}</span>
               <select
                 value={playMode}
                 onChange={(event) =>
                   onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
                 }
               >
-                {PLAY_MODE_OPTIONS.map((item) => (
+                {playModeOptions.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -262,14 +264,14 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
           <div className="grid-two">
             <label className="field">
-              <span>默认主持架构</span>
+              <span>{settingsText.gmArchitecture}</span>
               <select
                 value={gmArchitecture}
                 onChange={(event) =>
                   onGmArchitectureChange(event.target.value as CreateSessionRequest["gmArchitecture"])
                 }
               >
-                {GM_ARCHITECTURE_OPTIONS.map((item) => (
+                {gmArchitectureOptions.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -278,7 +280,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>默认日志显示</span>
+              <span>{settingsText.logViewMode}</span>
               <select
                 value={logViewMode}
                 onChange={(event) =>
@@ -287,7 +289,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   )
                 }
               >
-                {LOG_VIEW_OPTIONS.map((item) => (
+                {logViewOptions.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -298,7 +300,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
           <div className="grid-two">
             <label className="field">
-              <span>菜单字号</span>
+              <span>{settingsText.menuFontSize}</span>
               <select
                 value={menuFontSize}
                 onChange={(event) =>
@@ -307,7 +309,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   )
                 }
               >
-                {MENU_FONT_SIZE_OPTIONS.map((item) => (
+                {menuFontSizeOptions.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -317,14 +319,14 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
             <div className="summary-card">
               <div className="field checkbox-field">
-                <span>调试选项</span>
+                <span>{settingsText.debugOptions}</span>
                 <label className="toggle-row">
                   <input
                     checked={debugEnabled}
                     onChange={(event) => onDebugEnabledChange(event.target.checked)}
                     type="checkbox"
                   />
-                  <span>默认开启调试信息</span>
+                  <span>{settingsText.enableDebug}</span>
                 </label>
                 <label className="toggle-row">
                   <input
@@ -332,7 +334,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                     onChange={(event) => onShowAiMetadataChange(event.target.checked)}
                     type="checkbox"
                   />
-                  <span>显示 AI 耗时、Token 与费用</span>
+                  <span>{settingsText.showAiMetadata}</span>
                 </label>
               </div>
             </div>
@@ -342,25 +344,27 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <section className="summary-card">
           <div className="selection-column-header">
             <div>
-              <div className="eyebrow">Text Model</div>
-              <div className="summary-title">文本模型配置</div>
+              <div className="eyebrow">{settingsText.textModelEyebrow}</div>
+              <div className="summary-title">{settingsText.textModelTitle}</div>
               <div className="summary-text">
-                当前默认：
-                {selectedTextProfile?.name ?? "未选择"} /{" "}
-                {selectedTextProfile
-                  ? resolveConfigStatus(
-                      selectedTextProfile.configured,
-                      effectiveTextRuntimeConfig,
-                      selectedTextProfile.accessMode === "mock"
-                    )
-                  : "未配置"}
+                {settingsText.defaultSelectedSummary(
+                  selectedTextProfile?.name ?? text.common.none,
+                  selectedTextProfile
+                    ? resolveConfigStatus(
+                        selectedTextProfile.configured,
+                        effectiveTextRuntimeConfig,
+                        settingsText,
+                        selectedTextProfile.accessMode === "mock"
+                      )
+                    : settingsText.configStatusMissing
+                )}
               </div>
             </div>
           </div>
 
           <div className="grid-two">
             <label className="field">
-              <span>模型接入模式</span>
+              <span>{settingsText.modelAccessMode}</span>
               <select
                 value={modelAccessMode}
                 onChange={(event) =>
@@ -376,7 +380,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>默认文本模型档案</span>
+              <span>{settingsText.textModelProfile}</span>
               <select
                 value={modelProfileId}
                 onChange={(event) => onModelProfileIdChange(event.target.value)}
@@ -394,11 +398,11 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
           <div className="grid-two">
             <label className="field">
-              <span>API Key 覆盖</span>
+              <span>{settingsText.apiKeyOverride}</span>
               <input
                 autoComplete="new-password"
                 className="text-input"
-                placeholder="留空则读取本地 .env"
+                placeholder={settingsText.apiKeyPlaceholder}
                 type="password"
                 value={effectiveTextRuntimeConfig.apiKey}
                 onChange={(event) =>
@@ -410,10 +414,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>模型名覆盖</span>
+              <span>{settingsText.modelNameOverride}</span>
               <input
                 className="text-input"
-                placeholder={selectedTextProfile?.baseModel ?? "留空使用默认模型"}
+                placeholder={selectedTextProfile?.baseModel ?? settingsText.modelPlaceholder}
                 type="text"
                 value={effectiveTextRuntimeConfig.model}
                 onChange={(event) =>
@@ -426,10 +430,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
           </div>
 
           <label className="field">
-            <span>Base URL 覆盖</span>
+            <span>{settingsText.baseUrlOverride}</span>
             <input
               className="text-input"
-              placeholder={selectedTextProfile?.baseUrl ?? "留空使用默认 Base URL"}
+              placeholder={selectedTextProfile?.baseUrl ?? settingsText.baseUrlPlaceholder}
               type="text"
               value={effectiveTextRuntimeConfig.baseUrl}
               onChange={(event) =>
@@ -450,7 +454,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               }
               type="button"
             >
-              清空当前文本模型覆盖
+              {settingsText.clearTextModelOverride}
             </button>
           </div>
 
@@ -468,12 +472,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   <div className="model-capability-row">
                     <span className="model-capability-label">{feature.label}</span>
                     <span className="model-capability-state">
-                      {feature.supported ? "支持" : "不支持"}
+                      {feature.supported ? settingsText.supported : settingsText.unsupported}
                     </span>
                   </div>
                   <div className="model-capability-meta">
                     {selectedTextProfile.message}
-                    {feature.model ? ` / 参考模型：${feature.model}` : ""}
+                    {feature.model ? settingsText.referenceModel(feature.model) : ""}
                   </div>
                 </div>
               ))}
@@ -484,25 +488,27 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <section className="summary-card">
           <div className="selection-column-header">
             <div>
-              <div className="eyebrow">Image Model</div>
-              <div className="summary-title">文生图 Provider 配置</div>
+              <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
+              <div className="summary-title">{settingsText.imageModelTitle}</div>
               <div className="summary-text">
-                当前默认：
-                {selectedImageProfile?.name ?? "未选择"} /{" "}
-                {selectedImageProfile
-                  ? resolveConfigStatus(
-                      selectedImageProfile.configured,
-                      effectiveImageRuntimeConfig,
-                      selectedImageProfile.dependence === "Mock"
-                    )
-                  : "未配置"}
+                {settingsText.defaultSelectedSummary(
+                  selectedImageProfile?.name ?? text.common.none,
+                  selectedImageProfile
+                    ? resolveConfigStatus(
+                        selectedImageProfile.configured,
+                        effectiveImageRuntimeConfig,
+                        settingsText,
+                        selectedImageProfile.dependence === "Mock"
+                      )
+                    : settingsText.configStatusMissing
+                )}
               </div>
             </div>
           </div>
 
           <div className="grid-two">
             <label className="field">
-              <span>默认图片模型档案</span>
+              <span>{settingsText.imageModelProfile}</span>
               <select
                 value={imageProfileId}
                 onChange={(event) => onImageProfileIdChange(event.target.value)}
@@ -516,10 +522,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>图片模型名覆盖</span>
+              <span>{settingsText.imageModelNameOverride}</span>
               <input
                 className="text-input"
-                placeholder={selectedImageProfile?.baseModel ?? "留空使用默认模型"}
+                placeholder={selectedImageProfile?.baseModel ?? settingsText.modelPlaceholder}
                 type="text"
                 value={effectiveImageRuntimeConfig.model}
                 onChange={(event) =>
@@ -533,11 +539,11 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
           <div className="grid-two">
             <label className="field">
-              <span>图片 API Key 覆盖</span>
+              <span>{settingsText.imageApiKeyOverride}</span>
               <input
                 autoComplete="new-password"
                 className="text-input"
-                placeholder="留空则读取本地 .env"
+                placeholder={settingsText.apiKeyPlaceholder}
                 type="password"
                 value={effectiveImageRuntimeConfig.apiKey}
                 onChange={(event) =>
@@ -549,10 +555,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </label>
 
             <label className="field">
-              <span>图片 Base URL 覆盖</span>
+              <span>{settingsText.imageBaseUrlOverride}</span>
               <input
                 className="text-input"
-                placeholder={selectedImageProfile?.baseUrl ?? "留空使用默认 Base URL"}
+                placeholder={selectedImageProfile?.baseUrl ?? settingsText.baseUrlPlaceholder}
                 type="text"
                 value={effectiveImageRuntimeConfig.baseUrl}
                 onChange={(event) =>
@@ -577,7 +583,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               }
               type="button"
             >
-              清空当前图片模型覆盖
+              {settingsText.clearImageModelOverride}
             </button>
           </div>
 
@@ -595,12 +601,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   <div className="model-capability-row">
                     <span className="model-capability-label">{feature.label}</span>
                     <span className="model-capability-state">
-                      {feature.supported ? "支持" : "不支持"}
+                      {feature.supported ? settingsText.supported : settingsText.unsupported}
                     </span>
                   </div>
                   <div className="model-capability-meta">
                     {selectedImageProfile.message}
-                    {feature.model ? ` / 参考模型：${feature.model}` : ""}
+                    {feature.model ? settingsText.referenceModel(feature.model) : ""}
                   </div>
                 </div>
               ))}
@@ -612,17 +618,17 @@ export function SettingsScreen(props: SettingsScreenProps) {
           <section className="summary-card">
             <div className="selection-column-header">
               <div>
-                <div className="eyebrow">Image Prompt</div>
-                <div className="summary-title">文生图模板</div>
+                <div className="eyebrow">{settingsText.imagePromptEyebrow}</div>
+                <div className="summary-title">{settingsText.imagePromptTitle}</div>
                 <div className="summary-text">
-                  这里配置不同场景下的通用模板，实际生成时会与业务 prompt 自动拼接。
+                  {settingsText.imagePromptDescription}
                 </div>
               </div>
             </div>
 
             <div className="grid-two">
               <label className="field">
-                <span>默认主题</span>
+                <span>{settingsText.defaultTheme}</span>
                 <input
                   className="text-input"
                   type="text"
@@ -636,7 +642,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               </label>
 
               <label className="field">
-                <span>默认触发器</span>
+                <span>{settingsText.defaultTrigger}</span>
                 <select
                   value={resolvedImagePromptTemplateConfig.defaultTrigger}
                   onChange={(event) =>
@@ -646,7 +652,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                     })
                   }
                 >
-                  {IMAGE_TRIGGER_OPTIONS.map((item) => (
+                  {imageTriggerOptions.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -656,7 +662,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </div>
 
             <label className="field">
-              <span>兜底模板</span>
+              <span>{settingsText.fallbackTemplate}</span>
               <textarea
                 rows={4}
                 value={resolvedImagePromptTemplateConfig.fallbackTriggerTemplate}
@@ -671,7 +677,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             <div className="grid-two">
               {Object.entries(resolvedImagePromptTemplateConfig.themes).map(([themeKey, themeStyle]) => (
                 <label className="field" key={themeKey}>
-                  <span>主题样式: {themeKey}</span>
+                  <span>{settingsText.themeStyle(themeKey)}</span>
                   <textarea
                     rows={4}
                     value={themeStyle}
@@ -685,7 +691,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               {Object.entries(resolvedImagePromptTemplateConfig.triggerTemplates).map(
                 ([triggerKey, templateValue]) => (
                   <label className="field" key={triggerKey}>
-                    <span>触发器模板: {triggerKey}</span>
+                    <span>{settingsText.triggerTemplate(triggerKey)}</span>
                     <textarea
                       rows={5}
                       value={templateValue}
@@ -703,7 +709,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
             <div className="grid-two">
               <label className="field">
-                <span>角色拼接模板</span>
+                <span>{settingsText.characterClauseTemplate}</span>
                 <textarea
                   rows={4}
                   value={resolvedImagePromptTemplateConfig.characterClauseTemplate}
@@ -716,7 +722,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               </label>
 
               <label className="field">
-                <span>角色条目模板</span>
+                <span>{settingsText.characterEntryTemplate}</span>
                 <textarea
                   rows={4}
                   value={resolvedImagePromptTemplateConfig.characterEntryTemplate}
@@ -730,7 +736,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </div>
 
             <label className="field">
-              <span>角色连接符</span>
+              <span>{settingsText.characterJoinSeparator}</span>
               <input
                 className="text-input"
                 type="text"
@@ -747,10 +753,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
 
         <div className="button-row">
           <button className="primary-button" type="submit">
-            保存设置
+            {settingsText.saveSettings}
           </button>
           <button className="ghost-button" onClick={onReset} type="button">
-            恢复默认
+            {settingsText.resetDefaults}
           </button>
         </div>
       </form>

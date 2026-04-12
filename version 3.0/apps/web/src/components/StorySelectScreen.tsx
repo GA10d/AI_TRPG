@@ -12,6 +12,7 @@ import type {
   ContentCatalogEntry,
   ContentCatalogStoryEntry
 } from "../../../../packages/shared-types/src/index.ts";
+import { useUiText, type UiText } from "../locales/index.tsx";
 import { clipText, renderJoinedList } from "../ui.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
@@ -56,14 +57,6 @@ const RULE_COLLAPSED_WIDTH = 52;
 const STORY_COLLAPSED_WIDTH = 52;
 const SPLITTER_WIDTH = 14;
 const HOVER_DELAY_MS = 1000;
-const DEFAULT_RULE_INTRO =
-  "这条规则暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你可以继续选择剧本并进入设置页，后续也可以再补完整的规则简介。";
-const DEFAULT_STORY_INTRO =
-  "这个剧本暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你仍然可以进入游戏，后续再补完整简介和演出文本。";
-const DEFAULT_COVER_COPY =
-  "当前剧本暂时没有提供 `cover.png`，这里先使用默认封面区。后续只要在剧本目录放入 `cover.png`、`cover.jpg` 或 `cover.webp`，这里就会自动读取。";
-const DEFAULT_COVER_QUOTE =
-  "当前剧本还没有单独提供封面短句，所以这里先回退到剧本简介摘要。";
 
 const DEFAULT_LAYOUT: StoryLayoutState = {
   ruleWidth: 320,
@@ -180,38 +173,25 @@ function normalizeLayout(
   return nextLayout;
 }
 
-function buildRuleHoverPayload(rule: ContentCatalogEntry): HoverPreviewPayload {
+function buildRuleHoverPayload(rule: ContentCatalogEntry, text: UiText): HoverPreviewPayload {
   return {
     title: rule.ruleTitle,
-    meta: `${rule.ruleId} · ${renderJoinedList(rule.themes)}`,
-    body: clipText(rule.ruleIntro, 320)
+    meta: `${rule.ruleId} / ${renderJoinedList(rule.themes, text)}`,
+    body: clipText(rule.ruleIntro, 320, text)
   };
 }
 
-function buildStoryHoverPayload(story: ContentCatalogStoryEntry): HoverPreviewPayload {
-  const playerCountLabel =
-    story.playerCount.min === story.playerCount.max
-      ? `${story.playerCount.min} 人`
-      : `${story.playerCount.min}-${story.playerCount.max} 人`;
-
-  return {
-    title: story.title,
-    meta: `${playerCountLabel} · ${story.recommendedLength} · ${story.recommendedPacing}`,
-    body: clipText(story.intro, 320)
-  };
-}
-
-function pickRuleIntroText(rule: ContentCatalogEntry | null): string {
+function pickRuleIntroText(rule: ContentCatalogEntry | null, text: UiText): string {
   const intro = rule?.ruleIntro?.trim();
-  return intro && intro.length > 0 ? intro : DEFAULT_RULE_INTRO;
+  return intro && intro.length > 0 ? intro : text.storySelectScreen.defaultRuleIntro;
 }
 
-function pickStoryIntroText(story: ContentCatalogStoryEntry | null): string {
+function pickStoryIntroText(story: ContentCatalogStoryEntry | null, text: UiText): string {
   const intro = story?.intro?.trim();
-  return intro && intro.length > 0 ? intro : DEFAULT_STORY_INTRO;
+  return intro && intro.length > 0 ? intro : text.storySelectScreen.defaultStoryIntro;
 }
 
-function pickStoryCoverQuote(story: ContentCatalogStoryEntry | null): string {
+function pickStoryCoverQuote(story: ContentCatalogStoryEntry | null, text: UiText): string {
   const quote = story?.coverQuote?.trim();
   if (quote && quote.length > 0) {
     return quote;
@@ -219,13 +199,34 @@ function pickStoryCoverQuote(story: ContentCatalogStoryEntry | null): string {
 
   const intro = story?.intro?.trim();
   if (intro && intro.length > 0) {
-    return clipText(intro, 120);
+    return clipText(intro, 120, text);
   }
 
-  return DEFAULT_COVER_QUOTE;
+  return text.storySelectScreen.defaultCoverQuote;
+}
+
+function buildLocalizedStoryHoverPayload(
+  story: ContentCatalogStoryEntry,
+  text: UiText
+): HoverPreviewPayload {
+  const playerCountLabel =
+    story.playerCount.min === story.playerCount.max
+      ? text.storySelectScreen.playerCountSingle(story.playerCount.min)
+      : text.storySelectScreen.playerCountRange(
+          story.playerCount.min,
+          story.playerCount.max
+        );
+
+  return {
+    title: story.title,
+    meta: `${playerCountLabel} / ${story.recommendedLength} / ${story.recommendedPacing}`,
+    body: clipText(story.intro, 320, text)
+  };
 }
 
 export function StorySelectScreen(props: StorySelectScreenProps) {
+  const text = useUiText();
+  const storyText = text.storySelectScreen;
   const {
     bootstrap,
     ruleDirectoryName,
@@ -423,9 +424,9 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   const selectedStory =
     stories.find((item) => item.directoryName === storyDirectoryName) ?? stories[0] ?? null;
   const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
-  const ruleIntroText = pickRuleIntroText(selectedRule);
-  const storyIntroText = pickStoryIntroText(selectedStory);
-  const storyCoverQuote = pickStoryCoverQuote(selectedStory);
+  const ruleIntroText = pickRuleIntroText(selectedRule, text);
+  const storyIntroText = pickStoryIntroText(selectedStory, text);
+  const storyCoverQuote = pickStoryCoverQuote(selectedStory, text);
   const rulePaneStyle: CSSProperties = {
     width: layout.ruleWidth,
     minWidth: RULE_MIN_WIDTH
@@ -456,12 +457,12 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   return (
     <section className="panel page-panel story-select-page-panel">
       <ScreenHeader
-        title="开始游戏"
-        description="先从规则和剧本里挑出这一局的舞台。左侧选规则，中间挑故事，右侧确认氛围与信息。"
+        title={storyText.title}
+        description={storyText.description}
         onBack={onBack}
-        backLabel="返回主菜单"
+        backLabel={storyText.backLabel}
         onClose={onClose}
-        closeLabel="关闭"
+        closeLabel={storyText.closeLabel}
       />
 
       <div
@@ -474,23 +475,23 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             onClick={handleToggleRuleCollapse}
             type="button"
           >
-            <span className="collapsed-pane-toggle-label">RULE</span>
-            <span className="collapsed-pane-toggle-action">展开</span>
+            <span className="collapsed-pane-toggle-label">{storyText.collapsedRuleLabel}</span>
+            <span className="collapsed-pane-toggle-action">{storyText.expandAction}</span>
           </button>
         ) : (
           <>
             <section className="selection-column story-pane story-pane-rule" style={rulePaneStyle}>
               <div className="selection-column-header">
                 <div>
-                  <div className="eyebrow">Rule</div>
-                  <h2>规则列表</h2>
+                  <div className="eyebrow">{storyText.ruleEyebrow}</div>
+                  <h2>{storyText.ruleListTitle}</h2>
                 </div>
                 <button
                   className="ghost-button pane-toggle-button"
                   onClick={handleToggleRuleCollapse}
                   type="button"
                 >
-                  收起
+                  {storyText.collapseAction}
                 </button>
               </div>
               <div className="selection-card-list">
@@ -504,7 +505,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                       onMouseEnter={(event) =>
                         scheduleHoverPreview(
                           `rule:${rule.directoryName}`,
-                          buildRuleHoverPayload(rule),
+                          buildRuleHoverPayload(rule, text),
                           event
                         )
                       }
@@ -515,7 +516,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                       <div className="selection-card-title">{rule.ruleTitle}</div>
                       <div className="selection-card-meta">{rule.ruleId}</div>
                       <div className="selection-card-copy selection-card-copy-singleline">
-                        {clipText(rule.ruleIntro, 120)}
+                        {clipText(rule.ruleIntro, 120, text)}
                       </div>
                     </button>
                   );
@@ -524,7 +525,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             </section>
 
             <button
-              aria-label="调整规则栏和剧本栏宽度"
+              aria-label={storyText.splitterRuleStoryAria}
               className="story-resize-handle"
               onPointerDown={(event) => handleSplitterPointerDown("rule", event)}
               type="button"
@@ -540,8 +541,8 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             onClick={handleToggleStoryCollapse}
             type="button"
           >
-            <span className="collapsed-pane-toggle-label">STORY</span>
-            <span className="collapsed-pane-toggle-action">展开</span>
+            <span className="collapsed-pane-toggle-label">{storyText.collapsedStoryLabel}</span>
+            <span className="collapsed-pane-toggle-action">{storyText.expandAction}</span>
           </button>
         ) : (
           <>
@@ -551,15 +552,15 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             >
               <div className="selection-column-header">
                 <div>
-                  <div className="eyebrow">Story</div>
-                  <h2>剧本列表</h2>
+                  <div className="eyebrow">{storyText.storyEyebrow}</div>
+                  <h2>{storyText.storyListTitle}</h2>
                 </div>
                 <button
                   className="ghost-button pane-toggle-button"
                   onClick={handleToggleStoryCollapse}
                   type="button"
                 >
-                  收起
+                  {storyText.collapseAction}
                 </button>
               </div>
               <div className="selection-card-list">
@@ -573,7 +574,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                       onMouseEnter={(event) =>
                         scheduleHoverPreview(
                           `story:${story.directoryName}`,
-                          buildStoryHoverPayload(story),
+                          buildLocalizedStoryHoverPayload(story, text),
                           event
                         )
                       }
@@ -584,13 +585,16 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                       <div className="selection-card-title">{story.title}</div>
                       <div className="selection-card-meta">
                         {story.playerCount.min === story.playerCount.max
-                          ? `${story.playerCount.min} 人`
-                          : `${story.playerCount.min}-${story.playerCount.max} 人`}
-                        {" · "}
+                          ? storyText.playerCountSingle(story.playerCount.min)
+                          : storyText.playerCountRange(
+                              story.playerCount.min,
+                              story.playerCount.max
+                            )}
+                        {" / "}
                         {story.recommendedLength}
                       </div>
                       <div className="selection-card-copy selection-card-copy-singleline">
-                        {clipText(story.intro, 120)}
+                        {clipText(story.intro, 120, text)}
                       </div>
                       <div className="flag-list">
                         {story.tags.slice(0, 3).map((tag) => (
@@ -606,7 +610,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             </section>
 
             <button
-              aria-label="调整剧本栏和详情栏宽度"
+              aria-label={storyText.splitterStoryDetailAria}
               className="story-resize-handle"
               onPointerDown={(event) => handleSplitterPointerDown("story", event)}
               type="button"
@@ -627,48 +631,50 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
               >
                 {coverAsset ? (
                   <img
-                    alt={`${selectedStory.title} 灏侀潰`}
+                    alt={storyText.coverAlt(selectedStory.title)}
                     className="story-cover-image"
                     src={coverAsset.url}
                   />
                 ) : null}
                 {coverAsset ? (
                   <button
-                    aria-label={isCoverExpanded ? "收起大图" : "查看大图"}
+                    aria-label={
+                      isCoverExpanded ? storyText.closeCoverAria : storyText.openCoverAria
+                    }
                     className="ghost-button story-cover-expand-button"
                     onClick={() => setIsCoverExpanded(true)}
                     type="button"
                   >
-                    查看大图
+                    {storyText.openCoverButton}
                   </button>
                 ) : null}
                 <div className="story-cover-placeholder story-cover-overlay">
-                  <div className="eyebrow">Story Preview</div>
+                  <div className="eyebrow">{storyText.storyPreviewEyebrow}</div>
                   <h2>{selectedStory.title}</h2>
                   <p>{storyCoverQuote}</p>
                   {!coverAsset ? (
-                    <p className="story-cover-fallback-copy">{DEFAULT_COVER_COPY}</p>
+                    <p className="story-cover-fallback-copy">{storyText.defaultCoverCopy}</p>
                   ) : null}
                 </div>
               </div>
 
               <div className="summary-card story-detail-block">
-                <div className="meta-label">剧本简介</div>
+                <div className="meta-label">{storyText.storyIntroLabel}</div>
                 <MarkdownBlock className="story-markdown-block" content={storyIntroText} />
               </div>
 
               <div className="summary-card story-detail-block">
-                <div className="meta-label">规则简介</div>
+                <div className="meta-label">{storyText.ruleIntroLabel}</div>
                 <MarkdownBlock className="story-markdown-block" content={ruleIntroText} />
               </div>
 
               <div className="story-detail-meta-row">
                 <div className="summary-card">
-                  <div className="meta-label">标签</div>
-                  <div className="summary-text">{renderJoinedList(selectedStory.tags)}</div>
+                  <div className="meta-label">{storyText.tagsLabel}</div>
+                  <div className="summary-text">{renderJoinedList(selectedStory.tags, text)}</div>
                 </div>
                 <div className="summary-card">
-                  <div className="meta-label">节奏与时长</div>
+                  <div className="meta-label">{storyText.pacingLengthLabel}</div>
                   <div className="summary-text">
                     {selectedStory.recommendedPacing} / {selectedStory.recommendedLength}
                   </div>
@@ -677,17 +683,15 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
 
               <div className="story-detail-footer">
                 <div className="summary-text">
-                  内容警告：{renderJoinedList(selectedStory.contentWarnings)}
+                  {storyText.contentWarnings(renderJoinedList(selectedStory.contentWarnings, text))}
                 </div>
                 <button className="primary-button" onClick={onContinue} type="button">
-                  开始冒险
+                  {storyText.startAdventure}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="empty-state">
-              还没有可用的规则与剧本，请先检查内容包是否已经加载成功。
-            </div>
+            <div className="empty-state">{storyText.empty}</div>
           )}
         </section>
       </div>
@@ -702,7 +706,7 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
 
       {coverAsset && isCoverExpanded ? (
         <div
-          aria-label="剧本封面大图预览"
+          aria-label={storyText.coverDialogAria}
           className="story-cover-lightbox"
           onClick={() => setIsCoverExpanded(false)}
           role="dialog"
@@ -712,15 +716,15 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <button
-              aria-label="关闭大图预览"
+              aria-label={storyText.closeCoverDialogAria}
               className="ghost-button story-cover-lightbox-close"
               onClick={() => setIsCoverExpanded(false)}
               type="button"
             >
-              收起图片
+              {storyText.closeImageButton}
             </button>
             <img
-              alt={`${selectedStory.title} 封面大图`}
+              alt={storyText.coverDialogAlt(selectedStory.title)}
               className="story-cover-lightbox-image"
               src={coverAsset.url}
             />

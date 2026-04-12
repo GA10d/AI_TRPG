@@ -27,6 +27,7 @@ import { usePlaythroughGraph } from "./hooks/usePlaythroughGraph.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
+import { GameBootstrapPage } from "./pages/GameBootstrapPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
 import { GameSetupPage } from "./pages/GameSetupPage.tsx";
 import {
@@ -124,7 +125,7 @@ function splitTextIntoRevealChunks(text: string): string[] {
         return ["\n"];
       }
 
-      return trimmedParagraph.match(/.{1,18}(?:[闂備焦瀵х粙鎴犳偖椤愶箑鐒垫い鎺嗗亾闁稿锕﹀Σ鎰板箳濡や焦娅栭梺缁樻礀閸婂鐛姀銈嗙叆?.!?;:]|$)/gu) ?? [trimmedParagraph];
+      return trimmedParagraph.match(/.{1,18}(?:[，。！？、；：,.!?;:]|$)/gu) ?? [trimmedParagraph];
     });
 
   return paragraphChunks.filter(Boolean);
@@ -550,7 +551,7 @@ export function App() {
         recipientIds: [playerParticipantId],
         visibility: "system",
         kind: "system",
-        content: `Session is being created for ${args.storyTitle} (${locale}).`,
+        content: uiText.app.pendingSessionSystemMessage(args.storyTitle, locale),
         tags: ["session_booting"]
       },
       {
@@ -574,7 +575,7 @@ export function App() {
         actorId: "system",
         type: "session_created",
         displayLevel: "core",
-        summary: "Session bootstrap started",
+        summary: uiText.app.pendingSessionReplaySummary,
         payload: {
           revealPreviewLength: args.revealText.length
         }
@@ -613,7 +614,7 @@ export function App() {
           {
             id: playerParticipantId,
             role: "human_player",
-            displayName: "Player",
+            displayName: uiText.app.pendingPlayerName,
             isAiControlled: false,
             isLocalUser: true,
             locale
@@ -621,7 +622,7 @@ export function App() {
           {
             id: gmParticipantId,
             role: "gm",
-            displayName: "Narrator",
+            displayName: uiText.app.pendingNarratorName,
             isAiControlled: true,
             isLocalUser: false,
             locale
@@ -830,7 +831,7 @@ export function App() {
       selectedStory.coverQuote?.trim() ||
       openingPreviewText.trim().split("\n").find((line) => line.trim().length > 0)?.trim() ||
       selectedStory.intro?.trim() ||
-      `Loading the opening of ${selectedStory.title} into the live story scene.`;
+      uiText.gameBootstrapScreen.defaultLoadingHint(selectedStory.title);
 
     setIsCreating(true);
     setIsBootstrappingSession(true);
@@ -853,7 +854,6 @@ export function App() {
       });
 
       setTurnInput("");
-      setView("game");
       setSnapshot(pendingSnapshot);
       setSessionBootstrapState(
         buildSessionBootstrapPanelState(uiText, {
@@ -862,6 +862,7 @@ export function App() {
           activeStage: "entered_game"
         })
       );
+      setView("game_bootstrap");
 
       const nextSnapshot = await streamCreateSession(
         {
@@ -903,6 +904,7 @@ export function App() {
       );
       setSessionBootstrapState(null);
       setIsBootstrappingSession(false);
+      setView("game");
       setStatus({
         message: uiText.app.status.narratorConnected,
         tone: "neutral"
@@ -978,10 +980,10 @@ export function App() {
       return;
     }
 
-    await submitPlayerTurn(snapshot, "I force an immediate mock ending trigger", {
-      pendingMessage: "Running mock ending test...",
-      successMessage: "Mock ending test submitted.",
-      endingSuccessMessage: "Mock ending test succeeded and the session is now in an ending."
+    await submitPlayerTurn(snapshot, uiText.app.quickEndingTestInput, {
+      pendingMessage: uiText.app.status.quickEndingTestPending,
+      successMessage: uiText.app.status.quickEndingTestSuccess,
+      endingSuccessMessage: uiText.app.status.quickEndingTestEnded
     });
   }
 
@@ -1108,7 +1110,7 @@ export function App() {
   }
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
-    return restoreFromSaveBundle(record.bundle, `${uiText.common.load}：${record.storyTitle}`);
+    return restoreFromSaveBundle(record.bundle, `${uiText.common.load}: ${record.storyTitle}`);
   }
 
   async function handleContinueFromNode(nodeId: string): Promise<void> {
@@ -1478,6 +1480,14 @@ export function App() {
         />
       );
       break;
+    case "game_bootstrap":
+      content = (
+        <GameBootstrapPage
+          snapshot={snapshot}
+          sessionBootstrapState={sessionBootstrapState}
+        />
+      );
+      break;
     case "menu":
     default:
       content = (
@@ -1503,11 +1513,11 @@ export function App() {
   return (
     <UiTextProvider locale={uiLocale}>
       <main
-        className="app-shell"
+        className={view === "game_bootstrap" ? "app-shell app-shell-bootstrap" : "app-shell"}
         style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
       >
         {content}
-        {status.message ? (
+        {status.message && view !== "game_bootstrap" ? (
           <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
             {status.message}
           </p>

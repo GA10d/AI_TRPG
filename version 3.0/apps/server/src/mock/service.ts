@@ -62,11 +62,38 @@ function matchEndingKeyword(playerInput: string): "suicide" | "escape" | "truth"
   return null;
 }
 
+function isForcedMockEndingTrigger(playerInput: string): boolean {
+  const normalized = playerInput.toLowerCase();
+
+  return (
+    normalized.includes("mock ending") ||
+    normalized.includes("mock 结局") ||
+    normalized.includes("mockエンディング") ||
+    normalized.includes("mock エンディング")
+  );
+}
+
 function buildMockEndingAdjudication(
   playerInput: string,
   locale: string,
   round: number
 ): EndingAdjudication | null {
+  if (isForcedMockEndingTrigger(playerInput)) {
+    return {
+      isGameOver: true,
+      adjudicationSource: "mock",
+      endingState: {
+        endingId: "mock_forced_fast_end",
+        endingType: "preset",
+        title: isEnglishLocale(locale) ? "Mock Fast Ending" : "Mock 快速结局",
+        summary: isEnglishLocale(locale)
+          ? "The mock fast-ending trigger was invoked, so the session closes immediately and unlocks the post-ending flow."
+          : "已触发 mock 快速结局，本局会立即结束，并解锁结局后的后续界面。",
+        confirmedAtRound: round
+      }
+    };
+  }
+
   const matchedEnding = matchEndingKeyword(playerInput);
   if (!matchedEnding) {
     return null;

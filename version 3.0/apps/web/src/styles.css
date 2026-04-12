@@ -55,6 +55,15 @@ img {
   font-size: calc(16px * var(--ui-scale, 1));
 }
 
+.app-shell-bootstrap {
+  gap: 0;
+  padding: 0;
+}
+
+.app-shell-bootstrap > :first-child {
+  min-height: 100vh;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -111,12 +120,15 @@ img {
     minmax(0, calc(100% - var(--menu-left-ratio) - 14px));
   align-items: stretch;
   min-height: 100%;
+  height: calc(100vh - 20px);
+  overflow: hidden;
 }
 
 .menu-panel-left {
   grid-column: 1;
   display: grid;
   gap: 20px;
+  min-height: 0;
   justify-items: center;
   align-content: space-between;
   text-align: center;
@@ -125,8 +137,10 @@ img {
 .menu-panel-right {
   grid-column: 3;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px;
-  min-height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .menu-panel-left .eyebrow,
@@ -229,10 +243,18 @@ img {
   gap: 12px;
 }
 
+.menu-notice-section {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .menu-notice-list {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   display: grid;
   gap: 12px;
-  max-height: 48vh;
+  align-content: start;
   overflow: auto;
   padding-right: 6px;
 }
@@ -263,8 +285,16 @@ img {
 
 .menu-more-button {
   justify-self: center;
-  min-width: 180px;
+  min-width: 104px;
+  padding: 8px 14px;
+  font-size: 13px;
   color: #275db2;
+}
+
+.menu-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
 }
 
 .menu-meta-strip,
@@ -1719,6 +1749,175 @@ pre {
   font-family: "Cascadia Code", "Consolas", monospace;
 }
 
+.bootstrap-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  background: #351c18;
+  color: #f8eee4;
+}
+
+.bootstrap-screen-inner {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 24px;
+  justify-items: center;
+  text-align: center;
+}
+
+.bootstrap-screen-cover-frame {
+  width: min(460px, 62vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 244, 234, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
+}
+
+.bootstrap-screen-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bootstrap-screen-cover-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 12px;
+  place-content: center;
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(248, 238, 228, 0.86);
+}
+
+.bootstrap-screen-cover-fallback-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff7ef;
+}
+
+.bootstrap-screen-cover-fallback p,
+.bootstrap-screen-hint,
+.bootstrap-screen-detail,
+.bootstrap-screen-wait,
+.bootstrap-screen-tip-text {
+  margin: 0;
+}
+
+.bootstrap-screen-copy {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+.bootstrap-screen-story-label,
+.bootstrap-screen-tip-label {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(248, 238, 228, 0.62);
+}
+
+.bootstrap-screen-title {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.15;
+  color: #fff7ef;
+}
+
+.bootstrap-screen-hint {
+  font-size: 15px;
+  line-height: 1.8;
+  color: rgba(248, 238, 228, 0.78);
+}
+
+.bootstrap-screen-progress-block,
+.bootstrap-screen-tip-block {
+  display: grid;
+  gap: 10px;
+}
+
+.bootstrap-screen-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(248, 238, 228, 0.72);
+}
+
+.bootstrap-screen-progress-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 245, 236, 0.16);
+}
+
+.bootstrap-screen-progress-bar {
+  position: relative;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c17559, #f1c18c);
+  transition: width 260ms ease;
+}
+
+.bootstrap-screen-progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: bootstrap-progress-shimmer 1.4s linear infinite;
+}
+
+.bootstrap-screen-detail {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(248, 238, 228, 0.74);
+}
+
+.bootstrap-screen-wait {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #f8ddc0;
+}
+
+.bootstrap-screen-tip-text {
+  min-height: 3.6em;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 244, 234, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  line-height: 1.8;
+  color: rgba(255, 247, 239, 0.92);
+  animation: bootstrap-tip-enter 320ms ease;
+}
+
+@keyframes bootstrap-progress-shimmer {
+  0% {
+    transform: translateX(-140%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes bootstrap-tip-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .game-shell {
   position: relative;
   display: grid;
@@ -2118,6 +2317,22 @@ pre {
 }
 
 @media (max-width: 900px) {
+  .bootstrap-screen {
+    padding: 32px 20px;
+  }
+
+  .bootstrap-screen-cover-frame {
+    width: min(100%, 420px);
+  }
+
+  .bootstrap-screen-title {
+    font-size: clamp(26px, 6vw, 34px);
+  }
+
+  .bootstrap-screen-tip-text {
+    min-height: 4.8em;
+  }
+
   .menu-grid,
   .grid-two,
   .meta-grid,
@@ -2137,6 +2352,8 @@ pre {
 
   .menu-grid {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 
   .menu-panel-left,

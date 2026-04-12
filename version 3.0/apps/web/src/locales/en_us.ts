@@ -163,6 +163,9 @@ export const enUs = {
       startGameFirst: "Start a game first.",
       enterAction: "Enter an action for this turn.",
       quickEndingMockOnly: "Quick ending test is only available in mock mode.",
+      quickEndingTestPending: "Running the mock ending test...",
+      quickEndingTestSuccess: "Mock ending test submitted.",
+      quickEndingTestEnded: "Mock ending test succeeded and the session is now in an ending.",
       noActiveSessionToSave: "There is no active session to save.",
       creatingLocalSave: "Creating a local save...",
       localSaveCreated: "Local save created.",
@@ -222,7 +225,13 @@ export const enUs = {
         detail: "Saving the first narration and the current setup into the formal session.",
         progress: 0.96
       }
-    }
+    },
+    pendingSessionSystemMessage: (storyTitle: string, locale: string) =>
+      `Creating a session for ${storyTitle} (${locale}).`,
+    pendingSessionReplaySummary: "Session bootstrap started",
+    pendingPlayerName: "Player",
+    pendingNarratorName: "Narrator",
+    quickEndingTestInput: "I force an immediate mock ending trigger and choose to escape."
   },
   mainMenu: {
     eyebrow: "Main Menu",
@@ -260,6 +269,7 @@ export const enUs = {
       modelAccessMode: (value: string) => `Model mode: ${value}`,
       modelProfile: (value: string) => `Model profile: ${value}`
     },
+    uiLanguageAriaLabel: "Select UI language",
     splitterAriaLabel: "Drag to resize the main menu columns"
   },
   continueScreen: {
@@ -343,6 +353,8 @@ export const enUs = {
     npcDescription: "Review NPC notes, portraits, and generated image results here.",
     loadingNpcFiles: "Loading NPC files...",
     noNpcFiles: "This story does not expose readable NPC files yet.",
+    missingNpcContentInfo:
+      "This save is missing content directory information, so NPC files cannot be loaded.",
     npcSelectHint: "Select an NPC from the left side first.",
     generatePortrait: "Generate Portrait",
     generatingPortrait: "Generating...",
@@ -415,5 +427,240 @@ export const enUs = {
     characterJoinSeparator: "Character join separator",
     saveSettings: "Save settings",
     resetDefaults: "Restore defaults"
+  },
+  storySelectScreen: {
+    title: "Start Game",
+    description:
+      "Pick the rule set and story for this run first. Choose a rule on the left, a story in the middle, and confirm the tone and details on the right.",
+    backLabel: "Back to Menu",
+    closeLabel: "Close",
+    collapsedRuleLabel: "RULE",
+    collapsedStoryLabel: "STORY",
+    expandAction: "Expand",
+    collapseAction: "Collapse",
+    ruleEyebrow: "Rule",
+    ruleListTitle: "Rule List",
+    storyEyebrow: "Story",
+    storyListTitle: "Story List",
+    storyPreviewEyebrow: "Story Preview",
+    splitterRuleStoryAria: "Resize the rule and story columns",
+    splitterStoryDetailAria: "Resize the story and detail columns",
+    playerCountSingle: (count: number) => `${count} player`,
+    playerCountRange: (min: number, max: number) => `${min}-${max} players`,
+    defaultRuleIntro:
+      "This rule set does not provide `intro.txt` or `intro.md` yet, so a fallback summary is shown for now. You can still keep choosing a story and move into setup.",
+    defaultStoryIntro:
+      "This story does not provide `intro.txt` or `intro.md` yet, so a fallback summary is shown for now. You can still continue into the game and add richer intro copy later.",
+    defaultCoverCopy:
+      "This story does not provide `cover.png` yet, so the default cover area is used for now. If you later place `cover.png`, `cover.jpg`, or `cover.webp` in the story folder, it will be loaded automatically.",
+    defaultCoverQuote:
+      "This story does not provide a dedicated cover quote yet, so the intro summary is used instead.",
+    coverAlt: (storyTitle: string) => `${storyTitle} cover`,
+    openCoverAria: "View full image",
+    closeCoverAria: "Hide full image",
+    openCoverButton: "View full image",
+    storyIntroLabel: "Story Intro",
+    ruleIntroLabel: "Rule Intro",
+    tagsLabel: "Tags",
+    pacingLengthLabel: "Pacing & Length",
+    contentWarnings: (value: string) => `Content warnings: ${value}`,
+    startAdventure: "Start Adventure",
+    empty: "No playable rules or stories are available yet. Check whether the content packs loaded correctly.",
+    coverDialogAria: "Story cover preview",
+    closeCoverDialogAria: "Close cover preview",
+    closeImageButton: "Close image",
+    coverDialogAlt: (storyTitle: string) => `${storyTitle} full cover image`
+  },
+  gameSetupScreen: {
+    titleFallback: "Game Setup",
+    description:
+      "Confirm the host style, model entry, and your character concept one last time before the run formally begins.",
+    backLabel: "Back to Story Select",
+    closeLabel: "Close",
+    detailTabs: {
+      game: {
+        label: "Game Settings",
+        description: "Language, host style, display, and pace settings for this run."
+      },
+      model: {
+        label: "Model Settings",
+        description: "Model access, profile selection, and capability overview."
+      },
+      companions: {
+        label: "Companion Settings",
+        description: "AI companion entry points, content boundaries, and future extension slots."
+      }
+    },
+    fields: {
+      languageLabel: "Language",
+      languageHint: "Controls the base language of content text and interface text.",
+      difficultyLabel: "Difficulty",
+      difficultyHint: "Difficulty is not wired into real adjudication yet, so it is fixed for now.",
+      difficultyStandardPending: "Standard (Coming later)",
+      gmArchitectureLabel: "GM Architecture",
+      gmArchitectureHint: "A shared entry point for single-agent and multi-agent hosting.",
+      playModeLabel: "Play Mode",
+      playModeHint: "The current MVP keeps single, single + NPC, and multiplayer entry points visible.",
+      modelModeLabel: "Model Mode",
+      modelModeHint: "Choose whether this run stays in mock mode or goes through a real model proxy.",
+      modelProfileLabel: "Model Profile",
+      modelProfileHint: "This picker only decides which model profile this run will use.",
+      logViewLabel: "Log View",
+      logViewHint: "Adjust log detail for play or debugging.",
+      previewDeliveryLabel: "Opening Delivery",
+      previewDeliveryHint: "Streaming shows text as it arrives; complete waits for the full response first.",
+      markdownFontSizeLabel: "Markdown Font Size",
+      markdownFontSizeHint: "Controls the rendered size of AI body text, headings, and lists.",
+      debugModeLabel: "Debug Mode",
+      debugModeHint: "Currently used mainly for model and runtime debugging.",
+      debugOn: "On",
+      debugOff: "Off"
+    },
+    overview: {
+      eyebrow: "Setup Overview",
+      title: "Setup Overview",
+      gameTitle: "Game Settings",
+      gameDescription: "Manage language, hosting, and the baseline play style for this run.",
+      modelTitle: "Model Settings",
+      modelDescription: "Choose the model entry, profile, and display preferences for this run.",
+      currentRunTitle: "Current Run Overview"
+    },
+    currentRun: {
+      rule: (value: string) => `Rule: ${value}`,
+      story: (value: string) => `Story: ${value}`,
+      tags: (value: string) => `Tags: ${value}`,
+      gmStyle: (value: string) => `GM style: ${value}`,
+      noRule: "No rule selected",
+      noStory: "No story selected",
+      undecided: "TBD"
+    },
+    model: {
+      entryTitle: "Model Entry Setup",
+      capabilitiesTitle: "Model Capabilities",
+      capabilitiesDescription:
+        "This area tells you whether the current profile supports file upload, deeper reasoning, tool use, and other capabilities.",
+      noCapabilities: "There is no available model profile to show capability information for right now.",
+      summaryTitle: "Current Model Overview",
+      currentProfile: (value: string) => `Current profile: ${value}`,
+      accessMode: (value: string) => `Access: ${value}`,
+      profile: (value: string) => `Profile: ${value}`,
+      resolvedModel: (value: string) => `Actual model: ${value}`,
+      status: (value: string) => `Status: ${value}`,
+      message: (value: string) => `Notes: ${value}`,
+      supported: "Supported",
+      unsupported: "Unsupported",
+      referenceModel: (value: string) => `Reference model: ${value}`,
+      officialDocs: "Official docs",
+      noSpecificModel: "No specific model listed",
+      noExplanation: "No explanation provided",
+      notConfigured: "Not configured",
+      ready: "Ready to create a session",
+      needsConfig: "More configuration is required"
+    },
+    preview: {
+      eyebrow: "Opening Preview",
+      title: "Opening Preview",
+      regenerate: "Regenerate Opening",
+      regenerateBusy: "Generating...",
+      coverAlt: (storyTitle: string) => `${storyTitle} cover`,
+      openCoverAria: "View full image",
+      openCoverButton: "View full image",
+      fallbackStoryTitle: "No story selected",
+      generatingText: "Generating the AI opening preview...",
+      streamingText: "Receiving the opening preview as a stream...",
+      waitingText: "Waiting for the full opening preview...",
+      provider: (provider: string) => `Source: ${provider}`
+    },
+    characterSetup: {
+      eyebrow: "Character Setup",
+      title: "Who are you?",
+      description:
+        "You can write the concept yourself, or let AI generate or complete a first character draft from the opening.",
+      placeholder:
+        "Example: I am a documentary student searching for my missing sister. I am good with a camera, but I carry an unshakable sense of deja vu about the fire by the lake.",
+      generateButton: "AI Generate",
+      completeButton: "AI Complete",
+      generating: "AI is generating the character concept...",
+      completing: "AI is completing the character concept..."
+    },
+    companions: {
+      eyebrow: "Companions",
+      title: "Companion Settings",
+      description:
+        "This panel groups AI companion entry points, extension slots, and current story boundaries.",
+      entryTitle: "AI Companion Entry",
+      entryDescription:
+        "NPC companions and multiplayer private-chat views will be connected here later. Phase 2 keeps the layout and controls in place first.",
+      addTitle: "Add Companion",
+      addDescription: "Coming later: create, edit, and remove AI players.",
+      addButton: "+ Add Companion",
+      warningsTitle: "Content Warnings"
+    },
+    layout: {
+      collapsedConfigLabel: "CONFIG",
+      collapsedAllyLabel: "ALLY",
+      expandAction: "Expand",
+      detailButton: "Details",
+      collapseButton: "Collapse",
+      leftResizeAria: "Resize the left setup column",
+      rightResizeAria: "Resize the right companion column"
+    },
+    actions: {
+      startGame: "Start Game",
+      creatingSession: "Creating Session..."
+    },
+    modal: {
+      ariaLabel: "Setup details",
+      titleFallback: "Setup Details",
+      close: "Close",
+      categoryTabsAria: "Setup categories"
+    },
+    coverDialogAria: "Story cover preview",
+    closeCoverDialogAria: "Close cover preview",
+    closeImageButton: "Close image",
+    coverDialogAlt: (storyTitle: string) => `${storyTitle} full cover image`
+  },
+  gameBootstrapScreen: {
+    fallbackStoryTitle: "Preparing Session",
+    progressTitle: "Initialization Progress",
+    progressLabel: (percent: number) => `${percent}%`,
+    waitHint:
+      "Game initialization usually takes around 30 seconds. Thank you for your patience!",
+    tipLabel: "Tips While You Wait",
+    defaultLoadingHint: (storyTitle: string) =>
+      `We are opening ${storyTitle} and preparing the first narration for the live scene.`,
+    coverAlt: (storyTitle: string) => `${storyTitle} cover art`,
+    fallbackCoverTitle: "Cover Preview Unavailable",
+    fallbackCoverDescription:
+      "If this story pack provides cover.png, it will appear here automatically.",
+    tips: [
+      "Save and Load stay on the main play screen, so you can checkpoint before an important choice.",
+      "Use the NPC panel to inspect current character notes and generate portraits later.",
+      "The Details drawer keeps ending-judge JSON, replay logs, and branch graphs out of the main reading area.",
+      "Text model, image model, and image prompt defaults can all be adjusted from Settings.",
+      "If the opening tone feels off, go back to Beginning and rewrite your character concept before starting again."
+    ]
+  },
+  playthroughGraph: {
+    openingTitle: "Opening",
+    endingTitle: (round: number) => `Ending / R${round}`,
+    debriefTitle: "Debrief",
+    epilogueTitle: "Epilogue",
+    roundTitle: (round: number) => `Round ${round}`,
+    eyebrow: "Branch Backtrack Tree",
+    title: (count: number) => `Unlocked after the ending, with ${count} nodes`,
+    description: "You can drag nodes to rearrange the view now, and the links will update in real time.",
+    expandAriaLabel: "Expand the branch backtrack tree",
+    collapseAriaLabel: "Collapse the branch backtrack tree",
+    expandButton: "Expand",
+    collapseButton: "Collapse",
+    legendMainline: "Mainline / Brown Red",
+    legendBranch: "Branch / Teal Green",
+    legendAfterEnding: "After Ending / Purple",
+    noExtraSummary: "No additional summary is available for this node.",
+    currentNode: "Current node",
+    endingLeaf: "Ending leaf",
+    resumeBusy: "Resuming...",
+    continueFromHere: "Continue from here"
   }
 } as const satisfies UiText;

@@ -1,7 +1,7 @@
 export const zhCn = {
   appName: "AI TRPG 3.0",
   screenHeader: {
-    defaultBackLabel: "返回主菜单",
+    defaultBackLabel: "返回",
     defaultCloseLabel: "关闭"
   },
   common: {
@@ -10,7 +10,7 @@ export const zhCn = {
     backToMenu: "返回主菜单",
     close: "关闭",
     save: "保存",
-    load: "读档",
+    load: "读取",
     open: "打开",
     delete: "删除",
     details: "详情",
@@ -22,14 +22,14 @@ export const zhCn = {
     creating: "创建中...",
     clear: "清空",
     provider: "来源",
-    prompt: "Prompt"
+    prompt: "提示词"
   },
   options: {
     playModes: [
       {
         value: "single_player",
         label: "单人模式",
-        description: "由你一个人推进剧情，适合最轻量的体验。"
+        description: "由你一个人推进剧情，适合最轻量的游玩体验。"
       },
       {
         value: "single_player_with_npc",
@@ -39,7 +39,7 @@ export const zhCn = {
       {
         value: "multiplayer",
         label: "多人模式",
-        description: "为后续联机流程预留，当前仍以单机路径为主。"
+        description: "为后续联机流程预留入口，当前 MVP 仍以本地体验为主。"
       }
     ],
     gmArchitectures: [
@@ -63,12 +63,12 @@ export const zhCn = {
       {
         value: "compact",
         label: "精简日志",
-        description: "只保留关键信息，适合正常游玩。"
+        description: "只保留关键信息，更适合正常游玩。"
       },
       {
         value: "hidden",
         label: "隐藏日志",
-        description: "将日志区收敛为最低打扰。"
+        description: "尽量减少日志区域对主界面的打扰。"
       }
     ],
     markdownFontSizes: [
@@ -85,12 +85,12 @@ export const zhCn = {
       {
         value: "xlarge",
         label: "大字（20px）",
-        description: "适合更重视可读性的阅读体验。"
+        description: "更强调可读性与标题层级。"
       },
       {
         value: "xxlarge",
         label: "超大（22px）",
-        description: "适合远距离观看或高缩放场景。"
+        description: "适合高缩放或远距离查看。"
       }
     ],
     menuFontSizes: [
@@ -102,17 +102,17 @@ export const zhCn = {
       {
         value: "large",
         label: "偏大（110%）",
-        description: "让菜单按钮、标题和说明字更易读。"
+        description: "让按钮、标题和说明更易读。"
       },
       {
         value: "xlarge",
         label: "大字（120%）",
-        description: "适合偏好更明显字号层级的界面阅读。"
+        description: "适合更强调菜单可读性的界面。"
       },
       {
         value: "xxlarge",
         label: "超大（130%）",
-        description: "适合远距离观看或高分辨率大屏。"
+        description: "适合大屏或较远距离观看。"
       }
     ],
     openingPreviewDelivery: [
@@ -124,7 +124,7 @@ export const zhCn = {
       {
         value: "complete",
         label: "完整传输",
-        description: "等待全文完成后再一次性渲染。"
+        description: "等待全文完成后再一次性显示。"
       }
     ],
     imageTriggers: [
@@ -161,6 +161,9 @@ export const zhCn = {
       startGameFirst: "请先开始一局游戏。",
       enterAction: "请输入本轮行动。",
       quickEndingMockOnly: "快速结局测试仅在 mock 模式下可用。",
+      quickEndingTestPending: "正在运行 mock 结局测试...",
+      quickEndingTestSuccess: "Mock 结局测试已提交。",
+      quickEndingTestEnded: "Mock 结局测试成功，当前会话已进入结局。",
       noActiveSessionToSave: "当前没有可保存的活动会话。",
       creatingLocalSave: "正在创建本地存档...",
       localSaveCreated: "本地存档已创建。",
@@ -180,7 +183,8 @@ export const zhCn = {
       recentSaveDeleted: "最近存档已删除。",
       saveDeleted: "该存档已删除。",
       closeTabManually: "如果页面仍保持打开，请手动关闭浏览器标签页。",
-      waitOpeningPreviewBeforeAssist: "请先等开场预览生成完成，再使用角色设定 AI 辅助。",
+      waitOpeningPreviewBeforeAssist:
+        "请先等待开场预览生成完成，再使用角色概念 AI 辅助。",
       aiDraftingCharacterConcept: "AI 正在生成角色设定草稿...",
       aiCompletingCharacterConcept: "AI 正在补全当前角色设定...",
       aiDraftedCharacterConcept: "AI 已生成一版角色设定草稿，你可以继续修改。",
@@ -191,7 +195,7 @@ export const zhCn = {
     bootstrapStages: {
       entered_game: {
         label: "进入游戏界面",
-        detail: "已切换到核心游玩界面，正在准备正式会话。",
+        detail: "已经切换到核心游玩界面，正在准备正式会话。",
         progress: 0.08
       },
       loading_content: {
@@ -206,7 +210,7 @@ export const zhCn = {
       },
       requesting_narrator: {
         label: "请求 Narrator Agent",
-        detail: "正在把开场材料发送给模型，并准备第一段叙事。",
+        detail: "正在把开场材料发给模型，并准备第一段叙事。",
         progress: 0.64
       },
       waiting_first_reply: {
@@ -216,10 +220,16 @@ export const zhCn = {
       },
       finalizing_session: {
         label: "写入会话快照",
-        detail: "正在把首条叙事和本局设置写入正式会话。",
+        detail: "正在把首条叙事和当前设置写入正式会话。",
         progress: 0.96
       }
-    }
+    },
+    pendingSessionSystemMessage: (storyTitle: string, locale: string) =>
+      `正在为《${storyTitle}》创建会话（${locale}）。`,
+    pendingSessionReplaySummary: "会话初始化已启动",
+    pendingPlayerName: "玩家",
+    pendingNarratorName: "旁白",
+    quickEndingTestInput: "我强制触发一个立即发生的 mock 结局，并立刻 escape。"
   },
   mainMenu: {
     eyebrow: "主菜单",
@@ -257,6 +267,7 @@ export const zhCn = {
       modelAccessMode: (value: string) => `模型模式：${value}`,
       modelProfile: (value: string) => `模型档案：${value}`
     },
+    uiLanguageAriaLabel: "选择界面语言",
     splitterAriaLabel: "拖拽调整主菜单左右宽度"
   },
   continueScreen: {
@@ -279,7 +290,8 @@ export const zhCn = {
   },
   exitScreen: {
     title: "退出",
-    description: "网页版无法稳定直接退出程序，所以这里先提供退出前的整理操作。",
+    description:
+      "网页版本无法稳定直接退出程序，所以这里先提供退出前的整理操作。",
     noteTitle: "退出说明",
     noteBody:
       "如果只是想离开当前界面，可以返回主菜单；如果想结束当前网页，请关闭浏览器标签页。",
@@ -292,7 +304,7 @@ export const zhCn = {
   recordsScreen: {
     title: "记录",
     description: "这里后续会放正式的战绩、结局记录和统计内容。",
-    empty: "待开发"
+    empty: "暂时还没有可展示的记录。"
   },
   gameScreen: {
     emptyTitle: "游戏中",
@@ -321,12 +333,12 @@ export const zhCn = {
     yourAction: "你的行动",
     actionTitle: "输入这一轮的行动或对话",
     inputLocked: "场景尚未准备完成，暂时不能输入。",
-    submitTurnHint: "提交本轮行动。",
+    submitTurnHint: "输入后提交本轮行动。",
     initPlaceholder: "会话正在初始化，正式开场完成后即可行动。",
-    actionPlaceholder: "例如：我先查看门后的痕迹，再追问为什么会在这个时间出现。",
+    actionPlaceholder: "例如：我先检查门后的痕迹，再追问为什么会在这个时间出现在这里。",
     submitTurn: "提交本轮行动",
-    saveLoadEyebrow: "保存 / 读档",
-    loadSaveTitle: "读档",
+    saveLoadEyebrow: "保存 / 读取",
+    loadSaveTitle: "读取存档",
     saveLoadDescription: "保存和读档保留在核心游玩界面的一级入口。",
     saveOpen: "打开",
     savedAt: (value: string) => `存档时间：${value}`,
@@ -336,13 +348,15 @@ export const zhCn = {
     npcDescription: "在这里查看 NPC 设定、当前立绘和生成结果。",
     loadingNpcFiles: "正在加载 NPC 文件...",
     noNpcFiles: "这个剧本暂时没有可读取的 NPC 档案。",
+    missingNpcContentInfo: "这个存档缺少内容目录信息，因此无法加载 NPC 档案。",
     npcSelectHint: "请先从左侧选择一位 NPC。",
     generatePortrait: "生成立绘",
     generatingPortrait: "生成中...",
     noPortraitYet: "这个 NPC 暂时还没有立绘。",
     detailsEyebrow: "详情",
     detailsTitle: "会话详情",
-    detailsDescription: "非核心信息放在这里，包括结局判定、回放日志、分支图与调试信息。",
+    detailsDescription:
+      "非核心信息放在这里，包括结局判定、回放日志、分支图与调试信息。",
     sessionInfo: "会话信息",
     sessionId: (value: string) => `Session ID：${value}`,
     content: (ruleTitle: string, storyTitle: string) => `内容：${ruleTitle} / ${storyTitle}`,
@@ -405,6 +419,232 @@ export const zhCn = {
     characterJoinSeparator: "角色连接符",
     saveSettings: "保存设置",
     resetDefaults: "恢复默认"
+  },
+  storySelectScreen: {
+    title: "开始游戏",
+    description: "先从规则和剧本里挑出这一局的舞台。左侧选规则，中间挑故事，右侧确认氛围与信息。",
+    backLabel: "返回主菜单",
+    closeLabel: "关闭",
+    collapsedRuleLabel: "规则",
+    collapsedStoryLabel: "剧本",
+    expandAction: "展开",
+    collapseAction: "收起",
+    ruleEyebrow: "规则",
+    ruleListTitle: "规则列表",
+    storyEyebrow: "剧本",
+    storyListTitle: "剧本列表",
+    storyPreviewEyebrow: "剧本预览",
+    splitterRuleStoryAria: "调整规则栏和剧本栏宽度",
+    splitterStoryDetailAria: "调整剧本栏和详情栏宽度",
+    playerCountSingle: (count: number) => `${count} 人`,
+    playerCountRange: (min: number, max: number) => `${min}-${max} 人`,
+    defaultRuleIntro:
+      "这条规则暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你可以继续选择剧本并进入设置页，后续也可以再补完整的规则简介。",
+    defaultStoryIntro:
+      "这个剧本暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你仍然可以进入游戏，后续再补完整简介和演出文本。",
+    defaultCoverCopy:
+      "当前剧本暂时没有提供 `cover.png`，这里先使用默认封面区。后续只要在剧本目录放入 `cover.png`、`cover.jpg` 或 `cover.webp`，这里就会自动读取。",
+    defaultCoverQuote:
+      "当前剧本还没有单独提供封面短句，所以这里先回退到剧本简介摘要。",
+    coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
+    openCoverAria: "查看大图",
+    closeCoverAria: "收起大图",
+    openCoverButton: "查看大图",
+    storyIntroLabel: "剧本简介",
+    ruleIntroLabel: "规则简介",
+    tagsLabel: "标签",
+    pacingLengthLabel: "节奏与时长",
+    contentWarnings: (value: string) => `内容警告：${value}`,
+    startAdventure: "开始冒险",
+    empty: "还没有可用的规则与剧本，请先检查内容包是否已经加载成功。",
+    coverDialogAria: "剧本封面大图预览",
+    closeCoverDialogAria: "关闭大图预览",
+    closeImageButton: "收起图片",
+    coverDialogAlt: (storyTitle: string) => `${storyTitle} 封面大图`
+  },
+  gameSetupScreen: {
+    titleFallback: "游戏设置",
+    description: "最后确认这一局的主持方式、模型入口和角色概念，然后再真正开局。",
+    backLabel: "返回选剧本",
+    closeLabel: "关闭",
+    detailTabs: {
+      game: {
+        label: "游戏设置",
+        description: "语言、主持方式、显示和游玩节奏相关配置。"
+      },
+      model: {
+        label: "模型设置",
+        description: "模型入口、档案与当前能力概览。"
+      },
+      companions: {
+        label: "同行者设置",
+        description: "AI 同伴入口、内容边界与后续扩展位。"
+      }
+    },
+    fields: {
+      languageLabel: "语言",
+      languageHint: "控制内容文本和界面的基础语言。",
+      difficultyLabel: "难度",
+      difficultyHint: "难度还没接入真实裁定，当前先固定为标准。",
+      difficultyStandardPending: "标准（待开发）",
+      gmArchitectureLabel: "主持架构",
+      gmArchitectureHint: "为单 Agent / 多 Agent 主持预留统一入口。",
+      playModeLabel: "游戏模式",
+      playModeHint: "当前 MVP 先保留单人、单人 + NPC 和多人入口。",
+      modelModeLabel: "模型模式",
+      modelModeHint: "决定这局是纯 mock，还是通过代理接入真实模型。",
+      modelProfileLabel: "模型档案",
+      modelProfileHint: "这里只负责选择本局要使用的模型档案。",
+      logViewLabel: "日志显示",
+      logViewHint: "控制日志区域的细粒度，方便游玩或排查。",
+      previewDeliveryLabel: "开场传输",
+      previewDeliveryHint: "流式会边生成边显示；完整传输会等待全文完成后再显示。",
+      markdownFontSizeLabel: "Markdown 字号",
+      markdownFontSizeHint: "控制 AI 正文、标题和列表的渲染大小。",
+      debugModeLabel: "调试模式",
+      debugModeHint: "当前主要用于调试模型与运行时日志。",
+      debugOn: "开启",
+      debugOff: "关闭"
+    },
+    overview: {
+      eyebrow: "设置概览",
+      title: "设置概览",
+      gameTitle: "游戏设置",
+      gameDescription: "管理语言、主持架构和本局的基础游玩方式。",
+      modelTitle: "模型设置",
+      modelDescription: "选择本局使用的模型入口、档案以及显示偏好。",
+      currentRunTitle: "当前局面概览"
+    },
+    currentRun: {
+      rule: (value: string) => `规则：${value}`,
+      story: (value: string) => `剧本：${value}`,
+      tags: (value: string) => `标签：${value}`,
+      gmStyle: (value: string) => `主持风格：${value}`,
+      noRule: "未选择规则",
+      noStory: "未选择剧本",
+      undecided: "待定"
+    },
+    model: {
+      entryTitle: "模型入口设置",
+      capabilitiesTitle: "模型能力",
+      capabilitiesDescription: "这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。",
+      noCapabilities: "当前没有可用模型档案，暂时无法显示能力信息。",
+      summaryTitle: "当前模型概览",
+      currentProfile: (value: string) => `当前档案：${value}`,
+      accessMode: (value: string) => `入口：${value}`,
+      profile: (value: string) => `档案：${value}`,
+      resolvedModel: (value: string) => `实际模型：${value}`,
+      status: (value: string) => `状态：${value}`,
+      message: (value: string) => `说明：${value}`,
+      supported: "支持",
+      unsupported: "不支持",
+      referenceModel: (value: string) => `参考模型：${value}`,
+      officialDocs: "官方说明",
+      noSpecificModel: "未标注具体模型",
+      noExplanation: "未提供说明",
+      notConfigured: "未配置",
+      ready: "可创建会话",
+      needsConfig: "还需补全配置"
+    },
+    preview: {
+      eyebrow: "开场预览",
+      title: "开场预览",
+      regenerate: "重新生成开场白",
+      regenerateBusy: "生成中...",
+      coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
+      openCoverAria: "查看大图",
+      openCoverButton: "查看大图",
+      fallbackStoryTitle: "未选择剧本",
+      generatingText: "正在生成 AI 开场预览...",
+      streamingText: "正在流式接收开场预览...",
+      waitingText: "正在等待完整开场预览...",
+      provider: (provider: string) => `来源：${provider}`
+    },
+    characterSetup: {
+      eyebrow: "角色设定",
+      title: "你是谁？",
+      description: "可以先自己写，也可以基于开场白让 AI 生成或补全一版角色概念。",
+      placeholder: "例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。",
+      generateButton: "AI 生成",
+      completeButton: "AI 补全",
+      generating: "AI 正在生成角色概念...",
+      completing: "AI 正在补全角色概念..."
+    },
+    companions: {
+      eyebrow: "同行者",
+      title: "同行者设置",
+      description: "这里集中显示 AI 同伴入口、扩展位和当前剧本的内容边界。",
+      entryTitle: "AI 同伴入口",
+      entryDescription: "这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。",
+      addTitle: "添加同伴",
+      addDescription: "待开发：支持创建、编辑和删除 AI 玩家。",
+      addButton: "+ 添加同伴",
+      warningsTitle: "内容警告"
+    },
+    layout: {
+      collapsedConfigLabel: "配置",
+      collapsedAllyLabel: "同行者",
+      expandAction: "展开",
+      detailButton: "详情",
+      collapseButton: "收起",
+      leftResizeAria: "调整左侧配置栏宽度",
+      rightResizeAria: "调整右侧同行者栏宽度"
+    },
+    actions: {
+      startGame: "开始游戏",
+      creatingSession: "正在创建会话..."
+    },
+    modal: {
+      ariaLabel: "设置详情",
+      titleFallback: "设置详情",
+      close: "关闭",
+      categoryTabsAria: "设置分类"
+    },
+    coverDialogAria: "剧本封面大图预览",
+    closeCoverDialogAria: "关闭大图预览",
+    closeImageButton: "收起图片",
+    coverDialogAlt: (storyTitle: string) => `${storyTitle} 封面大图`
+  },
+  gameBootstrapScreen: {
+    fallbackStoryTitle: "正在准备会话",
+    progressTitle: "初始化进度",
+    progressLabel: (percent: number) => `${percent}%`,
+    waitHint: "游戏初始化通常需要等待30s左右，感谢您的耐心等待！",
+    tipLabel: "游玩小贴士",
+    defaultLoadingHint: (storyTitle: string) =>
+      `正在载入《${storyTitle}》并准备第一段正式叙事。`,
+    coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
+    fallbackCoverTitle: "暂无封面预览",
+    fallbackCoverDescription: "如果这个剧本包提供了 cover.png，这里会自动显示。",
+    tips: [
+      "保存和读档保留在主界面一级入口，重要选择前可以随时留档。",
+      "NPC 面板里可以查看角色档案，后续也会在这里接入立绘生成。",
+      "详情面板集中放结局判定、回放日志和分支图，不会打扰主游玩视线。",
+      "设置页可以统一调整文本模型、图像模型和文生图模板。",
+      "如果开场气质不对，可以回到 beginning 重写角色设定后重新开始。"
+    ]
+  },
+  playthroughGraph: {
+    openingTitle: "开场",
+    endingTitle: (round: number) => `结局 / R${round}`,
+    debriefTitle: "复盘",
+    epilogueTitle: "后日谈",
+    roundTitle: (round: number) => `回合 ${round}`,
+    eyebrow: "分支回溯树",
+    title: (count: number) => `已在结局后解锁，共 ${count} 个节点`,
+    description: "现在可以直接拖动节点重排视图，连线会实时跟随更新。",
+    expandAriaLabel: "放大分支回溯树",
+    collapseAriaLabel: "收起分支回溯树",
+    expandButton: "放大",
+    collapseButton: "收起",
+    legendMainline: "主线 / 棕红",
+    legendBranch: "分支 / 青绿",
+    legendAfterEnding: "结局后 / 紫色",
+    noExtraSummary: "该节点暂无额外摘要。",
+    currentNode: "当前节点",
+    endingLeaf: "结局叶节点",
+    resumeBusy: "恢复中...",
+    continueFromHere: "从此继续"
   }
 } as const;
 

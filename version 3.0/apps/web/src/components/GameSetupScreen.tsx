@@ -17,17 +17,18 @@ import {
   buildPreviewLines,
   clipText,
   formatAiGenerationMeta,
-  GM_ARCHITECTURE_OPTIONS,
-  LOG_VIEW_OPTIONS,
-  MARKDOWN_FONT_SIZE_OPTIONS,
-  PLAY_MODE_OPTIONS,
+  getGmArchitectureOptions,
+  getLogViewOptions,
+  getMarkdownFontSizeOptions,
+  getPlayModeOptions,
   renderJoinedList,
   type MarkdownFontSizePreset
 } from "../ui.ts";
 import {
-  OPENING_PREVIEW_DELIVERY_OPTIONS,
+  getOpeningPreviewDeliveryOptions,
   type OpeningPreviewDeliveryMode
 } from "../openingPreviewPreferences.ts";
+import { useUiText } from "../locales/index.tsx";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
@@ -246,6 +247,13 @@ function SettingField(props: {
 }
 
 export function GameSetupScreen(props: GameSetupScreenProps) {
+  const text = useUiText();
+  const setupText = text.gameSetupScreen;
+  const playModeOptions = getPlayModeOptions(text);
+  const gmArchitectureOptions = getGmArchitectureOptions(text);
+  const logViewOptions = getLogViewOptions(text);
+  const markdownFontSizeOptions = getMarkdownFontSizeOptions(text);
+  const openingPreviewDeliveryOptions = getOpeningPreviewDeliveryOptions(text);
   const {
     bootstrap,
     ruleDirectoryName,
@@ -432,26 +440,33 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
   const previewLines = buildPreviewLines(
     selectedStory?.intro ?? selectedRule?.ruleIntro ?? null,
-    5
+    5,
+    text
   );
   const hasPreviewText = openingPreviewText.trim().length > 0;
   const previewMarkdownContent =
     hasPreviewText ? openingPreviewText : previewLines.join("\n\n");
   const openingPreviewMetaLine =
     showAiMetadata && !openingPreviewLoading
-      ? formatAiGenerationMeta(openingPreviewMeta) ||
-        (openingPreviewProvider ? `来源：${openingPreviewProvider}` : "")
+      ? formatAiGenerationMeta(openingPreviewMeta, text) ||
+        (openingPreviewProvider ? setupText.preview.provider(openingPreviewProvider) : "")
       : "";
   const previewHeadline =
     selectedStory?.coverQuote?.trim() ||
-    clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120);
+    clipText(selectedStory?.intro ?? selectedRule?.ruleIntro, 120, text);
   const resolvedModelName =
-    runtimeModelConfig.model?.trim() || selectedProfile?.baseModel || "未配置";
+    runtimeModelConfig.model?.trim() ||
+    selectedProfile?.baseModel ||
+    setupText.model.notConfigured;
   const trimmedCharacterConcept = characterConcept.trim();
   const characterAssistButtonLabel =
-    trimmedCharacterConcept.length > 0 ? "AI 补全" : "AI 生成";
+    trimmedCharacterConcept.length > 0
+      ? setupText.characterSetup.completeButton
+      : setupText.characterSetup.generateButton;
   const characterAssistBusyLabel =
-    characterConceptAssistMode === "complete" ? "AI 补全中..." : "AI 生成中...";
+    characterConceptAssistMode === "complete"
+      ? setupText.characterSetup.completing
+      : setupText.characterSetup.generating;
   const canAssistCharacterConcept =
     !characterConceptAssistLoading &&
     !isCreating &&
@@ -476,18 +491,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }> = [
     {
       value: "game",
-      label: "游戏设置",
-      description: "语言、主持方式、显示和游玩节奏相关配置。"
+      label: setupText.detailTabs.game.label,
+      description: setupText.detailTabs.game.description
     },
     {
       value: "model",
-      label: "模型设置",
-      description: "模型入口、档案与当前能力概览。"
+      label: setupText.detailTabs.model.label,
+      description: setupText.detailTabs.model.description
     },
     {
       value: "companions",
-      label: "同行者设置",
-      description: "AI 同伴入口、内容边界与后续扩展位。"
+      label: setupText.detailTabs.companions.label,
+      description: setupText.detailTabs.companions.description
     }
   ];
 
@@ -497,7 +512,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
     return (
       <div className={containerClassName}>
-        <SettingField label="语言" hint="控制内容文本和界面的基础语言。">
+        <SettingField
+          label={setupText.fields.languageLabel}
+          hint={setupText.fields.languageHint}
+        >
           <select
             value={locale}
             onChange={(event) =>
@@ -512,15 +530,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           </select>
         </SettingField>
 
-        <SettingField label="难度" hint="难度还没接入真实裁定，当前先固定为标准。">
+        <SettingField
+          label={setupText.fields.difficultyLabel}
+          hint={setupText.fields.difficultyHint}
+        >
           <select disabled value="normal">
-            <option value="normal">标准（待开发）</option>
+            <option value="normal">{setupText.fields.difficultyStandardPending}</option>
           </select>
         </SettingField>
 
         <SettingField
-          label="主持架构"
-          hint="为单 Agent / 多 Agent 主持预留统一入口。"
+          label={setupText.fields.gmArchitectureLabel}
+          hint={setupText.fields.gmArchitectureHint}
         >
           <select
             value={gmArchitecture}
@@ -530,7 +551,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )
             }
           >
-            {GM_ARCHITECTURE_OPTIONS.map((item) => (
+            {gmArchitectureOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -539,8 +560,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="游戏模式"
-          hint="当前 MVP 先保留单人、单人 + NPC 和多人入口。"
+          label={setupText.fields.playModeLabel}
+          hint={setupText.fields.playModeHint}
         >
           <select
             value={playMode}
@@ -548,7 +569,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               onPlayModeChange(event.target.value as CreateSessionRequest["playMode"])
             }
           >
-            {PLAY_MODE_OPTIONS.map((item) => (
+            {playModeOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -566,8 +587,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     return (
       <div className={containerClassName}>
         <SettingField
-          label="模型模式"
-          hint="决定这局是纯 mock，还是通过代理接入真实模型。"
+          label={setupText.fields.modelModeLabel}
+          hint={setupText.fields.modelModeHint}
         >
           <select
             value={modelAccessMode}
@@ -586,8 +607,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="模型档案"
-          hint="这里只负责选择本局要使用的模型档案。"
+          label={setupText.fields.modelProfileLabel}
+          hint={setupText.fields.modelProfileHint}
         >
           <select
             value={selectedProfile?.id ?? modelProfileId}
@@ -602,8 +623,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="日志显示"
-          hint="控制日志区域的细粒度，方便游玩或排查。"
+          label={setupText.fields.logViewLabel}
+          hint={setupText.fields.logViewHint}
         >
           <select
             value={logViewMode}
@@ -613,7 +634,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )
             }
           >
-            {LOG_VIEW_OPTIONS.map((item) => (
+            {logViewOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -622,8 +643,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="开场传输"
-          hint="流式会边生成边显示；完整传输会等待全文完成后再显示。"
+          label={setupText.fields.previewDeliveryLabel}
+          hint={setupText.fields.previewDeliveryHint}
         >
           <select
             value={openingPreviewDeliveryMode}
@@ -633,7 +654,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )
             }
           >
-            {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
+            {openingPreviewDeliveryOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -642,8 +663,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="Markdown 字号"
-          hint="控制 AI 正文、标题和列表的渲染大小。"
+          label={setupText.fields.markdownFontSizeLabel}
+          hint={setupText.fields.markdownFontSizeHint}
         >
           <select
             value={markdownFontSize}
@@ -653,7 +674,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )
             }
           >
-            {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
+            {markdownFontSizeOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -662,8 +683,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </SettingField>
 
         <SettingField
-          label="调试模式"
-          hint="当前主要用于调试模型与运行时日志。"
+          label={setupText.fields.debugModeLabel}
+          hint={setupText.fields.debugModeHint}
         >
           <label className="toggle-row">
             <input
@@ -671,7 +692,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               type="checkbox"
               onChange={(event) => onDebugEnabledChange(event.target.checked)}
             />
-            <span>{debugEnabled ? "开启" : "关闭"}</span>
+            <span>{debugEnabled ? setupText.fields.debugOn : setupText.fields.debugOff}</span>
           </label>
         </SettingField>
       </div>
@@ -682,25 +703,26 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     return (
       <div className={gridClassName ?? "companion-list"}>
         <div className="companion-card">
-          <div className="selection-card-title">AI 同伴入口</div>
+          <div className="selection-card-title">{setupText.companions.entryTitle}</div>
           <div className="summary-text">
-            这里会在后续接入 NPC 同伴与多玩家私聊视图。当前 Phase 2 先保留页面结构和操作位置。
+            {setupText.companions.entryDescription}
           </div>
         </div>
 
         <div className="companion-card">
-          <div className="selection-card-title">添加同伴</div>
-          <div className="summary-text">待开发：支持创建、编辑和删除 AI 玩家。</div>
+          <div className="selection-card-title">{setupText.companions.addTitle}</div>
+          <div className="summary-text">{setupText.companions.addDescription}</div>
           <button className="ghost-button" disabled type="button">
-            + 添加同伴
+            {setupText.companions.addButton}
           </button>
         </div>
 
         <div className="companion-card">
-          <div className="selection-card-title">内容警告</div>
+          <div className="selection-card-title">{setupText.companions.warningsTitle}</div>
           <div className="summary-text">
             {renderJoinedList(
-              selectedStory?.contentWarnings ?? selectedRule?.contentWarnings ?? []
+              selectedStory?.contentWarnings ?? selectedRule?.contentWarnings ?? [],
+              text
             )}
           </div>
         </div>
@@ -714,21 +736,21 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <div className="settings-model-grid">
           <article className="summary-card settings-model-card">
             <div className="setup-section-heading">
-              <div className="eyebrow">Game</div>
-              <div className="summary-title">基础游戏设置</div>
+              <div className="eyebrow">{setupText.detailTabs.game.label}</div>
+              <div className="summary-title">{setupText.overview.gameTitle}</div>
             </div>
             {renderGameSettingsFields("detail")}
           </article>
 
           <article className="summary-card settings-model-card">
             <div className="setup-section-heading">
-              <div className="eyebrow">Display</div>
-              <div className="summary-title">显示与调试</div>
+              <div className="eyebrow">{setupText.fields.logViewLabel}</div>
+              <div className="summary-title">{setupText.fields.logViewLabel}</div>
             </div>
             <div className="setup-detail-fields-grid">
               <SettingField
-                label="日志显示"
-                hint="控制日志区域的细粒度，方便游玩或排查。"
+                label={setupText.fields.logViewLabel}
+                hint={setupText.fields.logViewHint}
               >
                 <select
                   value={logViewMode}
@@ -738,7 +760,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     )
                   }
                 >
-                  {LOG_VIEW_OPTIONS.map((item) => (
+                  {logViewOptions.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -747,8 +769,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               </SettingField>
 
               <SettingField
-                label="开场传输"
-                hint="流式会边生成边显示；完整传输会等待全文完成后再显示。"
+                label={setupText.fields.previewDeliveryLabel}
+                hint={setupText.fields.previewDeliveryHint}
               >
                 <select
                   value={openingPreviewDeliveryMode}
@@ -758,7 +780,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     )
                   }
                 >
-                  {OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => (
+                  {openingPreviewDeliveryOptions.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -767,8 +789,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               </SettingField>
 
               <SettingField
-                label="Markdown 字号"
-                hint="控制 AI 正文、标题和列表的渲染大小。"
+                label={setupText.fields.markdownFontSizeLabel}
+                hint={setupText.fields.markdownFontSizeHint}
               >
                 <select
                   value={markdownFontSize}
@@ -778,7 +800,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     )
                   }
                 >
-                  {MARKDOWN_FONT_SIZE_OPTIONS.map((item) => (
+                  {markdownFontSizeOptions.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -787,8 +809,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               </SettingField>
 
               <SettingField
-                label="调试模式"
-                hint="当前主要用于调试模型与运行时日志。"
+                label={setupText.fields.debugModeLabel}
+                hint={setupText.fields.debugModeHint}
               >
                 <label className="toggle-row">
                   <input
@@ -796,7 +818,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     type="checkbox"
                     onChange={(event) => onDebugEnabledChange(event.target.checked)}
                   />
-                  <span>{debugEnabled ? "开启" : "关闭"}</span>
+                  <span>{debugEnabled ? setupText.fields.debugOn : setupText.fields.debugOff}</span>
                 </label>
               </SettingField>
             </div>
@@ -806,22 +828,24 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <article className="summary-card settings-model-entry">
           <div className="settings-model-entry-head">
             <div>
-              <div className="eyebrow">Current Run</div>
-              <div className="summary-title">当前局面概览</div>
+              <div className="eyebrow">{setupText.overview.currentRunTitle}</div>
+              <div className="summary-title">{setupText.overview.currentRunTitle}</div>
             </div>
           </div>
           <div className="settings-model-entry-grid">
             <div className="summary-text">
-              规则：{selectedRule?.ruleTitle ?? "未选择规则"}
+              {setupText.currentRun.rule(selectedRule?.ruleTitle ?? setupText.currentRun.noRule)}
             </div>
             <div className="summary-text">
-              剧本：{selectedStory?.title ?? "未选择剧本"}
+              {setupText.currentRun.story(selectedStory?.title ?? setupText.currentRun.noStory)}
             </div>
             <div className="summary-text">
-              标签：{renderJoinedList(selectedStory?.tags ?? [])}
+              {setupText.currentRun.tags(renderJoinedList(selectedStory?.tags ?? [], text))}
             </div>
             <div className="summary-text">
-              主持风格：{selectedStory?.gmStyle ?? "待定"}
+              {setupText.currentRun.gmStyle(
+                selectedStory?.gmStyle ?? setupText.currentRun.undecided
+              )}
             </div>
           </div>
         </article>
@@ -835,8 +859,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <div className="settings-model-grid">
           <article className="summary-card settings-model-card">
             <div className="setup-section-heading">
-              <div className="eyebrow">Model</div>
-              <div className="summary-title">模型入口设置</div>
+              <div className="eyebrow">{setupText.detailTabs.model.label}</div>
+              <div className="summary-title">{setupText.model.entryTitle}</div>
             </div>
             {renderModelSettingsFields("detail")}
           </article>
@@ -844,10 +868,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           {selectedProfile ? (
             <article className="summary-card settings-model-card">
               <div className="setup-section-heading">
-                <div className="eyebrow">Capabilities</div>
-                <div className="summary-title">模型能力</div>
+                <div className="eyebrow">{setupText.model.capabilitiesTitle}</div>
+                <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
                 <div className="summary-text">
-                  这里会告诉你当前模型档案是否支持文件上传、深度思考、工具调用等能力。
+                  {setupText.model.capabilitiesDescription}
                 </div>
               </div>
               <div className="model-capability-list">
@@ -863,16 +887,20 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     <div className="model-capability-row">
                       <span className="model-capability-label">{feature.label}</span>
                       <span className="model-capability-state">
-                        {feature.supported ? "支持" : "不支持"}
+                        {feature.supported
+                          ? setupText.model.supported
+                          : setupText.model.unsupported}
                       </span>
                     </div>
                     <div className="model-capability-meta">
-                      {feature.model ? `参考模型：${feature.model}` : "未标注具体模型"}
+                      {feature.model
+                        ? setupText.model.referenceModel(feature.model)
+                        : setupText.model.noSpecificModel}
                       {feature.url ? (
                         <>
                           {" · "}
                           <a href={feature.url} rel="noreferrer" target="_blank">
-                            官方说明
+                            {setupText.model.officialDocs}
                           </a>
                         </>
                       ) : null}
@@ -884,10 +912,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           ) : (
             <article className="summary-card settings-model-card">
               <div className="setup-section-heading">
-                <div className="eyebrow">Capabilities</div>
-                <div className="summary-title">模型能力</div>
+                <div className="eyebrow">{setupText.model.capabilitiesTitle}</div>
+                <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
               </div>
-              <div className="summary-text">当前没有可用模型档案，暂时无法显示能力信息。</div>
+              <div className="summary-text">{setupText.model.noCapabilities}</div>
             </article>
           )}
         </div>
@@ -895,23 +923,29 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <article className="summary-card settings-model-entry">
           <div className="settings-model-entry-head">
             <div>
-              <div className="eyebrow">Summary</div>
-              <div className="summary-title">当前模型概览</div>
+              <div className="eyebrow">{setupText.model.summaryTitle}</div>
+              <div className="summary-title">{setupText.model.summaryTitle}</div>
             </div>
           </div>
           <div className="settings-model-entry-grid">
             <div className="summary-text">
-              入口：{selectedModelMode?.label ?? "未配置"}
+              {setupText.model.accessMode(
+                selectedModelMode?.label ?? setupText.model.notConfigured
+              )}
             </div>
             <div className="summary-text">
-              档案：{selectedProfile?.name ?? "未配置"}
+              {setupText.model.profile(selectedProfile?.name ?? setupText.model.notConfigured)}
             </div>
-            <div className="summary-text">实际模型：{resolvedModelName}</div>
+            <div className="summary-text">{setupText.model.resolvedModel(resolvedModelName)}</div>
             <div className="summary-text">
-              状态：{profileReady ? "可创建会话" : "还需补全配置"}
+              {setupText.model.status(
+                profileReady ? setupText.model.ready : setupText.model.needsConfig
+              )}
             </div>
             <div className="summary-text">
-              说明：{selectedProfile?.message ?? "未提供说明"}
+              {setupText.model.message(
+                selectedProfile?.message ?? setupText.model.noExplanation
+              )}
             </div>
           </div>
         </article>
@@ -925,12 +959,12 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <article className="summary-card settings-model-entry">
           <div className="settings-model-entry-head">
             <div>
-              <div className="eyebrow">Companions</div>
-              <div className="summary-title">同行者设置</div>
+              <div className="eyebrow">{setupText.companions.eyebrow}</div>
+              <div className="summary-title">{setupText.companions.title}</div>
             </div>
           </div>
           <div className="summary-text">
-            这里集中展示同伴入口、扩展位和当前剧本的内容边界，后续多人玩法也会从这里展开。
+            {setupText.companions.description}
           </div>
         </article>
 
@@ -954,12 +988,12 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   return (
     <section className="panel page-panel setup-page-panel">
       <ScreenHeader
-        title={selectedStory?.title ?? "游戏设置"}
-        description="最后确认这一局的主持方式、模型入口和角色概念，然后再真正开局。"
+        title={selectedStory?.title ?? setupText.titleFallback}
+        description={setupText.description}
         onBack={onBack}
-        backLabel="返回选剧本"
+        backLabel={setupText.backLabel}
         onClose={onClose}
-        closeLabel="关闭"
+        closeLabel={setupText.closeLabel}
       />
 
       <form className="setup-form" onSubmit={onSubmit}>
@@ -973,16 +1007,20 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               onClick={handleToggleLeftCollapse}
               type="button"
             >
-              <span className="collapsed-pane-toggle-label">CONFIG</span>
-              <span className="collapsed-pane-toggle-action">展开</span>
+              <span className="collapsed-pane-toggle-label">
+                {setupText.layout.collapsedConfigLabel}
+              </span>
+              <span className="collapsed-pane-toggle-action">
+                {setupText.layout.expandAction}
+              </span>
             </button>
           ) : (
             <>
               <section className="setup-pane setup-pane-left" style={leftPaneStyle}>
                 <div className="selection-column-header">
                   <div>
-                    <div className="eyebrow">Setup Overview</div>
-                    <h2>设置概览</h2>
+                    <div className="eyebrow">{setupText.overview.eyebrow}</div>
+                    <h2>{setupText.overview.title}</h2>
                   </div>
                   <div className="setup-pane-header-actions">
                     <button
@@ -990,14 +1028,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       onClick={() => handleOpenSettingsDetail("game")}
                       type="button"
                     >
-                      详情
+                      {setupText.layout.detailButton}
                     </button>
                     <button
                       className="ghost-button ghost-button-small pane-header-button pane-toggle-button"
                       onClick={handleToggleLeftCollapse}
                       type="button"
                     >
-                      收起
+                      {setupText.layout.collapseButton}
                     </button>
                   </div>
                 </div>
@@ -1005,10 +1043,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="setup-pane-scroll">
                   <article className="summary-card setup-section-card">
                     <div className="setup-section-heading">
-                      <div className="eyebrow">Game</div>
-                      <div className="summary-title">游戏设置</div>
+                      <div className="eyebrow">{setupText.detailTabs.game.label}</div>
+                      <div className="summary-title">{setupText.overview.gameTitle}</div>
                       <div className="summary-text">
-                        管理语言、主持架构和本局的基础游玩方式。
+                        {setupText.overview.gameDescription}
                       </div>
                     </div>
                     {renderGameSettingsFields("sidebar")}
@@ -1016,41 +1054,57 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                   <article className="summary-card setup-section-card">
                     <div className="setup-section-heading">
-                      <div className="eyebrow">Model</div>
-                      <div className="summary-title">模型设置</div>
+                      <div className="eyebrow">{setupText.detailTabs.model.label}</div>
+                      <div className="summary-title">{setupText.detailTabs.model.label}</div>
                       <div className="summary-text">
-                        选择本局使用的模型入口、档案以及显示偏好。
+                        {setupText.overview.modelDescription}
                       </div>
                     </div>
                     {renderModelSettingsFields("sidebar")}
                     <div className="setup-section-summary-list">
                       <div className="summary-text">
-                        当前档案：{selectedProfile?.name ?? selectedModelMode?.label ?? "未配置"}
+                        {setupText.model.currentProfile(
+                          selectedProfile?.name ??
+                            selectedModelMode?.label ??
+                            setupText.model.notConfigured
+                        )}
                       </div>
-                      <div className="summary-text">实际模型：{resolvedModelName}</div>
                       <div className="summary-text">
-                        可用状态：{profileReady ? "可创建会话" : "还需补全配置"}
+                        {setupText.model.resolvedModel(resolvedModelName)}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.status(
+                          profileReady ? setupText.model.ready : setupText.model.needsConfig
+                        )}
                       </div>
                     </div>
                   </article>
 
                   <article className="summary-card setup-section-card">
                     <div className="setup-section-heading">
-                      <div className="eyebrow">Current Run</div>
-                      <div className="summary-title">当前局面概览</div>
+                      <div className="eyebrow">{setupText.overview.currentRunTitle}</div>
+                      <div className="summary-title">{setupText.overview.currentRunTitle}</div>
                     </div>
                     <div className="setup-section-summary-list">
                       <div className="summary-text">
-                        规则：{selectedRule?.ruleTitle ?? "未选择规则"}
+                        {setupText.currentRun.rule(
+                          selectedRule?.ruleTitle ?? setupText.currentRun.noRule
+                        )}
                       </div>
                       <div className="summary-text">
-                        剧本：{selectedStory?.title ?? "未选择剧本"}
+                        {setupText.currentRun.story(
+                          selectedStory?.title ?? setupText.currentRun.noStory
+                        )}
                       </div>
                       <div className="summary-text">
-                        标签：{renderJoinedList(selectedStory?.tags ?? [])}
+                        {setupText.currentRun.tags(
+                          renderJoinedList(selectedStory?.tags ?? [], text)
+                        )}
                       </div>
                       <div className="summary-text">
-                        主持风格：{selectedStory?.gmStyle ?? "待定"}
+                        {setupText.currentRun.gmStyle(
+                          selectedStory?.gmStyle ?? setupText.currentRun.undecided
+                        )}
                       </div>
                     </div>
                   </article>
@@ -1059,7 +1113,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               </section>
 
               <button
-                aria-label="调整左侧配置栏宽度"
+                aria-label={setupText.layout.leftResizeAria}
                 className="story-resize-handle"
                 onPointerDown={(event) => handleSplitterPointerDown("left", event)}
                 type="button"
@@ -1072,8 +1126,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           <section className="setup-pane setup-pane-center">
             <div className="selection-column-header">
               <div>
-                <div className="eyebrow">Opening Preview</div>
-                <h2>开场预览</h2>
+                <div className="eyebrow">{setupText.preview.eyebrow}</div>
+                <h2>{setupText.preview.title}</h2>
               </div>
               <button
                 className="ghost-button ghost-button-small"
@@ -1081,7 +1135,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 onClick={onRegenerateOpeningPreview}
                 type="button"
               >
-                {openingPreviewLoading ? "生成中..." : "重新生成开场白"}
+                {openingPreviewLoading
+                  ? setupText.preview.regenerateBusy
+                  : setupText.preview.regenerate}
               </button>
             </div>
 
@@ -1091,28 +1147,30 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   {coverAsset ? (
                     <>
                       <img
-                        alt={`${selectedStory?.title ?? "剧本"}封面`}
+                        alt={setupText.preview.coverAlt(
+                          selectedStory?.title ?? setupText.preview.fallbackStoryTitle
+                        )}
                         className="story-cover-image"
                         src={coverAsset.url}
                       />
                       <button
-                        aria-label="查看大图"
+                        aria-label={setupText.preview.openCoverAria}
                         className="ghost-button story-cover-expand-button"
                         onClick={() => setIsCoverExpanded(true)}
                         type="button"
                       >
-                        查看大图
+                        {setupText.preview.openCoverButton}
                       </button>
                       <div className="story-cover-placeholder story-cover-overlay">
-                        <div className="eyebrow">Preview</div>
-                        <h2>{selectedStory?.title ?? "未选择剧本"}</h2>
+                        <div className="eyebrow">{setupText.preview.eyebrow}</div>
+                        <h2>{selectedStory?.title ?? setupText.preview.fallbackStoryTitle}</h2>
                         <p>{previewHeadline}</p>
                       </div>
                     </>
                   ) : (
                     <div className="story-cover-placeholder">
-                      <div className="eyebrow">Preview</div>
-                      <h2>{selectedStory?.title ?? "未选择剧本"}</h2>
+                      <div className="eyebrow">{setupText.preview.eyebrow}</div>
+                      <h2>{selectedStory?.title ?? setupText.preview.fallbackStoryTitle}</h2>
                       <p>{previewHeadline}</p>
                     </div>
                   )}
@@ -1120,7 +1178,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                 <div className="opening-block setup-preview-copy">
                   {openingPreviewLoading && !hasPreviewText ? (
-                    <p>正在生成 AI 开场预览...</p>
+                    <p>{setupText.preview.generatingText}</p>
                   ) : (
                     <MarkdownBlock
                       className="story-markdown-block opening-markdown setup-preview-markdown"
@@ -1134,8 +1192,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   {openingPreviewLoading ? (
                     <p className="preview-meta-line">
                       {openingPreviewDeliveryMode === "stream"
-                        ? "正在流式接收开场预览..."
-                        : "正在等待完整开场预览..."}
+                        ? setupText.preview.streamingText
+                        : setupText.preview.waitingText}
                     </p>
                   ) : null}
                   {!openingPreviewLoading && openingPreviewError ? (
@@ -1149,10 +1207,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
             <div className="character-setup-controls setup-pane-footer">
               <div className="companion-card character-setup-copy">
-                <div className="eyebrow">Character Setup</div>
-                <h2>你是谁？</h2>
+                <div className="eyebrow">{setupText.characterSetup.eyebrow}</div>
+                <h2>{setupText.characterSetup.title}</h2>
                 <p className="summary-text">
-                  可以先自己写，也可以基于开场白让 AI 生成或补全一版角色概念。
+                  {setupText.characterSetup.description}
                 </p>
               </div>
               <div
@@ -1165,7 +1223,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <textarea
                   className="character-setup-input"
                   disabled={characterConceptAssistLoading}
-                  placeholder="例如：我是来寻找失踪姐姐的纪录片学生，擅长摄影，但对湖边大火有难以解释的既视感。"
+                  placeholder={setupText.characterSetup.placeholder}
                   value={characterConcept}
                   onChange={(event) => onCharacterConceptChange(event.target.value)}
                 />
@@ -1174,8 +1232,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     <div className="character-setup-loading-bar" />
                     <div className="character-setup-loading-copy">
                       {characterConceptAssistMode === "complete"
-                        ? "AI 正在补全角色概念..."
-                        : "AI 正在生成角色概念..."}
+                        ? setupText.characterSetup.completing
+                        : setupText.characterSetup.generating}
                     </div>
                   </div>
                 ) : null}
@@ -1189,13 +1247,17 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               onClick={handleToggleRightCollapse}
               type="button"
             >
-              <span className="collapsed-pane-toggle-label">ALLY</span>
-              <span className="collapsed-pane-toggle-action">展开</span>
+              <span className="collapsed-pane-toggle-label">
+                {setupText.layout.collapsedAllyLabel}
+              </span>
+              <span className="collapsed-pane-toggle-action">
+                {setupText.layout.expandAction}
+              </span>
             </button>
           ) : (
             <>
               <button
-                aria-label="调整右侧同行者栏宽度"
+                aria-label={setupText.layout.rightResizeAria}
                 className="story-resize-handle"
                 onPointerDown={(event) => handleSplitterPointerDown("right", event)}
                 type="button"
@@ -1205,9 +1267,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
               <section className="setup-pane setup-pane-right" style={rightPaneStyle}>
                 <div className="selection-column-header">
-                  <div>
-                    <div className="eyebrow">Companions</div>
-                    <h2>同行者设置</h2>
+                    <div>
+                    <div className="eyebrow">{setupText.companions.eyebrow}</div>
+                    <h2>{setupText.companions.title}</h2>
                   </div>
                   <div className="setup-pane-header-actions">
                     <button
@@ -1215,14 +1277,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       onClick={() => handleOpenSettingsDetail("companions")}
                       type="button"
                     >
-                      详情
+                      {setupText.layout.detailButton}
                     </button>
                     <button
                       className="ghost-button ghost-button-small pane-header-button pane-toggle-button"
                       onClick={handleToggleRightCollapse}
                       type="button"
                     >
-                      收起
+                      {setupText.layout.collapseButton}
                     </button>
                   </div>
                 </div>
@@ -1230,10 +1292,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 <div className="setup-pane-scroll">
                   <article className="summary-card setup-section-card">
                     <div className="setup-section-heading">
-                      <div className="eyebrow">Companions</div>
-                      <div className="summary-title">同行者设置</div>
+                      <div className="eyebrow">{setupText.companions.eyebrow}</div>
+                      <div className="summary-title">{setupText.companions.title}</div>
                       <div className="summary-text">
-                        这里集中显示 AI 同伴入口、扩展位和当前剧本的内容边界。
+                        {setupText.companions.description}
                       </div>
                     </div>
                     {renderCompanionCards()}
@@ -1261,7 +1323,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     }
                     type="submit"
                   >
-                    {isCreating ? "正在创建会话..." : "开始游戏"}
+                    {isCreating ? setupText.actions.creatingSession : setupText.actions.startGame}
                   </button>
                 </div>
               </section>
@@ -1272,7 +1334,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
       {isSettingsDetailOpen ? (
         <div
-          aria-label="设置详情"
+          aria-label={setupText.modal.ariaLabel}
           className="setup-detail-modal-backdrop"
           onClick={handleCloseSettingsDetail}
           role="dialog"
@@ -1283,9 +1345,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           >
             <div className="setup-detail-modal-header">
               <div>
-                <div className="eyebrow">Setup Detail</div>
+                <div className="eyebrow">{setupText.modal.titleFallback}</div>
                 <h2>
-                  {detailTabs.find((tab) => tab.value === activeDetailTab)?.label ?? "设置详情"}
+                  {detailTabs.find((tab) => tab.value === activeDetailTab)?.label ??
+                    setupText.modal.titleFallback}
                 </h2>
                 <div className="summary-text">
                   {detailTabs.find((tab) => tab.value === activeDetailTab)?.description ?? ""}
@@ -1296,11 +1359,15 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 onClick={handleCloseSettingsDetail}
                 type="button"
               >
-                关闭
+                {setupText.modal.close}
               </button>
             </div>
 
-            <div className="setup-detail-tabs" role="tablist" aria-label="设置分类">
+            <div
+              className="setup-detail-tabs"
+              role="tablist"
+              aria-label={setupText.modal.categoryTabsAria}
+            >
               {detailTabs.map((tab) => (
                 <button
                   key={tab.value}
@@ -1325,7 +1392,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
       {coverAsset && isCoverExpanded ? (
         <div
-          aria-label="剧本封面大图预览"
+          aria-label={setupText.coverDialogAria}
           className="story-cover-lightbox"
           onClick={() => setIsCoverExpanded(false)}
           role="dialog"
@@ -1335,15 +1402,17 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <button
-              aria-label="关闭大图预览"
+              aria-label={setupText.closeCoverDialogAria}
               className="ghost-button story-cover-lightbox-close"
               onClick={() => setIsCoverExpanded(false)}
               type="button"
             >
-              收起图片
+              {setupText.closeImageButton}
             </button>
             <img
-              alt={`${selectedStory?.title ?? "剧本"}封面大图`}
+              alt={setupText.coverDialogAlt(
+                selectedStory?.title ?? setupText.preview.fallbackStoryTitle
+              )}
               className="story-cover-lightbox-image"
               src={coverAsset.url}
             />

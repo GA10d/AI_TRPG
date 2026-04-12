@@ -8,6 +8,7 @@ export type AppView =
   | "menu"
   | "story_select"
   | "game_setup"
+  | "game_bootstrap"
   | "continue"
   | "records"
   | "settings"

@@ -225,27 +225,31 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
           <div className="summary-text">{text.mainMenu.feed.description}</div>
         </div>
 
-        <div className="menu-notice-list">
-          {visibleAnnouncements.map((announcement) => (
-            <article className="menu-notice-card" key={announcement.id}>
-              <div className="menu-notice-meta">{announcement.publishedAt}</div>
-              <div className="summary-title menu-notice-title">{announcement.title}</div>
-              <p className="summary-text menu-notice-body">{announcement.body}</p>
-            </article>
-          ))}
-        </div>
+        <div className="menu-notice-section">
+          <div className="menu-notice-list">
+            {visibleAnnouncements.map((announcement) => (
+              <article className="menu-notice-card" key={announcement.id}>
+                <div className="menu-notice-meta">{announcement.publishedAt}</div>
+                <div className="summary-title menu-notice-title">{announcement.title}</div>
+                <p className="summary-text menu-notice-body">{announcement.body}</p>
+              </article>
+            ))}
 
-        {hasMoreAnnouncements ? (
-          <button
-            className="ghost-button menu-more-button"
-            onClick={() =>
-              setVisibleNoticeCount((current) => current + NOTICE_LOAD_MORE_STEP)
-            }
-            type="button"
-          >
-            {text.mainMenu.feed.showMore}
-          </button>
-        ) : null}
+            {hasMoreAnnouncements ? (
+              <div className="menu-more-row">
+                <button
+                  className="ghost-button menu-more-button"
+                  onClick={() =>
+                    setVisibleNoticeCount((current) => current + NOTICE_LOAD_MORE_STEP)
+                  }
+                  type="button"
+                >
+                  {text.mainMenu.feed.showMore}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         <div className="menu-meta-strip">
           <div className="summary-card">

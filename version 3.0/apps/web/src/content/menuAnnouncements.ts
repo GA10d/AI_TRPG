@@ -35,4 +35,11 @@ export const MENU_ANNOUNCEMENTS: MenuAnnouncement[] = Object.entries(rawAnnounce
       body: body.trim()
     };
   })
-  .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt));
+  .sort((left, right) => {
+    const dateDiff = right.publishedAt.localeCompare(left.publishedAt);
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+
+    return right.id.localeCompare(left.id);
+  });
