@@ -9,15 +9,16 @@ import type {
   ReplayEvent,
   SaveBundle,
   SaveRuntimeConfig,
+  SessionCreateStage,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 import {
   assistCharacterConcept,
   createSave,
-  createSession,
   fetchSession,
   generateOpeningPreview,
   loadSaveBundle,
+  streamCreateSession,
   streamOpeningPreview,
   submitTurn
 } from "./lib/trpgApiClient.ts";
@@ -28,6 +29,12 @@ import { ContinuePage } from "./pages/ContinuePage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
 import { GameSetupPage } from "./pages/GameSetupPage.tsx";
+import {
+  UiTextProvider,
+  getUiTextByLocale,
+  type UiLocaleCode,
+  type UiText
+} from "./locales/index.tsx";
 import { MenuPage } from "./pages/MenuPage.tsx";
 import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
@@ -39,6 +46,61 @@ const initialStatus: StatusState = {
   message: "",
   tone: "neutral"
 };
+
+type SessionBootstrapVisualStage = "entered_game" | SessionCreateStage;
+type SessionBootstrapStepStatus = "pending" | "active" | "completed";
+
+type SessionBootstrapPanelState = {
+  coverAssetUrl: string | null;
+  loadingHint: string;
+  progress: number;
+  activeLabel: string;
+  activeDetail: string;
+  steps: Array<{
+    stage: SessionBootstrapVisualStage;
+    label: string;
+    detail: string;
+    status: SessionBootstrapStepStatus;
+  }>;
+};
+
+const SESSION_BOOTSTRAP_STAGE_ORDER: SessionBootstrapVisualStage[] = [
+  "entered_game",
+  "loading_content",
+  "assembling_prompt",
+  "requesting_narrator",
+  "waiting_first_reply",
+  "finalizing_session"
+];
+
+function buildSessionBootstrapPanelState(text: UiText, input: {
+  coverAssetUrl: string | null;
+  loadingHint: string;
+  activeStage: SessionBootstrapVisualStage;
+}): SessionBootstrapPanelState {
+  const stageMeta = text.app.bootstrapStages;
+  const activeIndex = SESSION_BOOTSTRAP_STAGE_ORDER.indexOf(input.activeStage);
+  const activeMeta = stageMeta[input.activeStage];
+
+  return {
+    coverAssetUrl: input.coverAssetUrl,
+    loadingHint: input.loadingHint,
+    progress: activeMeta.progress,
+    activeLabel: activeMeta.label,
+    activeDetail: activeMeta.detail,
+    steps: SESSION_BOOTSTRAP_STAGE_ORDER.map((stage, index) => ({
+      stage,
+      label: stageMeta[stage].label,
+      detail: stageMeta[stage].detail,
+      status:
+        index < activeIndex
+          ? "completed"
+          : index === activeIndex
+            ? "active"
+            : "pending"
+    }))
+  };
+}
 
 function createTemporaryId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -62,7 +124,7 @@ function splitTextIntoRevealChunks(text: string): string[] {
         return ["\n"];
       }
 
-      return trimmedParagraph.match(/.{1,18}(?:[锛屻€傦紒锛燂紱锛?.!?;:]|$)/gu) ?? [trimmedParagraph];
+      return trimmedParagraph.match(/.{1,18}(?:[闂備焦瀵х粙鎴犳偖椤愶箑鐒垫い鎺嗗亾闁稿锕﹀Σ鎰板箳濡や焦娅栭梺缁樻礀閸婂鐛姀銈嗙叆?.!?;:]|$)/gu) ?? [trimmedParagraph];
     });
 
   return paragraphChunks.filter(Boolean);
@@ -160,6 +222,9 @@ export function App() {
   const [openingPreviewError, setOpeningPreviewError] = useState<string | null>(null);
   const [openingPreviewRegenerateNonce, setOpeningPreviewRegenerateNonce] = useState(0);
   const [isBootstrappingSession, setIsBootstrappingSession] = useState(false);
+  const [isOpeningRevealInProgress, setIsOpeningRevealInProgress] = useState(false);
+  const [sessionBootstrapState, setSessionBootstrapState] =
+    useState<SessionBootstrapPanelState | null>(null);
   const lastHandledOpeningPreviewRegenerateNonceRef = useRef(0);
   const stagedOpeningRevealTimerRef = useRef<number | null>(null);
   const stagedSessionBootTokenRef = useRef(0);
@@ -168,6 +233,7 @@ export function App() {
     bootstrap,
     ruleDirectoryName,
     storyDirectoryName,
+    uiLocale,
     locale,
     playMode,
     gmArchitecture,
@@ -187,6 +253,7 @@ export function App() {
     menuFontSize,
     setRuleDirectoryName,
     setStoryDirectoryName,
+    setUiLocale,
     setLocale,
     setPlayMode,
     setGmArchitecture,
@@ -217,6 +284,7 @@ export function App() {
     clearSavedGamesList,
     removeSavedGameById
   } = useStoredProgress();
+  const uiText = getUiTextByLocale(uiLocale);
 
   const {
     activeGraphBundle,
@@ -265,8 +333,8 @@ export function App() {
       setOpeningPreviewLoading(false);
       setOpeningPreviewError(
         modelAccessMode === "browser_direct"
-          ? "当前模型模式暂不支持 AI 开场预览，请切换到 Mock 或 Server Proxy。"
-          : "当前模型档案尚未配置完整，暂时只能显示静态预览文案。"
+          ? "This model mode does not support AI opening preview. Switch to Mock or Server Proxy."
+          : "The current model profile is incomplete, so only static preview text can be shown."
       );
       return;
     }
@@ -382,6 +450,32 @@ export function App() {
 
   function saveDefaults(): void {
     storeWebDefaults({
+      uiLocale,
+      locale,
+      playMode,
+      gmArchitecture,
+      modelAccessMode,
+      modelProfileId,
+      runtimeModelConfig,
+      profileRuntimeConfigs,
+      imageProfileId,
+      runtimeImageModelConfig,
+      imageProfileRuntimeConfigs,
+      imagePromptTemplateConfig:
+        imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
+      debugEnabled,
+      logViewMode,
+      openingPreviewDeliveryMode,
+      showAiMetadata,
+      markdownFontSize,
+      menuFontSize
+    });
+  }
+
+  function handleUiLocaleChange(nextUiLocale: UiLocaleCode): void {
+    setUiLocale(nextUiLocale);
+    storeWebDefaults({
+      uiLocale: nextUiLocale,
       locale,
       playMode,
       gmArchitecture,
@@ -413,6 +507,28 @@ export function App() {
       window.clearInterval(stagedOpeningRevealTimerRef.current);
       stagedOpeningRevealTimerRef.current = null;
     }
+  }
+
+  function replaceMessageContent(
+    currentSnapshot: SessionSnapshot,
+    messageId: string,
+    content: string
+  ): SessionSnapshot {
+    return {
+      ...currentSnapshot,
+      session: {
+        ...currentSnapshot.session,
+        updatedAt: new Date().toISOString()
+      },
+      messages: currentSnapshot.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              content
+            }
+          : message
+      )
+    };
   }
 
   function buildPendingSessionSnapshot(args: {
@@ -497,7 +613,7 @@ export function App() {
           {
             id: playerParticipantId,
             role: "human_player",
-            displayName: "鐜╁",
+            displayName: "Player",
             isAiControlled: false,
             isLocalUser: true,
             locale
@@ -505,7 +621,7 @@ export function App() {
           {
             id: gmParticipantId,
             role: "gm",
-            displayName: "主持人",
+            displayName: "Narrator",
             isAiControlled: true,
             isLocalUser: false,
             locale
@@ -593,6 +709,60 @@ export function App() {
     }, 70);
   }
 
+  function startOpeningNarrationReveal(
+    finalSnapshot: SessionSnapshot,
+    bootToken: number,
+    options?: {
+      onComplete?: () => void;
+    }
+  ): void {
+    clearStagedOpeningReveal();
+
+    const openingMessage =
+      [...finalSnapshot.messages]
+        .reverse()
+        .find((message) => message.kind === "gm_narration" || message.kind === "gm_dialogue") ??
+      null;
+
+    if (!openingMessage) {
+      setSnapshot(finalSnapshot);
+      setIsOpeningRevealInProgress(false);
+      options?.onComplete?.();
+      return;
+    }
+
+    const revealChunks = splitTextIntoRevealChunks(openingMessage.content);
+    if (!revealChunks.length) {
+      setSnapshot(finalSnapshot);
+      setIsOpeningRevealInProgress(false);
+      options?.onComplete?.();
+      return;
+    }
+
+    let chunkIndex = 0;
+    setIsOpeningRevealInProgress(true);
+    setSnapshot(replaceMessageContent(finalSnapshot, openingMessage.id, ""));
+
+    stagedOpeningRevealTimerRef.current = window.setInterval(() => {
+      if (stagedSessionBootTokenRef.current !== bootToken) {
+        clearStagedOpeningReveal();
+        setIsOpeningRevealInProgress(false);
+        return;
+      }
+
+      chunkIndex += 1;
+      const nextContent = revealChunks.slice(0, chunkIndex).join("");
+      setSnapshot(replaceMessageContent(finalSnapshot, openingMessage.id, nextContent));
+
+      if (chunkIndex >= revealChunks.length) {
+        clearStagedOpeningReveal();
+        setSnapshot(finalSnapshot);
+        setIsOpeningRevealInProgress(false);
+        options?.onComplete?.();
+      }
+    }, 46);
+  }
+
   async function submitPlayerTurn(
     currentSnapshot: SessionSnapshot,
     playerInput: string,
@@ -604,7 +774,7 @@ export function App() {
   ): Promise<void> {
     setIsSubmittingTurn(true);
     setStatus({
-      message: options?.pendingMessage ?? "姝ｅ湪鎻愪氦鏈疆琛屽姩...",
+      message: options?.pendingMessage ?? uiText.app.status.submitTurnPending,
       tone: "neutral"
     });
 
@@ -622,8 +792,8 @@ export function App() {
       setStatus({
         message:
           nextSnapshot.session.status === "ended"
-            ? options?.endingSuccessMessage ?? "本轮处理完成，并已进入结局。"
-            : options?.successMessage ?? "本轮处理完成。",
+            ? options?.endingSuccessMessage ?? uiText.app.status.turnCompleteEnded
+            : options?.successMessage ?? uiText.app.status.turnComplete,
         tone: "neutral"
       });
     } catch (error) {
@@ -648,16 +818,25 @@ export function App() {
 
     if (!bootstrap || !selectedRule || !selectedStory) {
       setStatus({
-        message: "当前没有可用的规则或剧本。",
+        message: uiText.app.status.noPlayableStory,
         tone: "error"
       });
       return;
     }
 
+    const coverAssetUrl =
+      selectedStory.assets.find((asset) => asset.type === "cover")?.url ?? null;
+    const loadingHint =
+      selectedStory.coverQuote?.trim() ||
+      openingPreviewText.trim().split("\n").find((line) => line.trim().length > 0)?.trim() ||
+      selectedStory.intro?.trim() ||
+      `Loading the opening of ${selectedStory.title} into the live story scene.`;
+
     setIsCreating(true);
     setIsBootstrappingSession(true);
+    setIsOpeningRevealInProgress(false);
     setStatus({
-      message: "正在进入游戏并创建正式会话...",
+      message: uiText.app.status.createSessionPending,
       tone: "neutral"
     });
 
@@ -667,55 +846,82 @@ export function App() {
       const bootToken = stagedSessionBootTokenRef.current + 1;
       stagedSessionBootTokenRef.current = bootToken;
 
-      const stagedRevealText =
-        openingPreviewText.trim() ||
-        selectedStory.intro?.trim() ||
-        selectedStory.coverQuote?.trim() ||
-        `${selectedStory.title} 的开场正在生成中……`;
       const pendingSnapshot = buildPendingSessionSnapshot({
         ruleTitle: selectedRule.ruleTitle,
         storyTitle: selectedStory.title,
-        revealText: stagedRevealText
+        revealText: loadingHint
       });
 
       setTurnInput("");
       setView("game");
-      startStagedOpeningReveal(pendingSnapshot, stagedRevealText);
+      setSnapshot(pendingSnapshot);
+      setSessionBootstrapState(
+        buildSessionBootstrapPanelState(uiText, {
+          coverAssetUrl,
+          loadingHint,
+          activeStage: "entered_game"
+        })
+      );
 
-      const nextSnapshot = await createSession({
-        ruleDirectoryName,
-        storyDirectoryName,
-        locale,
-        playMode,
-        gmArchitecture,
-        modelAccessMode,
-        characterConcept,
-        modelProfileId,
-        runtimeModelConfig,
-        debugEnabled,
-        promptDebugEnabled: false,
-        logViewMode
-      });
+      const nextSnapshot = await streamCreateSession(
+        {
+          ruleDirectoryName,
+          storyDirectoryName,
+          locale,
+          playMode,
+          gmArchitecture,
+          modelAccessMode,
+          characterConcept,
+          modelProfileId,
+          runtimeModelConfig,
+          debugEnabled,
+          promptDebugEnabled: false,
+          logViewMode
+        },
+        {
+          onStage: (event) => {
+            setSessionBootstrapState(
+              buildSessionBootstrapPanelState(uiText, {
+                coverAssetUrl,
+                loadingHint,
+                activeStage: event.stage
+              })
+            );
+          }
+        }
+      );
 
       if (stagedSessionBootTokenRef.current !== bootToken) {
         return;
       }
 
       clearStagedOpeningReveal();
-      commitSnapshot(nextSnapshot);
+      persistStoredSnapshot(nextSnapshot);
       beginFromSnapshot(
         nextSnapshot,
         buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
       );
+      setSessionBootstrapState(null);
+      setIsBootstrappingSession(false);
       setStatus({
-        message:
-          characterConcept.trim().length > 0
-            ? "会话创建成功，你的角色设定已带入正式开场。"
-            : "会话创建成功。",
+        message: uiText.app.status.narratorConnected,
         tone: "neutral"
+      });
+      startOpeningNarrationReveal(nextSnapshot, bootToken, {
+        onComplete: () => {
+          setStatus({
+            message:
+              characterConcept.trim().length > 0
+                ? uiText.app.status.sessionCreatedWithCharacter
+                : uiText.app.status.sessionCreated,
+            tone: "neutral"
+          });
+        }
       });
     } catch (error) {
       clearStagedOpeningReveal();
+      setSessionBootstrapState(null);
+      setIsOpeningRevealInProgress(false);
       setSnapshot(null);
       setView("game_setup");
       setStatus({
@@ -724,7 +930,9 @@ export function App() {
       });
     } finally {
       setIsCreating(false);
-      setIsBootstrappingSession(false);
+      if (stagedOpeningRevealTimerRef.current === null) {
+        setIsBootstrappingSession(false);
+      }
     }
   }
 
@@ -735,7 +943,7 @@ export function App() {
 
     if (!snapshot) {
       setStatus({
-        message: "请先开始游戏。",
+        message: uiText.app.status.startGameFirst,
         tone: "error"
       });
       return;
@@ -744,7 +952,7 @@ export function App() {
     const trimmedInput = turnInput.trim();
     if (!trimmedInput) {
       setStatus({
-        message: "请输入本轮行动。",
+        message: uiText.app.status.enterAction,
         tone: "error"
       });
       return;
@@ -756,7 +964,7 @@ export function App() {
   async function handleQuickEndingTest(): Promise<void> {
     if (!snapshot) {
       setStatus({
-        message: "请先开始游戏。",
+        message: uiText.app.status.startGameFirst,
         tone: "error"
       });
       return;
@@ -764,23 +972,23 @@ export function App() {
 
     if (snapshot.session.modelAccessMode !== "mock") {
       setStatus({
-        message: "快速结局测试按钮只在 mock 模式下可用。",
+        message: uiText.app.status.quickEndingMockOnly,
         tone: "error"
       });
       return;
     }
 
-    await submitPlayerTurn(snapshot, "鎴戞帍鍑烘墜鏋嚜鏉€", {
-      pendingMessage: "姝ｅ湪瑙﹀彂 mock 缁撳眬娴嬭瘯...",
-      successMessage: "mock 结局测试已提交。",
-      endingSuccessMessage: "mock 结局测试成功，当前会话已进入结局。"
+    await submitPlayerTurn(snapshot, "I force an immediate mock ending trigger", {
+      pendingMessage: "Running mock ending test...",
+      successMessage: "Mock ending test submitted.",
+      endingSuccessMessage: "Mock ending test succeeded and the session is now in an ending."
     });
   }
 
   async function handleSaveGame(): Promise<void> {
     if (!snapshot) {
       setStatus({
-        message: "当前没有可保存的会话。",
+        message: uiText.app.status.noActiveSessionToSave,
         tone: "error"
       });
       return;
@@ -788,7 +996,7 @@ export function App() {
 
     setIsSaving(true);
     setStatus({
-      message: "姝ｅ湪鍒涘缓鏈湴瀛樻。...",
+      message: uiText.app.status.creatingLocalSave,
       tone: "neutral"
     });
 
@@ -798,7 +1006,7 @@ export function App() {
       commitSaveBundle(result.saveBundle);
       syncSavedBundle(result.saveBundle);
       setStatus({
-        message: "手动存档已保存到本地。",
+        message: uiText.app.status.localSaveCreated,
         tone: "neutral"
       });
     } catch (error) {
@@ -817,7 +1025,7 @@ export function App() {
   ): Promise<void> {
     setIsRestoring(true);
     setStatus({
-      message: "姝ｅ湪鎭㈠瀛樻。...",
+      message: uiText.app.status.loadingSelectedSave,
       tone: "neutral"
     });
 
@@ -847,19 +1055,19 @@ export function App() {
   async function handleContinueRecentSave(): Promise<void> {
     if (!recentSave) {
       setStatus({
-        message: "当前没有最近存档。",
+        message: uiText.app.status.noRecentSave,
         tone: "error"
       });
       return;
     }
 
-    return restoreFromSaveBundle(recentSave.bundle, "已从最近存档恢复会话。");
+    return restoreFromSaveBundle(recentSave.bundle, uiText.continueScreen.continueSave);
   }
 
   async function handleContinueRecentSnapshot(): Promise<void> {
     if (!recentSnapshot) {
       setStatus({
-        message: "本地还没有最近进度。",
+        message: uiText.app.status.noRecentSnapshot,
         tone: "error"
       });
       return;
@@ -867,7 +1075,7 @@ export function App() {
 
     setIsRestoring(true);
     setStatus({
-      message: "姝ｅ湪鎭㈠鏈€杩戝揩鐓?..",
+      message: uiText.app.status.restoringLatestSnapshot,
       tone: "neutral"
     });
 
@@ -880,7 +1088,7 @@ export function App() {
       );
       setView("game");
       setStatus({
-        message: "已从服务端同步最近会话。",
+        message: uiText.app.status.latestSessionSynced,
         tone: "neutral"
       });
     } catch {
@@ -891,7 +1099,7 @@ export function App() {
       );
       setView("game");
       setStatus({
-        message: "服务端未找到该会话，已改用本地快照打开。",
+        message: uiText.app.status.localSnapshotOpenedInstead,
         tone: "neutral"
       });
     } finally {
@@ -900,14 +1108,14 @@ export function App() {
   }
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
-    return restoreFromSaveBundle(record.bundle, `宸茶浇鍏ュ瓨妗ｏ細${record.storyTitle}`);
+    return restoreFromSaveBundle(record.bundle, `${uiText.common.load}：${record.storyTitle}`);
   }
 
   async function handleContinueFromNode(nodeId: string): Promise<void> {
     const prepared = prepareResume(nodeId);
     if (!prepared) {
       setStatus({
-        message: "当前节点不可继续，或本地缺少对应快照。",
+        message: uiText.app.status.nodeCannotResume,
         tone: "error"
       });
       return;
@@ -915,7 +1123,7 @@ export function App() {
 
     setIsResumingBranch(true);
     setStatus({
-      message: "姝ｅ湪浠庡巻鍙茶妭鐐规仮澶嶏紝骞跺噯澶囩敓鎴愭柊鐨勫垎鏀?..",
+      message: uiText.app.status.switchingNode,
       tone: "neutral"
     });
 
@@ -925,7 +1133,7 @@ export function App() {
       setTurnInput("");
       setView("game");
       setStatus({
-        message: "已切换到所选节点。下一轮行动将从这里长出新的分支。",
+        message: uiText.app.status.switchedNode,
         tone: "neutral"
       });
     } catch (error) {
@@ -943,7 +1151,7 @@ export function App() {
     saveDefaults();
     setView("menu");
     setStatus({
-      message: "默认设置已保存。",
+      message: uiText.app.status.defaultSettingsSaved,
       tone: "neutral"
     });
   }
@@ -969,7 +1177,7 @@ export function App() {
     setMarkdownFontSize("large");
     setMenuFontSize("standard");
     setStatus({
-      message: "已恢复默认设置。",
+      message: uiText.app.status.defaultsRestored,
       tone: "neutral"
     });
   }
@@ -977,7 +1185,7 @@ export function App() {
   function handleClearRecent(): void {
     clearRecent();
     setStatus({
-      message: "最近快照已清除。",
+      message: uiText.app.status.recentSnapshotCleared,
       tone: "neutral"
     });
   }
@@ -985,7 +1193,7 @@ export function App() {
   function handleClearSavedGames(): void {
     clearSavedGamesList();
     setStatus({
-      message: "本地存档已清空。",
+      message: uiText.app.status.localSavesCleared,
       tone: "neutral"
     });
   }
@@ -997,7 +1205,7 @@ export function App() {
 
     removeSavedGameById(recentSave.saveId);
     setStatus({
-      message: "最近存档已删除。",
+      message: uiText.app.status.recentSaveDeleted,
       tone: "neutral"
     });
   }
@@ -1005,7 +1213,7 @@ export function App() {
   function handleDeleteSavedGame(saveId: string): void {
     removeSavedGameById(saveId);
     setStatus({
-      message: "该存档已删除。",
+      message: uiText.app.status.saveDeleted,
       tone: "neutral"
     });
   }
@@ -1013,7 +1221,7 @@ export function App() {
   function handleExit(): void {
     window.close();
     setStatus({
-      message: "如果页面没有关闭，请直接关闭浏览器标签页。",
+      message: uiText.app.status.closeTabManually,
       tone: "neutral"
     });
   }
@@ -1035,7 +1243,7 @@ export function App() {
 
     if (!openingText) {
       setStatus({
-        message: "请先等开场预览生成完成，再使用 AI 生成或补全角色概念。",
+        message: uiText.app.status.waitOpeningPreviewBeforeAssist,
         tone: "error"
       });
       return;
@@ -1046,8 +1254,8 @@ export function App() {
     setStatus({
       message:
         nextMode === "generate"
-          ? "AI 姝ｅ湪鏍规嵁寮€鍦虹櫧鐢熸垚瑙掕壊姒傚康..."
-          : "AI 姝ｅ湪鏍规嵁寮€鍦虹櫧琛ュ叏瑙掕壊姒傚康...",
+          ? uiText.app.status.aiDraftingCharacterConcept
+          : uiText.app.status.aiCompletingCharacterConcept,
       tone: "neutral"
     });
 
@@ -1073,8 +1281,8 @@ export function App() {
       setStatus({
         message:
           nextMode === "generate"
-            ? "AI 已生成角色概念，你可以继续手动修改。"
-            : "AI 已补全角色概念，你可以继续手动修改。",
+            ? uiText.app.status.aiDraftedCharacterConcept
+            : uiText.app.status.aiCompletedCharacterConcept,
         tone: "neutral"
       });
     } catch (error) {
@@ -1095,7 +1303,7 @@ export function App() {
 
     if (!selectedRule || !selectedStory) {
       setStatus({
-        message: "请先选择一个可用剧本。",
+        message: uiText.app.status.selectStoryFirst,
         tone: "error"
       });
       return;
@@ -1246,6 +1454,8 @@ export function App() {
           activeGraphBundle={activeGraphBundle}
           turnInput={turnInput}
           isBootstrappingSession={isBootstrappingSession}
+          isOpeningRevealInProgress={isOpeningRevealInProgress}
+          sessionBootstrapState={sessionBootstrapState}
           isSubmittingTurn={isSubmittingTurn}
           isSaving={isSaving}
           savedGames={savedGames}
@@ -1273,11 +1483,13 @@ export function App() {
       content = (
         <MenuPage
           recentSnapshot={recentSnapshot}
+          uiLocale={uiLocale}
           locale={locale}
           playMode={playMode}
           gmArchitecture={gmArchitecture}
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
+          onUiLocaleChange={handleUiLocaleChange}
           onOpenNewGame={handleOpenStorySelect}
           onOpenContinue={() => setView("continue")}
           onOpenRecords={() => setView("records")}
@@ -1289,16 +1501,18 @@ export function App() {
   }
 
   return (
-    <main
-      className="app-shell"
-      style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
-    >
-      {content}
-      {status.message ? (
-        <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
-          {status.message}
-        </p>
-      ) : null}
-    </main>
+    <UiTextProvider locale={uiLocale}>
+      <main
+        className="app-shell"
+        style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
+      >
+        {content}
+        {status.message ? (
+          <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
+            {status.message}
+          </p>
+        ) : null}
+      </main>
+    </UiTextProvider>
   );
 }

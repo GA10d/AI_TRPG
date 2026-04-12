@@ -1,3 +1,4 @@
+import { useUiText } from "../locales/index.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type ExitScreenProps = {
@@ -8,33 +9,32 @@ type ExitScreenProps = {
 };
 
 export function ExitScreen(props: ExitScreenProps) {
+  const text = useUiText();
   const { onBack, onExit, onClearRecent, onClearRecords } = props;
 
   return (
     <section className="panel page-panel">
       <ScreenHeader
-        title="退出"
-        description="网页版本无法稳定直接退出程序，所以这里先提供退出前的整理操作。"
+        title={text.exitScreen.title}
+        description={text.exitScreen.description}
         onBack={onBack}
       />
 
       <div className="stack-grid">
         <div className="summary-card">
-          <div className="meta-label">退出说明</div>
-          <div className="summary-text">
-            如果只是想离开当前界面，可以返回主菜单；如果想结束当前网页，请关闭浏览器标签页。
-          </div>
+          <div className="meta-label">{text.exitScreen.noteTitle}</div>
+          <div className="summary-text">{text.exitScreen.noteBody}</div>
         </div>
 
         <div className="button-row">
           <button className="primary-button" onClick={onExit} type="button">
-            尝试关闭窗口
+            {text.exitScreen.buttons.tryCloseWindow}
           </button>
           <button className="ghost-button" onClick={onClearRecent} type="button">
-            清除最近进度
+            {text.exitScreen.buttons.clearRecent}
           </button>
           <button className="ghost-button" onClick={onClearRecords} type="button">
-            清除战绩摘要
+            {text.exitScreen.buttons.clearRecords}
           </button>
         </div>
       </div>

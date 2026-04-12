@@ -9,6 +9,7 @@ import type {
   SessionSnapshot
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchNpcRoster, generateSceneImage } from "../lib/trpgApiClient.ts";
+import { useUiText } from "../locales/index.tsx";
 import type { SavedGameRecord } from "../storage.ts";
 import {
   formatAiGenerationMeta,
@@ -18,11 +19,29 @@ import {
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { PlaythroughGraphPanel } from "./PlaythroughGraphPanel.tsx";
 
+type SessionBootstrapStepStatus = "pending" | "active" | "completed";
+
+type SessionBootstrapPanelState = {
+  coverAssetUrl: string | null;
+  loadingHint: string;
+  progress: number;
+  activeLabel: string;
+  activeDetail: string;
+  steps: Array<{
+    stage: string;
+    label: string;
+    detail: string;
+    status: SessionBootstrapStepStatus;
+  }>;
+};
+
 type GameScreenProps = {
   snapshot: SessionSnapshot | null;
   activeGraphBundle: PlaythroughGraphBundle | null;
   turnInput: string;
   isBootstrappingSession: boolean;
+  isOpeningRevealInProgress: boolean;
+  sessionBootstrapState: SessionBootstrapPanelState | null;
   isSubmittingTurn: boolean;
   isSaving: boolean;
   isRestoring: boolean;
@@ -50,6 +69,8 @@ export function GameScreen(props: GameScreenProps) {
     activeGraphBundle,
     turnInput,
     isBootstrappingSession,
+    isOpeningRevealInProgress,
+    sessionBootstrapState,
     isSubmittingTurn,
     isSaving,
     isRestoring,
@@ -68,6 +89,7 @@ export function GameScreen(props: GameScreenProps) {
     onTurnInputChange,
     onSubmitTurn
   } = props;
+  const text = useUiText();
 
   const [activeDrawer, setActiveDrawer] = useState<GameDrawer>("none");
   const [npcRoster, setNpcRoster] = useState<NpcRosterEntry[]>([]);
@@ -79,6 +101,7 @@ export function GameScreen(props: GameScreenProps) {
   >({});
   const [generatingNpcId, setGeneratingNpcId] = useState<string | null>(null);
 
+  const actionLocked = isBootstrappingSession || isOpeningRevealInProgress;
   const visibleMessages =
     snapshot?.messages.filter((message) => message.kind !== "system") ?? [];
   const latestNarration =
@@ -90,16 +113,25 @@ export function GameScreen(props: GameScreenProps) {
     ? visibleMessages.filter((message) => message.id !== latestNarration.id).slice(-8)
     : visibleMessages.slice(-8);
   const isSessionEnded = snapshot?.session.status === "ended";
-  const composerDisabled = isSessionEnded || isBootstrappingSession;
+  const composerDisabled = isSessionEnded || actionLocked;
   const endingJudgeJson = snapshot?.session.gameState.lastEndingJudgeResult
     ? JSON.stringify(snapshot.session.gameState.lastEndingJudgeResult, null, 2)
-    : "暂无本轮结局判定结果。";
+    : text.gameScreen.noEndingJudge;
   const selectedNpc =
     npcRoster.find((npc) => npc.id === selectedNpcId) ?? npcRoster[0] ?? null;
   const canUseQuickEndingTest =
     snapshot?.session.modelAccessMode === "mock" &&
     snapshot.session.status !== "ended" &&
-    !isBootstrappingSession;
+    !actionLocked;
+  const bootstrapProgressPercent = Math.max(
+    8,
+    Math.min(100, Math.round((sessionBootstrapState?.progress ?? 0.08) * 100))
+  );
+  const shouldShowBootstrapInline = isBootstrappingSession && !latestNarration?.content;
+  const bootstrapStatusLabel =
+    sessionBootstrapState?.activeLabel ?? text.app.bootstrapStages.entered_game.label;
+  const bootstrapStatusDetail =
+    sessionBootstrapState?.activeDetail ?? text.app.bootstrapStages.waiting_first_reply.detail;
 
   useEffect(() => {
     setNpcRoster([]);
@@ -111,7 +143,7 @@ export function GameScreen(props: GameScreenProps) {
   }, [snapshot?.session.id]);
 
   useEffect(() => {
-    if (activeDrawer !== "npcs" || !snapshot || isBootstrappingSession) {
+    if (activeDrawer !== "npcs" || !snapshot || actionLocked) {
       return;
     }
 
@@ -121,7 +153,7 @@ export function GameScreen(props: GameScreenProps) {
     if (!ruleDirectoryName || !storyDirectoryName) {
       setNpcRoster([]);
       setSelectedNpcId(null);
-      setNpcError("当前存档不包含内容目录信息，暂时无法读取 NPC 档案。");
+      setNpcError("This save is missing content directory info, so NPC files cannot be loaded.");
       return;
     }
 
@@ -158,7 +190,7 @@ export function GameScreen(props: GameScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeDrawer, snapshot, isBootstrappingSession]);
+  }, [activeDrawer, actionLocked, snapshot]);
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
     setActiveDrawer("none");
@@ -207,17 +239,17 @@ export function GameScreen(props: GameScreenProps) {
       <section className="panel page-panel">
         <div className="screen-header">
           <div>
-            <div className="eyebrow">AI TRPG 3.0</div>
-            <h1>游戏中</h1>
-            <p className="lead">当前还没有活动中的会话。</p>
+            <div className="eyebrow">{text.appName}</div>
+            <h1>{text.gameScreen.emptyTitle}</h1>
+            <p className="lead">{text.gameScreen.emptyDescription}</p>
           </div>
           <div className="button-row header-actions">
             <button className="ghost-button" onClick={onBack} type="button">
-              返回主菜单
+              {text.common.backToMenu}
             </button>
           </div>
         </div>
-        <div className="empty-state">暂无可展示的游玩会话。</div>
+        <div className="empty-state">{text.gameScreen.emptyState}</div>
       </section>
     );
   }
@@ -226,73 +258,70 @@ export function GameScreen(props: GameScreenProps) {
     <section className="panel page-panel game-shell">
       <header className="game-hero">
         <div className="game-hero-copy">
-          <div className="eyebrow">Core Play</div>
+          <div className="eyebrow">{text.gameScreen.heroEyebrow}</div>
           <h1>{snapshot.contentSummary.storyTitle}</h1>
           <p className="lead">
             {snapshot.contentSummary.ruleTitle} / Round {snapshot.session.currentRound} /{" "}
             {isBootstrappingSession
-              ? "正在进入场景"
-              : snapshot.session.status === "ended"
-                ? "结局已锁定"
-                : "进行中"}
+              ? text.gameScreen.creatingSession
+              : isOpeningRevealInProgress
+                ? text.gameScreen.openingScene
+                : snapshot.session.status === "ended"
+                  ? text.gameScreen.ended
+                  : text.gameScreen.inProgress}
           </p>
         </div>
 
         <div className="game-toolbar">
           <button className="ghost-button" onClick={onBack} type="button">
-            返回菜单
+            {text.common.backToMenu}
           </button>
           <button
             className="ghost-button"
-            disabled={isSaving || isBootstrappingSession}
+            disabled={isSaving || actionLocked}
             onClick={() => void onSaveGame()}
             type="button"
           >
-            {isSaving ? "保存中..." : "保存"}
+            {isSaving ? text.common.creating : text.common.save}
           </button>
           <button
             className="ghost-button"
-            disabled={isRestoring || isBootstrappingSession}
+            disabled={isRestoring || actionLocked}
             onClick={() => setActiveDrawer("saves")}
             type="button"
           >
-            {isRestoring ? "读档中..." : "读档"}
+            {isRestoring ? text.common.loading : text.common.load}
           </button>
           <button
             className="ghost-button"
-            disabled={isBootstrappingSession}
+            disabled={actionLocked}
             onClick={() => setActiveDrawer("npcs")}
             type="button"
           >
-            NPC
+            {text.common.npc}
           </button>
           <button
             className="ghost-button"
-            disabled={isBootstrappingSession}
+            disabled={actionLocked}
             onClick={() => setActiveDrawer("details")}
             type="button"
           >
-            详情
+            {text.common.details}
           </button>
         </div>
       </header>
-
-      {isBootstrappingSession ? (
-        <div className="info-banner">
-          <div className="meta-label">会话初始化</div>
-          <div className="summary-text">
-            已经进入游戏界面，正在后台建立正式会话。你现在看到的是渐显过渡内容，正式开场就绪后会自动替换。
-          </div>
-        </div>
-      ) : null}
 
       <div className="game-main">
         <section className="summary-card game-focus-panel">
           <div className="game-panel-head">
             <div>
-              <div className="meta-label">本轮叙事</div>
+              <div className="meta-label">{text.gameScreen.currentNarration}</div>
               <div className="summary-title">
-                {isSessionEnded ? "当前会话已进入结局" : "主持人正在推进故事"}
+                {isSessionEnded
+                  ? text.gameScreen.endedTitle
+                  : shouldShowBootstrapInline
+                    ? text.gameScreen.joiningSceneTitle
+                    : text.gameScreen.advancingStoryTitle}
               </div>
             </div>
             {snapshot.session.gameState.endingState ? (
@@ -301,25 +330,52 @@ export function GameScreen(props: GameScreenProps) {
           </div>
 
           <div className="game-focus-scroll">
-            <MarkdownBlock
-              className="story-markdown-block game-focus-markdown"
-              content={latestNarration?.content ?? "尚未生成叙事文本。"}
-              fontSizePreset={markdownFontSize}
-            />
+            {shouldShowBootstrapInline ? (
+              <div className="game-inline-loading">
+                <div className="game-inline-loading-copy">
+                  <div className="meta-label">{text.gameScreen.bootstrapEyebrow}</div>
+                  <div className="summary-title">{bootstrapStatusLabel}</div>
+                  <p className="summary-text">{text.gameScreen.bootstrapWaiting}</p>
+                </div>
 
-            {showAiMetadata && latestNarration?.aiMetadata ? (
-              <div className="ai-meta-line">{formatAiGenerationMeta(latestNarration.aiMetadata)}</div>
-            ) : null}
+                <div className="game-inline-loading-progress">
+                  <div className="game-loading-progress-meta">
+                    <span>{bootstrapStatusDetail}</span>
+                    <span>{bootstrapProgressPercent}%</span>
+                  </div>
+                  <div className="game-loading-progress-track" aria-hidden="true">
+                    <div
+                      className="game-loading-progress-bar"
+                      style={{ width: `${bootstrapProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <MarkdownBlock
+                  className="story-markdown-block game-focus-markdown"
+                  content={latestNarration?.content ?? text.gameScreen.noNarrationYet}
+                  fontSizePreset={markdownFontSize}
+                />
+
+                {showAiMetadata && latestNarration?.aiMetadata ? (
+                  <div className="ai-meta-line">
+                    {formatAiGenerationMeta(latestNarration.aiMetadata, text)}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         </section>
 
         <section className="summary-card game-history-panel">
           <div className="game-panel-head">
             <div>
-              <div className="meta-label">最近上下文</div>
-              <div className="summary-title">上一轮对话与铺垫</div>
+              <div className="meta-label">{text.gameScreen.recentContext}</div>
+              <div className="summary-title">{text.gameScreen.recentContextTitle}</div>
             </div>
-            <span className="summary-text">{recentHistory.length} 条</span>
+            <span className="summary-text">{text.gameScreen.recentItems(recentHistory.length)}</span>
           </div>
 
           <div className="game-history-scroll">
@@ -336,7 +392,9 @@ export function GameScreen(props: GameScreenProps) {
                   >
                     <div className="game-history-meta">
                       <span>
-                        {message.kind === "player_input" ? "玩家" : "主持人"} / R{message.round}
+                        {message.kind === "player_input"
+                          ? text.gameScreen.playerRound(message.round)
+                          : text.gameScreen.narratorRound(message.round)}
                       </span>
                       <span>{formatDateTime(message.createdAt)}</span>
                     </div>
@@ -353,7 +411,7 @@ export function GameScreen(props: GameScreenProps) {
                   </article>
                 ))
               ) : (
-                <div className="empty-state">当前还没有足够的历史对话。</div>
+                <div className="empty-state">{text.gameScreen.historyEmpty}</div>
               )}
             </div>
           </div>
@@ -362,7 +420,7 @@ export function GameScreen(props: GameScreenProps) {
 
       {snapshot.session.gameState.endingState ? (
         <div className="info-banner info-banner-success">
-          <div className="meta-label">结局状态</div>
+          <div className="meta-label">{text.gameScreen.endingState}</div>
           <div className="summary-title">{snapshot.session.gameState.endingState.title}</div>
           <div className="summary-text">{snapshot.session.gameState.endingState.summary}</div>
         </div>
@@ -371,11 +429,11 @@ export function GameScreen(props: GameScreenProps) {
       <form className="summary-card game-composer" onSubmit={onSubmitTurn}>
         <div className="game-panel-head">
           <div>
-            <div className="meta-label">你的行动</div>
-            <div className="summary-title">输入这一轮的行动或对话</div>
+            <div className="meta-label">{text.gameScreen.yourAction}</div>
+            <div className="summary-title">{text.gameScreen.actionTitle}</div>
           </div>
           <span className="summary-text">
-            {composerDisabled ? "会话未就绪，暂不可输入" : "输入后提交本轮行动"}
+            {composerDisabled ? text.gameScreen.inputLocked : text.gameScreen.submitTurnHint}
           </span>
         </div>
 
@@ -383,9 +441,9 @@ export function GameScreen(props: GameScreenProps) {
           disabled={composerDisabled}
           rows={5}
           placeholder={
-            isBootstrappingSession
-              ? "会话初始化中，正式开场完成后即可输入行动。"
-              : "例如：我先检查门后的痕迹，再低声询问对方为什么会在这个时间出现在这里。"
+            actionLocked
+              ? text.gameScreen.initPlaceholder
+              : text.gameScreen.actionPlaceholder
           }
           value={turnInput}
           onChange={(event) => onTurnInputChange(event.target.value)}
@@ -397,7 +455,7 @@ export function GameScreen(props: GameScreenProps) {
             disabled={isSubmittingTurn || composerDisabled}
             type="submit"
           >
-            {isSubmittingTurn ? "提交中..." : "提交本轮行动"}
+            {isSubmittingTurn ? text.common.creating : text.gameScreen.submitTurn}
           </button>
         </div>
       </form>
@@ -409,9 +467,9 @@ export function GameScreen(props: GameScreenProps) {
               <div className="game-drawer-body">
                 <div className="screen-header">
                   <div>
-                    <div className="eyebrow">Save / Load</div>
-                    <h2>读档</h2>
-                    <p className="lead">主界面保留存档与读档入口，方便长线游玩。</p>
+                    <div className="eyebrow">{text.gameScreen.saveLoadEyebrow}</div>
+                    <h2>{text.gameScreen.loadSaveTitle}</h2>
+                    <p className="lead">{text.gameScreen.saveLoadDescription}</p>
                   </div>
                   <div className="button-row header-actions">
                     <button
@@ -419,7 +477,7 @@ export function GameScreen(props: GameScreenProps) {
                       onClick={() => setActiveDrawer("none")}
                       type="button"
                     >
-                      关闭
+                      {text.common.close}
                     </button>
                   </div>
                 </div>
@@ -441,16 +499,16 @@ export function GameScreen(props: GameScreenProps) {
                             onClick={() => void handleLoadSavedGame(record)}
                             type="button"
                           >
-                            {isRestoring ? "读档中..." : "载入"}
+                            {isRestoring ? text.common.loading : text.common.open}
                           </button>
                         </div>
                         <div className="summary-text">
-                          保存时间：{formatDateTime(record.savedAt)}
+                          {text.gameScreen.savedAt(formatDateTime(record.savedAt))}
                         </div>
                       </article>
                     ))
                   ) : (
-                    <div className="empty-state">当前还没有可用的本地存档。</div>
+                    <div className="empty-state">{text.gameScreen.noLocalSaves}</div>
                   )}
                 </div>
               </div>
@@ -460,9 +518,9 @@ export function GameScreen(props: GameScreenProps) {
               <div className="game-drawer-body">
                 <div className="screen-header">
                   <div>
-                    <div className="eyebrow">NPC</div>
-                    <h2>角色档案</h2>
-                    <p className="lead">在这里查看 NPC 文档、现有立绘，以及后续生成的 AI 立绘。</p>
+                    <div className="eyebrow">{text.gameScreen.npcEyebrow}</div>
+                    <h2>{text.gameScreen.npcTitle}</h2>
+                    <p className="lead">{text.gameScreen.npcDescription}</p>
                   </div>
                   <div className="button-row header-actions">
                     <button
@@ -470,12 +528,12 @@ export function GameScreen(props: GameScreenProps) {
                       onClick={() => setActiveDrawer("none")}
                       type="button"
                     >
-                      关闭
+                      {text.common.close}
                     </button>
                   </div>
                 </div>
 
-                {npcLoading ? <div className="empty-state">正在读取 NPC 档案...</div> : null}
+                {npcLoading ? <div className="empty-state">{text.gameScreen.loadingNpcFiles}</div> : null}
                 {npcError ? <div className="info-banner info-banner-warning">{npcError}</div> : null}
 
                 {!npcLoading && !npcError ? (
@@ -496,7 +554,7 @@ export function GameScreen(props: GameScreenProps) {
                           </button>
                         ))
                       ) : (
-                        <div className="empty-state">这个剧本暂时没有暴露可读的 NPC 文档。</div>
+                        <div className="empty-state">{text.gameScreen.noNpcFiles}</div>
                       )}
                     </div>
 
@@ -505,7 +563,7 @@ export function GameScreen(props: GameScreenProps) {
                         <>
                           <div className="game-panel-head">
                             <div>
-                              <div className="meta-label">NPC</div>
+                              <div className="meta-label">{text.common.npc}</div>
                               <div className="summary-title">{selectedNpc.name}</div>
                             </div>
                             <button
@@ -514,7 +572,9 @@ export function GameScreen(props: GameScreenProps) {
                               onClick={() => void handleGenerateNpcPortrait(selectedNpc)}
                               type="button"
                             >
-                              {generatingNpcId === selectedNpc.id ? "生成中..." : "AI 生成立绘"}
+                              {generatingNpcId === selectedNpc.id
+                                ? text.gameScreen.generatingPortrait
+                                : text.gameScreen.generatePortrait}
                             </button>
                           </div>
 
@@ -530,7 +590,7 @@ export function GameScreen(props: GameScreenProps) {
                                 }
                               />
                             ) : (
-                              <div className="empty-state">当前还没有这名 NPC 的立绘。</div>
+                              <div className="empty-state">{text.gameScreen.noPortraitYet}</div>
                             )}
                           </div>
 
@@ -538,14 +598,14 @@ export function GameScreen(props: GameScreenProps) {
                           <pre>{selectedNpc.promptText}</pre>
                           {generatedPortraits[selectedNpc.id] ? (
                             <div className="hint-text">
-                              Provider: {generatedPortraits[selectedNpc.id]?.provider}
+                              {text.common.provider}: {generatedPortraits[selectedNpc.id]?.provider}
                               {"\n"}
-                              Prompt: {generatedPortraits[selectedNpc.id]?.revisedPrompt}
+                              {text.common.prompt}: {generatedPortraits[selectedNpc.id]?.revisedPrompt}
                             </div>
                           ) : null}
                         </>
                       ) : (
-                        <div className="empty-state">先从左侧选择一个 NPC。</div>
+                        <div className="empty-state">{text.gameScreen.npcSelectHint}</div>
                       )}
                     </div>
                   </div>
@@ -557,11 +617,9 @@ export function GameScreen(props: GameScreenProps) {
               <div className="game-drawer-body">
                 <div className="screen-header">
                   <div>
-                    <div className="eyebrow">Details</div>
-                    <h2>会话详情</h2>
-                    <p className="lead">
-                      非核心信息统一收在这里，包括结局判定、回放日志、分支图和调试辅助。
-                    </p>
+                    <div className="eyebrow">{text.gameScreen.detailsEyebrow}</div>
+                    <h2>{text.gameScreen.detailsTitle}</h2>
+                    <p className="lead">{text.gameScreen.detailsDescription}</p>
                   </div>
                   <div className="button-row header-actions">
                     <button
@@ -569,26 +627,31 @@ export function GameScreen(props: GameScreenProps) {
                       onClick={() => setActiveDrawer("none")}
                       type="button"
                     >
-                      关闭
+                      {text.common.close}
                     </button>
                   </div>
                 </div>
 
                 <div className="grid-two">
                   <div className="summary-card">
-                    <div className="meta-label">会话信息</div>
-                    <div className="summary-text">Session ID: {snapshot.session.id}</div>
+                    <div className="meta-label">{text.gameScreen.sessionInfo}</div>
                     <div className="summary-text">
-                      内容：{snapshot.contentSummary.ruleTitle} / {snapshot.contentSummary.storyTitle}
+                      {text.gameScreen.sessionId(snapshot.session.id)}
                     </div>
                     <div className="summary-text">
-                      模型：{snapshot.session.modelAccessMode} /{" "}
+                      {text.gameScreen.content(
+                        snapshot.contentSummary.ruleTitle,
+                        snapshot.contentSummary.storyTitle
+                      )}
+                    </div>
+                    <div className="summary-text">
+                      Model: {snapshot.session.modelAccessMode} /{" "}
                       {snapshot.session.settings.modelProfileId ?? "unknown"}
                     </div>
                   </div>
 
                   <div className="summary-card">
-                    <div className="meta-label">快捷操作</div>
+                    <div className="meta-label">{text.gameScreen.quickEndingTest}</div>
                     <div className="button-row">
                       <button
                         className="ghost-button"
@@ -596,14 +659,14 @@ export function GameScreen(props: GameScreenProps) {
                         onClick={() => void onQuickEndingTest()}
                         type="button"
                       >
-                        {isSubmittingTurn ? "处理中..." : "Mock 快速结局测试"}
+                        {isSubmittingTurn ? text.common.creating : text.gameScreen.quickEndingTest}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <div className="summary-card">
-                  <div className="meta-label">结局判定 JSON</div>
+                  <div className="meta-label">{text.gameScreen.endingJudge}</div>
                   <pre>{endingJudgeJson}</pre>
                 </div>
 
@@ -614,16 +677,20 @@ export function GameScreen(props: GameScreenProps) {
                 />
 
                 <div className="summary-card">
-                  <div className="meta-label">回放日志</div>
+                  <div className="meta-label">{text.gameScreen.replayLog}</div>
                   <div className="replay-list">
-                    {snapshot.replay.map((event) => (
-                      <article className="replay-item" key={event.id}>
-                        <div className="replay-meta">
-                          {event.type} / R{event.round}
-                        </div>
-                        <div className="replay-body">{event.summary}</div>
-                      </article>
-                    ))}
+                    {snapshot.replay.length ? (
+                      snapshot.replay.map((event) => (
+                        <article className="replay-item" key={event.id}>
+                          <div className="replay-meta">
+                            {event.type} / R{event.round}
+                          </div>
+                          <div className="replay-body">{event.summary}</div>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="empty-state">{text.gameScreen.noReplayLog}</div>
+                    )}
                   </div>
                 </div>
               </div>

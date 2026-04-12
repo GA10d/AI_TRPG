@@ -6,6 +6,7 @@ import type {
   SaveBundle,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
+import type { UiLocaleCode } from "./locales/types.ts";
 import type { OpeningPreviewDeliveryMode } from "./openingPreviewPreferences.ts";
 import type { MarkdownFontSizePreset, MenuFontSizePreset } from "./ui.ts";
 
@@ -17,6 +18,7 @@ const MAX_SESSION_RECORDS = 20;
 const MAX_SAVED_GAMES = 12;
 
 export type StoredWebDefaults = {
+  uiLocale?: UiLocaleCode;
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];

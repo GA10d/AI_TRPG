@@ -100,6 +100,30 @@ export type SessionSnapshot = {
   contentSummary: SessionContentSummary;
 };
 
+export type SessionCreateStage =
+  | "loading_content"
+  | "assembling_prompt"
+  | "requesting_narrator"
+  | "waiting_first_reply"
+  | "finalizing_session";
+
+export type SessionCreateStreamEvent =
+  | {
+      type: "stage";
+      stage: SessionCreateStage;
+      label: string;
+      detail: string;
+      progress: number;
+    }
+  | {
+      type: "done";
+      snapshot: SessionSnapshot;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
 export type CreateSaveResponse = {
   snapshot: SessionSnapshot;
   saveBundle: SaveBundle;

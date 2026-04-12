@@ -1,4 +1,5 @@
 import type { SavedGameRecord } from "../storage.ts";
+import { useUiText } from "../locales/index.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
 type RecordsScreenProps = {
@@ -11,17 +12,18 @@ type RecordsScreenProps = {
 };
 
 export function RecordsScreen(props: RecordsScreenProps) {
+  const text = useUiText();
   const { onBack } = props;
 
   return (
     <section className="panel page-panel">
       <ScreenHeader
-        title="战绩"
-        description="这里后续会放正式的战绩、结局记录和统计内容。"
+        title={text.recordsScreen.title}
+        description={text.recordsScreen.description}
         onBack={onBack}
       />
 
-      <div className="empty-state">待开发</div>
+      <div className="empty-state">{text.recordsScreen.empty}</div>
     </section>
   );
 }

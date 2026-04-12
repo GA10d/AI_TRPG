@@ -10,6 +10,7 @@ import type {
   ImageGenerationResponse,
   NpcRosterEntry,
   SaveBundle,
+  SessionCreateStreamEvent,
   SessionSnapshot,
   SubmitTurnRequest
 } from "../../../../packages/shared-types/src/index.ts";
@@ -34,24 +35,22 @@ async function parseJson<T>(response: Response): Promise<T> {
 
   if (responseText.trim()) {
     try {
-      data = JSON.parse(responseText) as T & {
-        message?: string;
-      };
+      data = JSON.parse(responseText) as T & { message?: string };
     } catch {
       if (!response.ok) {
         throw new Error(responseText.trim());
       }
 
-      throw new Error("服务端返回了非 JSON 响应。");
+      throw new Error("The server returned a non-JSON response.");
     }
   }
 
   if (!response.ok) {
-    throw new Error(data?.message ?? (responseText.trim() || "请求失败"));
+    throw new Error(data?.message ?? (responseText.trim() || "Request failed."));
   }
 
   if (!data) {
-    throw new Error("服务端返回了空响应。");
+    throw new Error("The server returned an empty response.");
   }
 
   return data;
@@ -64,7 +63,7 @@ function normalizeNetworkError(error: unknown): Error {
 
   if (error instanceof TypeError) {
     return new Error(
-      "无法连接到本地 API 服务。请确认游戏服务正在运行，并访问 http://127.0.0.1:4316/ 。"
+      "Unable to reach the local API service. Make sure the game server is running at http://127.0.0.1:4316/."
     );
   }
 
@@ -93,6 +92,96 @@ export async function createSession(
     });
 
     return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function streamCreateSession(
+  payload: CreateSessionRequest,
+  options?: {
+    signal?: AbortSignal;
+    onStage?: (event: Extract<SessionCreateStreamEvent, { type: "stage" }>) => void;
+  }
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch("/api/sessions/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    if (!response.body) {
+      throw new Error("The session creation stream did not return readable data.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalSnapshot: SessionSnapshot | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), {
+          stream: !done
+        });
+
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex >= 0) {
+          const rawLine = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          newlineIndex = buffer.indexOf("\n");
+
+          if (!rawLine) {
+            continue;
+          }
+
+          const event = JSON.parse(rawLine) as SessionCreateStreamEvent;
+          if (event.type === "stage") {
+            options?.onStage?.(event);
+            continue;
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message || "Session creation failed.");
+          }
+
+          finalSnapshot = event.snapshot;
+        }
+
+        if (done) {
+          break;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const trailing = buffer.trim();
+    if (trailing) {
+      const event = JSON.parse(trailing) as SessionCreateStreamEvent;
+      if (event.type === "stage") {
+        options?.onStage?.(event);
+      } else if (event.type === "error") {
+        throw new Error(event.message || "Session creation failed.");
+      } else {
+        finalSnapshot = event.snapshot;
+      }
+    }
+
+    if (!finalSnapshot) {
+      throw new Error("The session creation stream ended without a final session payload.");
+    }
+
+    return finalSnapshot;
   } catch (error) {
     throw normalizeNetworkError(error);
   }
@@ -142,7 +231,7 @@ export async function streamOpeningPreview(
     }
 
     if (!response.body) {
-      throw new Error("预览流未返回可读取的数据。");
+      throw new Error("The preview stream did not return readable data.");
     }
 
     const reader = response.body.getReader();
@@ -174,7 +263,7 @@ export async function streamOpeningPreview(
           }
 
           if (event.type === "error") {
-            throw new Error(event.message || "开场预览流生成失败。");
+            throw new Error(event.message || "Opening preview streaming failed.");
           }
 
           finalResult = event.result;
@@ -194,14 +283,14 @@ export async function streamOpeningPreview(
       if (event.type === "delta") {
         options?.onTextDelta?.(event.delta);
       } else if (event.type === "error") {
-        throw new Error(event.message || "开场预览流生成失败。");
+        throw new Error(event.message || "Opening preview streaming failed.");
       } else {
         finalResult = event.result;
       }
     }
 
     if (!finalResult) {
-      throw new Error("开场预览流已结束，但没有收到最终结果。");
+      throw new Error("The opening preview stream ended without a final result.");
     }
 
     return finalResult;
@@ -235,7 +324,7 @@ export async function assistCharacterConcept(
   } catch (error) {
     if (error instanceof Error && error.message === "Not Found") {
       throw new Error(
-        "角色概念 AI 接口当前不可用。现在很可能仍连接着旧的 version 3.0 服务端进程，请重启服务端后再试。"
+        "The character concept AI endpoint is not available right now. You may still be connected to an older version 3.0 server process, so please restart the server and try again."
       );
     }
 

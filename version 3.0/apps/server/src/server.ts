@@ -17,6 +17,7 @@ import type {
   GenerateOpeningPreviewResponse,
   ImageGenerationRequest,
   LoadSaveRequest,
+  SessionCreateStreamEvent,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
 import {
@@ -35,6 +36,7 @@ import {
   buildDefaultCreateSessionRequest,
   createSaveBundleForSession,
   createSessionSnapshot,
+  createSessionSnapshotWithProgress,
   loadSessionFromSaveBundle,
   submitTurn
 } from "./session/index.ts";
@@ -78,6 +80,8 @@ type OpeningPreviewStreamEvent =
       message: string;
     };
 
+type SessionCreateNdjsonEvent = SessionCreateStreamEvent;
+
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
 
@@ -115,6 +119,13 @@ function sendText(response: ServerResponse, statusCode: number, content: string)
 function sendNdjsonEvent(
   response: ServerResponse,
   event: OpeningPreviewStreamEvent
+): void {
+  response.write(`${JSON.stringify(event)}\n`);
+}
+
+function sendSessionCreateEvent(
+  response: ServerResponse,
+  event: SessionCreateNdjsonEvent
 ): void {
   response.write(`${JSON.stringify(event)}\n`);
 }
@@ -243,6 +254,52 @@ async function handleApiRequest(
     const payload = await readJsonBody<CreateSessionRequest>(request);
     const snapshot = await createSessionSnapshot(contentRoot, payload, store);
     sendJson(response, 201, snapshot);
+    return true;
+  }
+
+  if (url.pathname === "/api/sessions/stream" && request.method === "POST") {
+    const payload = await readJsonBody<CreateSessionRequest>(request);
+
+    response.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    response.flushHeaders?.();
+
+    try {
+      const snapshot = await createSessionSnapshotWithProgress(contentRoot, payload, store, {
+        onStage: async (event) => {
+          if (response.writableEnded || response.destroyed) {
+            return;
+          }
+
+          sendSessionCreateEvent(response, {
+            type: "stage",
+            ...event
+          });
+        }
+      });
+
+      if (!response.writableEnded && !response.destroyed) {
+        sendSessionCreateEvent(response, {
+          type: "done",
+          snapshot
+        });
+        response.end();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!response.writableEnded && !response.destroyed) {
+        sendSessionCreateEvent(response, {
+          type: "error",
+          message
+        });
+        response.end();
+      }
+    }
+
     return true;
   }
 

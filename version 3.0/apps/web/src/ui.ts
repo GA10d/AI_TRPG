@@ -2,6 +2,7 @@ import type {
   AiGenerationMetadata,
   CreateSessionRequest
 } from "../../../packages/shared-types/src/index.ts";
+import { zhCn, type UiText } from "./locales/index.tsx";
 
 export type AppView =
   | "menu"
@@ -18,66 +19,41 @@ export type StatusState = {
   tone: "neutral" | "error";
 };
 
-export const PLAY_MODE_OPTIONS: Array<{
+export function getPlayModeOptions(
+  text: UiText = zhCn
+): Array<{
   value: CreateSessionRequest["playMode"];
   label: string;
   description: string;
-}> = [
-  {
-    value: "single_player",
-    label: "单人模式",
-    description: "由你一个人推进剧情，适合最轻量的体验。"
-  },
-  {
-    value: "single_player_with_npc",
-    label: "单人 + NPC",
-    description: "除你之外还会有 AI 同伴参与讨论与行动。"
-  },
-  {
-    value: "multiplayer",
-    label: "多人模式",
-    description: "为后续联机流程预留，当前仍以单机路径为主。"
-  }
-];
+}> {
+  return [...text.options.playModes];
+}
 
-export const GM_ARCHITECTURE_OPTIONS: Array<{
+export const PLAY_MODE_OPTIONS = getPlayModeOptions();
+
+export function getGmArchitectureOptions(
+  text: UiText = zhCn
+): Array<{
   value: CreateSessionRequest["gmArchitecture"];
   label: string;
   description: string;
-}> = [
-  {
-    value: "single_agent",
-    label: "单 Agent 主持",
-    description: "由一个主持模型统一负责叙事与 NPC 扮演。"
-  },
-  {
-    value: "multi_agent",
-    label: "多 Agent 主持",
-    description: "为未来多智能体协作保留入口，当前仍以单 Agent 为主。"
-  }
-];
+}> {
+  return [...text.options.gmArchitectures];
+}
 
-export const LOG_VIEW_OPTIONS: Array<{
+export const GM_ARCHITECTURE_OPTIONS = getGmArchitectureOptions();
+
+export function getLogViewOptions(
+  text: UiText = zhCn
+): Array<{
   value: NonNullable<CreateSessionRequest["logViewMode"]>;
   label: string;
   description: string;
-}> = [
-  {
-    value: "all",
-    label: "全部日志",
-    description: "显示完整运行日志，方便排查。"
-  },
-  {
-    value: "compact",
-    label: "精简日志",
-    description: "只保留关键事件，适合正常游玩。"
-  },
-  {
-    value: "hidden",
-    label: "隐藏日志",
-    description: "将日志区域收敛为最低打扰。"
-  }
-];
+}> {
+  return [...text.options.logViews];
+}
+
+export const LOG_VIEW_OPTIONS = getLogViewOptions();
 
 export type MarkdownFontSizePreset =
   | "standard"
@@ -91,59 +67,29 @@ export type MenuFontSizePreset =
   | "xlarge"
   | "xxlarge";
 
-export const MARKDOWN_FONT_SIZE_OPTIONS: Array<{
+export function getMarkdownFontSizeOptions(
+  text: UiText = zhCn
+): Array<{
   value: MarkdownFontSizePreset;
   label: string;
   description: string;
-}> = [
-  {
-    value: "standard",
-    label: "标准（16px）",
-    description: "适合桌面端默认阅读。"
-  },
-  {
-    value: "large",
-    label: "偏大（18px）",
-    description: "正文更舒展，适合长段落阅读。"
-  },
-  {
-    value: "xlarge",
-    label: "大字（20px）",
-    description: "适合更重视可读性的阅读体验。"
-  },
-  {
-    value: "xxlarge",
-    label: "超大（22px）",
-    description: "适合远距离观看或高缩放场景。"
-  }
-];
+}> {
+  return [...text.options.markdownFontSizes];
+}
 
-export const MENU_FONT_SIZE_OPTIONS: Array<{
+export const MARKDOWN_FONT_SIZE_OPTIONS = getMarkdownFontSizeOptions();
+
+export function getMenuFontSizeOptions(
+  text: UiText = zhCn
+): Array<{
   value: MenuFontSizePreset;
   label: string;
   description: string;
-}> = [
-  {
-    value: "standard",
-    label: "标准（100%）",
-    description: "保持默认菜单与界面字号。"
-  },
-  {
-    value: "large",
-    label: "偏大（110%）",
-    description: "让菜单按钮、标题和说明字更易读。"
-  },
-  {
-    value: "xlarge",
-    label: "大字（120%）",
-    description: "适合偏好更明显字号层级的界面阅读。"
-  },
-  {
-    value: "xxlarge",
-    label: "超大（130%）",
-    description: "适合远距离观看或高分辨率大屏。"
-  }
-];
+}> {
+  return [...text.options.menuFontSizes];
+}
+
+export const MENU_FONT_SIZE_OPTIONS = getMenuFontSizeOptions();
 
 export function getMenuFontScale(value: MenuFontSizePreset): number {
   switch (value) {
@@ -172,15 +118,19 @@ export function formatDateTime(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-export function renderJoinedList(items: string[]): string {
-  return items.length > 0 ? items.join(" / ") : "暂无";
+export function renderJoinedList(items: string[], text: UiText = zhCn): string {
+  return items.length > 0 ? items.join(" / ") : text.common.none;
 }
 
-export function clipText(content: string | null | undefined, maxLength = 180): string {
+export function clipText(
+  content: string | null | undefined,
+  maxLength = 180,
+  text: UiText = zhCn
+): string {
   const normalized = content?.replace(/\s+/g, " ").trim() ?? "";
 
   if (!normalized) {
-    return "暂无内容。";
+    return text.common.noContent;
   }
 
   if (normalized.length <= maxLength) {
@@ -190,14 +140,14 @@ export function clipText(content: string | null | undefined, maxLength = 180): s
   return `${normalized.slice(0, maxLength).trimEnd()}...`;
 }
 
-export function buildPreviewLines(content: string | null | undefined, maxLines = 5): string[] {
+export function buildPreviewLines(
+  content: string | null | undefined,
+  maxLines = 5,
+  text: UiText = zhCn
+): string[] {
   const normalized = content?.replace(/\r\n/g, "\n").trim() ?? "";
   if (!normalized) {
-    return [
-      "夜幕正在收拢，旧磁带里的声音还没完全显形。",
-      "这段预览区会在后续接入真实开场生成。",
-      "当前先根据剧本简介和规则设定为你搭起氛围。"
-    ];
+    return text.helperText.previewFallbackLines.slice(0, maxLines);
   }
 
   return normalized
@@ -207,29 +157,36 @@ export function buildPreviewLines(content: string | null | undefined, maxLines =
     .slice(0, maxLines);
 }
 
-export function formatAiGenerationMeta(meta: AiGenerationMetadata | null | undefined): string {
+export function formatAiGenerationMeta(
+  meta: AiGenerationMetadata | null | undefined,
+  text: UiText = zhCn
+): string {
   if (!meta) {
     return "";
   }
 
   const segments: string[] = [];
   if (meta.provider) {
-    segments.push(`来源：${meta.provider}`);
+    segments.push(text.helperText.aiMeta.source(meta.provider));
   }
   if (typeof meta.durationMs === "number") {
     segments.push(
-      `耗时：${(meta.durationMs / 1000).toFixed(meta.durationMs >= 1000 ? 2 : 1)}s`
+      text.helperText.aiMeta.duration(
+        (meta.durationMs / 1000).toFixed(meta.durationMs >= 1000 ? 2 : 1)
+      )
     );
   }
   if (typeof meta.usage?.totalTokens === "number") {
-    segments.push(`Tokens：${meta.usage.totalTokens}`);
+    segments.push(text.helperText.aiMeta.tokens(meta.usage.totalTokens));
   }
   if (meta.estimatedCost) {
     const currencySymbol = meta.estimatedCost.currency === "CNY" ? "¥" : "$";
-    segments.push(`费用：${currencySymbol}${meta.estimatedCost.amount.toFixed(6)}`);
+    segments.push(
+      text.helperText.aiMeta.cost(currencySymbol, meta.estimatedCost.amount.toFixed(6))
+    );
   } else {
-    segments.push("费用：待补充");
+    segments.push(text.helperText.aiMeta.pendingCost);
   }
 
-  return segments.join(" · ");
+  return segments.join(text.helperText.aiMeta.separator);
 }

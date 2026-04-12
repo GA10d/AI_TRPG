@@ -11,15 +11,23 @@ import type {
   SessionSnapshot
 } from "../../../../packages/shared-types/src/index.ts";
 import { MENU_ANNOUNCEMENTS } from "../content/menuAnnouncements.ts";
+import {
+  UI_LOCALE_OPTIONS,
+  resolveUiLocaleCode,
+  useUiText,
+  type UiLocaleCode
+} from "../locales/index.tsx";
 import { formatDateTime } from "../ui.ts";
 
 type MainMenuScreenProps = {
   recentSnapshot: SessionSnapshot | null;
+  uiLocale: UiLocaleCode;
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId: string;
+  onUiLocaleChange: (value: UiLocaleCode) => void;
   onOpenNewGame: () => void;
   onOpenContinue: () => void;
   onOpenRecords: () => void;
@@ -52,13 +60,16 @@ function loadStoredRatio(): number {
 }
 
 export function MainMenuScreen(props: MainMenuScreenProps) {
+  const text = useUiText();
   const {
     recentSnapshot,
+    uiLocale,
     locale,
     playMode,
     gmArchitecture,
     modelAccessMode,
     modelProfileId,
+    onUiLocaleChange,
     onOpenNewGame,
     onOpenContinue,
     onOpenRecords,
@@ -145,43 +156,59 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
       }
     >
       <section className="panel hero-panel menu-panel-left">
-        <div className="eyebrow">Main Menu</div>
-        <h1>AI TRPG 3.0</h1>
-        <p className="lead menu-lead">
-          以文字叙事为核心的 AI TRPG 原型。你可以从这里开始新游戏、继续最近进度，
-          或调整当前版本的默认模型与语言配置。
-        </p>
+        <div className="menu-panel-header">
+          <div aria-hidden="true" className="menu-panel-header-spacer" />
+          <div className="eyebrow">{text.mainMenu.eyebrow}</div>
+          <div className="menu-language-picker">
+            <select
+              aria-label="Select UI language"
+              className="menu-language-select"
+              onChange={(event) =>
+                onUiLocaleChange(resolveUiLocaleCode(event.currentTarget.value))
+              }
+              value={uiLocale}
+            >
+              {UI_LOCALE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <h1>{text.mainMenu.title}</h1>
+        <p className="lead menu-lead">{text.mainMenu.description}</p>
 
         <div className="menu-button-list">
           <button className="menu-button" onClick={onOpenNewGame} type="button">
-            开始游戏
+            {text.mainMenu.buttons.newGame}
           </button>
           <button className="menu-button" onClick={onOpenContinue} type="button">
-            继续游戏
+            {text.mainMenu.buttons.continue}
           </button>
           <button className="menu-button" onClick={onOpenRecords} type="button">
-            战绩
+            {text.mainMenu.buttons.records}
           </button>
           <button className="menu-button" onClick={onOpenSettings} type="button">
-            设置
+            {text.mainMenu.buttons.settings}
           </button>
           <button className="menu-button menu-button-danger" onClick={onOpenExit} type="button">
-            退出
+            {text.mainMenu.buttons.exit}
           </button>
         </div>
 
         <div className="menu-footer-links">
           <button className="ghost-button menu-link-button" type="button">
-            关于
+            {text.mainMenu.footer.about}
           </button>
           <button className="ghost-button menu-link-button" type="button">
-            联系我们
+            {text.mainMenu.footer.contact}
           </button>
         </div>
       </section>
 
       <button
-        aria-label="拖拽调整主菜单左右宽度"
+        aria-label={text.mainMenu.splitterAriaLabel}
         className="menu-splitter"
         onPointerDown={handlePointerDown}
         type="button"
@@ -192,10 +219,10 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
       <section className="panel summary-panel menu-panel-right">
         <div className="menu-notice-header">
           <div>
-            <div className="eyebrow">Official Feed</div>
-            <h2>公告与动态</h2>
+            <div className="eyebrow">{text.mainMenu.feed.eyebrow}</div>
+            <h2>{text.mainMenu.feed.title}</h2>
           </div>
-          <div className="summary-text">这里会展示最近的版本更新与开发动态。</div>
+          <div className="summary-text">{text.mainMenu.feed.description}</div>
         </div>
 
         <div className="menu-notice-list">
@@ -216,35 +243,46 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
             }
             type="button"
           >
-            显示更多...
+            {text.mainMenu.feed.showMore}
           </button>
         ) : null}
 
         <div className="menu-meta-strip">
           <div className="summary-card">
-            <div className="meta-label">最近进度</div>
+            <div className="meta-label">{text.mainMenu.recentProgress.label}</div>
             {recentSnapshot ? (
               <>
                 <div className="summary-title">{recentSnapshot.contentSummary.storyTitle}</div>
                 <div className="summary-text">
-                  回合 {recentSnapshot.session.currentRound} / 状态 {recentSnapshot.session.status}
+                  {text.mainMenu.recentProgress.roundAndStatus(
+                    recentSnapshot.session.currentRound,
+                    recentSnapshot.session.status
+                  )}
                 </div>
                 <div className="summary-text">
-                  更新时间：{formatDateTime(recentSnapshot.session.updatedAt)}
+                  {text.mainMenu.recentProgress.updatedAt(
+                    formatDateTime(recentSnapshot.session.updatedAt)
+                  )}
                 </div>
               </>
             ) : (
-              <div className="summary-text">还没有可继续的本地进度。</div>
+              <div className="summary-text">{text.mainMenu.recentProgress.empty}</div>
             )}
           </div>
 
           <div className="summary-card">
-            <div className="meta-label">当前默认配置</div>
-            <div className="summary-text">语言：{locale}</div>
-            <div className="summary-text">模式：{playMode}</div>
-            <div className="summary-text">主持架构：{gmArchitecture}</div>
-            <div className="summary-text">模型模式：{modelAccessMode}</div>
-            <div className="summary-text">模型档案：{modelProfileId}</div>
+            <div className="meta-label">{text.mainMenu.defaults.label}</div>
+            <div className="summary-text">{text.mainMenu.defaults.locale(locale)}</div>
+            <div className="summary-text">{text.mainMenu.defaults.playMode(playMode)}</div>
+            <div className="summary-text">
+              {text.mainMenu.defaults.gmArchitecture(gmArchitecture)}
+            </div>
+            <div className="summary-text">
+              {text.mainMenu.defaults.modelAccessMode(modelAccessMode)}
+            </div>
+            <div className="summary-text">
+              {text.mainMenu.defaults.modelProfile(modelProfileId)}
+            </div>
           </div>
         </div>
       </section>

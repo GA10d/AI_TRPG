@@ -9,21 +9,26 @@ import type {
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchBootstrap } from "../lib/trpgApiClient.ts";
 import {
-  OPENING_PREVIEW_DELIVERY_OPTIONS,
+  getOpeningPreviewDeliveryOptions,
   type OpeningPreviewDeliveryMode
 } from "../openingPreviewPreferences.ts";
 import { loadStoredWebDefaults } from "../storage.ts";
 import {
-  GM_ARCHITECTURE_OPTIONS,
-  LOG_VIEW_OPTIONS,
-  MARKDOWN_FONT_SIZE_OPTIONS,
-  MENU_FONT_SIZE_OPTIONS,
-  PLAY_MODE_OPTIONS,
+  getGmArchitectureOptions,
+  getLogViewOptions,
+  getMarkdownFontSizeOptions,
+  getMenuFontSizeOptions,
+  getPlayModeOptions,
   type MarkdownFontSizePreset,
   type MenuFontSizePreset,
   type StatusState,
   pickOption
 } from "../ui.ts";
+import {
+  DEFAULT_UI_LOCALE,
+  resolveUiLocaleCode,
+  type UiLocaleCode
+} from "../locales/index.tsx";
 
 type UseBootstrapStateArgs = {
   onStatusChange: (status: StatusState) => void;
@@ -246,10 +251,17 @@ function sanitizeImagePromptTemplateConfig(
 }
 
 export function useBootstrapState(args: UseBootstrapStateArgs) {
+  const playModeOptions = getPlayModeOptions();
+  const gmArchitectureOptions = getGmArchitectureOptions();
+  const logViewOptions = getLogViewOptions();
+  const openingPreviewDeliveryOptions = getOpeningPreviewDeliveryOptions();
+  const markdownFontSizeOptions = getMarkdownFontSizeOptions();
+  const menuFontSizeOptions = getMenuFontSizeOptions();
   const { onStatusChange } = args;
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [ruleDirectoryName, setRuleDirectoryName] = useState("");
   const [storyDirectoryName, setStoryDirectoryName] = useState("");
+  const [uiLocale, setUiLocale] = useState<UiLocaleCode>(DEFAULT_UI_LOCALE);
   const [locale, setLocale] = useState<CreateSessionRequest["locale"]>("zh-CN");
   const [playMode, setPlayMode] = useState<CreateSessionRequest["playMode"]>("single_player");
   const [gmArchitecture, setGmArchitecture] =
@@ -336,6 +348,9 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         setBootstrap(data);
         setRuleDirectoryName(data.catalog[0]?.directoryName ?? "");
         setStoryDirectoryName(data.catalog[0]?.stories[0]?.directoryName ?? "");
+        setUiLocale(
+          resolveUiLocaleCode(storedDefaults?.uiLocale ?? storedDefaults?.locale)
+        );
         setLocale(
           pickOption(
             storedDefaults?.locale,
@@ -346,14 +361,14 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         setPlayMode(
           pickOption(
             storedDefaults?.playMode,
-            PLAY_MODE_OPTIONS.map((item) => item.value),
+            playModeOptions.map((item) => item.value),
             data.defaults.playMode
           )
         );
         setGmArchitecture(
           pickOption(
             storedDefaults?.gmArchitecture,
-            GM_ARCHITECTURE_OPTIONS.map((item) => item.value),
+            gmArchitectureOptions.map((item) => item.value),
             data.defaults.gmArchitecture
           )
         );
@@ -379,14 +394,14 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         setLogViewMode(
           pickOption(
             storedDefaults?.logViewMode,
-            LOG_VIEW_OPTIONS.map((item) => item.value),
+            logViewOptions.map((item) => item.value),
             data.defaults.logViewMode
           )
         );
         setOpeningPreviewDeliveryMode(
           pickOption(
             storedDefaults?.openingPreviewDeliveryMode,
-            OPENING_PREVIEW_DELIVERY_OPTIONS.map((item) => item.value),
+            openingPreviewDeliveryOptions.map((item) => item.value),
             "stream"
           )
         );
@@ -394,14 +409,14 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         setMarkdownFontSize(
           pickOption(
             storedDefaults?.markdownFontSize,
-            MARKDOWN_FONT_SIZE_OPTIONS.map((item) => item.value),
+            markdownFontSizeOptions.map((item) => item.value),
             "large"
           )
         );
         setMenuFontSize(
           pickOption(
             storedDefaults?.menuFontSize,
-            MENU_FONT_SIZE_OPTIONS.map((item) => item.value),
+            menuFontSizeOptions.map((item) => item.value),
             "standard"
           )
         );
@@ -529,6 +544,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     bootstrap,
     ruleDirectoryName,
     storyDirectoryName,
+    uiLocale,
     locale,
     playMode,
     gmArchitecture,
@@ -548,6 +564,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     menuFontSize,
     setRuleDirectoryName,
     setStoryDirectoryName,
+    setUiLocale,
     setLocale,
     setPlayMode,
     setGmArchitecture,

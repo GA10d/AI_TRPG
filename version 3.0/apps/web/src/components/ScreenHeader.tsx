@@ -1,3 +1,5 @@
+import { useUiText } from "../locales/index.tsx";
+
 type ScreenHeaderProps = {
   title: string;
   description: string;
@@ -8,19 +10,20 @@ type ScreenHeaderProps = {
 };
 
 export function ScreenHeader(props: ScreenHeaderProps) {
+  const text = useUiText();
   const {
     title,
     description,
     onBack,
-    backLabel = "返回主菜单",
+    backLabel = text.screenHeader.defaultBackLabel,
     onClose,
-    closeLabel = "关闭"
+    closeLabel = text.screenHeader.defaultCloseLabel
   } = props;
 
   return (
     <div className="screen-header">
       <div>
-        <div className="eyebrow">AI TRPG 3.0</div>
+        <div className="eyebrow">{text.appName}</div>
         <h1>{title}</h1>
         <p className="lead">{description}</p>
       </div>

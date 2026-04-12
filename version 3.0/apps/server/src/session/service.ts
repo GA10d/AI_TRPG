@@ -10,6 +10,7 @@ import type {
   Message,
   ReplayEvent,
   SaveBundle,
+  SessionCreateStage,
   Session,
   SessionContentSummary,
   SessionSnapshot,
@@ -81,6 +82,32 @@ function buildLoadReplayEvent(sessionId: string, savedAt: string, loadedAt: stri
   };
 }
 
+type SessionCreateProgressHandler = (event: {
+  stage: SessionCreateStage;
+  label: string;
+  detail: string;
+  progress: number;
+}) => void | Promise<void>;
+
+type CreateSessionSnapshotOptions = {
+  onStage?: SessionCreateProgressHandler;
+};
+
+async function emitCreateSessionStage(
+  options: CreateSessionSnapshotOptions | undefined,
+  stage: SessionCreateStage,
+  label: string,
+  detail: string,
+  progress: number
+): Promise<void> {
+  await options?.onStage?.({
+    stage,
+    label,
+    detail,
+    progress
+  });
+}
+
 function buildSaveBundle(
   snapshot: SessionSnapshot,
   runtimeConfig: SessionRuntimeConfig | null,
@@ -97,11 +124,19 @@ function buildSaveBundle(
   };
 }
 
-export async function createSessionSnapshot(
+async function createSessionSnapshotInternal(
   contentRoot: string,
   request: CreateSessionRequest,
-  store: InMemorySessionStore
+  store: InMemorySessionStore,
+  options?: CreateSessionSnapshotOptions
 ): Promise<SessionSnapshot> {
+  await emitCreateSessionStage(
+    options,
+    "loading_content",
+    "读取规则与剧本",
+    "正在加载 rule / story 文本，以及当前剧本的基础内容。",
+    0.2
+  );
   const bundle = await loadPlayableContentBundle(
     contentRoot,
     request.ruleDirectoryName,
@@ -121,7 +156,24 @@ export async function createSessionSnapshot(
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
   const characterConcept = request.characterConcept?.trim() ?? "";
   const modelGateway = getModelGateway(request.modelAccessMode);
-  const openingResult = await modelGateway.generateInitialSessionNarration({
+
+  await emitCreateSessionStage(
+    options,
+    "assembling_prompt",
+    "整理 Narrator 输入",
+    "正在组合 narrator prompt、rule.txt、story.txt 和 player_info.txt。",
+    0.42
+  );
+
+  await emitCreateSessionStage(
+    options,
+    "requesting_narrator",
+    "请求 Narrator Agent",
+    "正在把会话开场材料发送给模型，准备生成第一段叙事。",
+    0.64
+  );
+
+  const openingPromise = modelGateway.generateInitialSessionNarration({
     accessMode: request.modelAccessMode,
     modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig,
@@ -132,6 +184,22 @@ export async function createSessionSnapshot(
     storyText: bundle.story.story.content,
     playerInfo: characterConcept
   });
+  await emitCreateSessionStage(
+    options,
+    "waiting_first_reply",
+    "等待首条叙事返回",
+    "模型已经开始处理开场，正在等待第一条正式 narration 完成。",
+    0.84
+  );
+  const openingResult = await openingPromise;
+
+  await emitCreateSessionStage(
+    options,
+    "finalizing_session",
+    "写入会话快照",
+    "正在把首条叙事和本局配置写入正式会话。",
+    0.96
+  );
 
   const session: Session = {
     id: sessionId,
@@ -292,6 +360,23 @@ export async function createSessionSnapshot(
     runtimeModelConfig: request.runtimeModelConfig
   });
   return snapshot;
+}
+
+export async function createSessionSnapshot(
+  contentRoot: string,
+  request: CreateSessionRequest,
+  store: InMemorySessionStore
+): Promise<SessionSnapshot> {
+  return createSessionSnapshotInternal(contentRoot, request, store);
+}
+
+export async function createSessionSnapshotWithProgress(
+  contentRoot: string,
+  request: CreateSessionRequest,
+  store: InMemorySessionStore,
+  options?: CreateSessionSnapshotOptions
+): Promise<SessionSnapshot> {
+  return createSessionSnapshotInternal(contentRoot, request, store, options);
 }
 
 export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
