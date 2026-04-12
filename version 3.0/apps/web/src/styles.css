@@ -834,6 +834,71 @@ img {
   width: 100%;
 }
 
+.character-assist-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.character-assist-button::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+.character-assist-button:hover::before,
+.character-assist-button:focus-visible::before,
+.character-assist-button.is-complete::before {
+  opacity: 1;
+}
+
+.character-assist-button-label,
+.character-assist-button-static {
+  position: relative;
+  display: block;
+  min-height: 1.2em;
+}
+
+.character-assist-button-label {
+  overflow: hidden;
+}
+
+.character-assist-button-static {
+  z-index: 1;
+}
+
+.character-assist-button-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.1em;
+  transition: transform 420ms cubic-bezier(1, -0.25, 0, 1.25);
+  will-change: transform;
+}
+
+.character-assist-button-text-generate {
+  transform: translate3d(0, 0, 0);
+}
+
+.character-assist-button-text-complete {
+  transform: translate3d(0, -120%, 0);
+}
+
+.character-assist-button.is-complete .character-assist-button-text-generate {
+  transform: translate3d(0, 120%, 0);
+}
+
+.character-assist-button.is-complete .character-assist-button-text-complete {
+  transform: translate3d(0, 0, 0);
+}
+
 .setup-settings-list {
   align-content: start;
 }
@@ -1440,6 +1505,13 @@ textarea {
   cursor: wait;
   transform: none;
   box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-assist-button::before,
+  .character-assist-button-text {
+    transition: none;
+  }
 }
 
 .summary-card,

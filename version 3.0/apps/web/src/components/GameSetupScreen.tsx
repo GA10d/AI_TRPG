@@ -459,14 +459,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     selectedProfile?.baseModel ||
     setupText.model.notConfigured;
   const trimmedCharacterConcept = characterConcept.trim();
+  const characterAssistShowsComplete = trimmedCharacterConcept.length > 0;
   const characterAssistButtonLabel =
-    trimmedCharacterConcept.length > 0
+    characterAssistShowsComplete
       ? setupText.characterSetup.completeButton
       : setupText.characterSetup.generateButton;
   const characterAssistBusyLabel =
     characterConceptAssistMode === "complete"
       ? setupText.characterSetup.completing
       : setupText.characterSetup.generating;
+  const characterAssistAriaLabel = characterConceptAssistLoading
+    ? characterAssistBusyLabel
+    : characterAssistButtonLabel;
   const canAssistCharacterConcept =
     !characterConceptAssistLoading &&
     !isCreating &&
@@ -1304,14 +1308,26 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                 <div className="setup-pane-footer setup-pane-actions-footer">
                   <button
-                    className="ghost-button"
+                    aria-label={characterAssistAriaLabel}
+                    className={`ghost-button character-assist-button${characterAssistShowsComplete ? " is-complete" : ""}`}
                     disabled={!canAssistCharacterConcept}
                     onClick={() => void onAssistCharacterConcept()}
                     type="button"
                   >
-                    {characterConceptAssistLoading
-                      ? characterAssistBusyLabel
-                      : characterAssistButtonLabel}
+                    {characterConceptAssistLoading ? (
+                      <span className="character-assist-button-static">
+                        {characterAssistBusyLabel}
+                      </span>
+                    ) : (
+                      <span aria-hidden="true" className="character-assist-button-label">
+                        <span className="character-assist-button-text character-assist-button-text-generate">
+                          {setupText.characterSetup.generateButton}
+                        </span>
+                        <span className="character-assist-button-text character-assist-button-text-complete">
+                          {setupText.characterSetup.completeButton}
+                        </span>
+                      </span>
+                    )}
                   </button>
                   <button
                     className="primary-button"
