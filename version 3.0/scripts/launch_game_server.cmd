@@ -7,6 +7,7 @@ set "SERVER_LOG=%LOG_DIR%\gameplay_server.log"
 set "SERVER_ERR_LOG=%LOG_DIR%\gameplay_server.err.log"
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+call "%~dp0organize_root_logs.cmd"
 
 echo Writing server logs to:
 echo %SERVER_LOG%

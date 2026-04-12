@@ -9,6 +9,7 @@ set "SERVER_LOG=%LOG_DIR%\gameplay_server.log"
 set "SERVER_ERR_LOG=%LOG_DIR%\gameplay_server.err.log"
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+call "%~dp0scripts\organize_root_logs.cmd"
 
 echo Starting AI TRPG 3.0 gameplay server...
 start "AI TRPG 3.0 Server" cmd /k call "%~dp0scripts\launch_game_server.cmd"

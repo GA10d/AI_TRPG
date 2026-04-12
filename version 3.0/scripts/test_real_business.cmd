@@ -5,6 +5,7 @@ set "LOG_DIR=%cd%\logs"
 set "FLOW_LOG=%LOG_DIR%\real_business_flow.log"
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+call "%~dp0organize_root_logs.cmd"
 
 echo This script is a smoke test only.
 echo For actual gameplay, please use start_game.cmd in the version 3.0 root folder.
