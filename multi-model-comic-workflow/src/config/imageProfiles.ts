@@ -45,7 +45,7 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
     code: "mock_image",
     providerFamily: "mock",
     dependence: "Mock",
-    description: "Built-in placeholder generator for UI development and pipeline verification.",
+    description: "Built-in placeholder generator for pipeline verification.",
     urlRequirements: false,
     baseUrl: null,
     baseModel: null,
@@ -69,24 +69,22 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
     code: "gemini_image",
     providerFamily: "google-native",
     dependence: "Google",
-    description: "Use Gemini image generation for portraits and scene illustrations.",
+    description: "Google Gemini native image generation for comic pages and reference-aware composition.",
     urlRequirements: false,
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     baseModel: "gemini-3.1-flash-image-preview",
     chargeUrl: "https://ai.google.dev/pricing",
     docsUrl: "https://ai.google.dev/gemini-api/docs/image-generation",
     envKeyCandidates: [
-      "TRPG_IMAGE_API_KEY",
+      "COMIC_GEMINI_IMAGE_API_KEY",
       "GEMINI_API_KEY",
       "GOOGLE_API_KEY"
     ],
     modelEnvKeyCandidates: [
-      "TRPG_IMAGE_MODEL",
-      "TRPG_GEMINI_IMAGE_MODEL"
+      "COMIC_GEMINI_IMAGE_MODEL"
     ],
     baseUrlEnvKeyCandidates: [
-      "TRPG_IMAGE_BASE_URL",
-      "TRPG_GEMINI_IMAGE_BASE_URL"
+      "COMIC_GEMINI_IMAGE_BASE_URL"
     ],
     allowsCustomApiKey: true,
     allowsCustomBaseUrl: true,
@@ -111,21 +109,21 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
     code: "chatgpt_image",
     providerFamily: "openai-native",
     dependence: "OpenAI",
-    description: "Use OpenAI GPT Image for native text-to-image generation.",
+    description: "OpenAI GPT Image for comic page generation.",
     urlRequirements: false,
     baseUrl: "https://api.openai.com/v1",
     baseModel: "gpt-image-1.5",
     chargeUrl: "https://openai.com/api/pricing/",
     docsUrl: "https://platform.openai.com/docs/guides/image-generation",
     envKeyCandidates: [
-      "TRPG_CHATGPT_IMAGE_API_KEY",
+      "COMIC_OPENAI_IMAGE_API_KEY",
       "OPENAI_API_KEY"
     ],
     modelEnvKeyCandidates: [
-      "TRPG_CHATGPT_IMAGE_MODEL"
+      "COMIC_OPENAI_IMAGE_MODEL"
     ],
     baseUrlEnvKeyCandidates: [
-      "TRPG_CHATGPT_IMAGE_BASE_URL"
+      "COMIC_OPENAI_IMAGE_BASE_URL"
     ],
     allowsCustomApiKey: true,
     allowsCustomBaseUrl: true,
@@ -150,24 +148,22 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
     code: "doubao_image",
     providerFamily: "volcengine-ark-openai-compatible",
     dependence: "OpenAI",
-    description: "Use Volcengine Ark Seedream image generation through the OpenAI-compatible image API.",
+    description: "Volcengine Ark Seedream image generation through the domestic OpenAI-compatible API.",
     urlRequirements: false,
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     baseModel: "doubao-seedream-5-0-260128",
     chargeUrl: "https://console.volcengine.com/ark",
     docsUrl: "https://www.volcengine.com/docs/82379/1541523",
     envKeyCandidates: [
-      "TRPG_DOUBAO_IMAGE_API_KEY",
+      "COMIC_DOUBAO_IMAGE_API_KEY",
       "DOUBAO_API_KEY",
-      "TRPG_DOUBAO_API_KEY",
       "ARK_API_KEY"
     ],
     modelEnvKeyCandidates: [
-      "TRPG_DOUBAO_IMAGE_MODEL"
+      "COMIC_DOUBAO_IMAGE_MODEL"
     ],
     baseUrlEnvKeyCandidates: [
-      "TRPG_DOUBAO_IMAGE_BASE_URL",
-      "TRPG_DOUBAO_BASE_URL"
+      "COMIC_DOUBAO_IMAGE_BASE_URL"
     ],
     allowsCustomApiKey: true,
     allowsCustomBaseUrl: true,
