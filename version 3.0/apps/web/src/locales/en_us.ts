@@ -117,6 +117,18 @@ export const enUs = {
         description: "Best for large screens or distant viewing."
       }
     ],
+    frontendThemes: [
+      {
+        value: "red_black_white",
+        label: "Red / Black / White",
+        description: "A high-contrast anomaly terminal with sharper danger cues."
+      },
+      {
+        value: "blue_white_pink",
+        label: "Blue / White / Pink",
+        description: "A brighter neon-night palette with a more fashionable mood."
+      }
+    ],
     openingPreviewDelivery: [
       {
         value: "stream",
@@ -196,33 +208,33 @@ export const enUs = {
     },
     bootstrapStages: {
       entered_game: {
-        label: "Entered the play screen",
-        detail: "You are already in the core play view and the formal session is being prepared.",
+        label: "Entering the story core",
+        detail: "You already reached the core view and the system is locking onto this run.",
         progress: 0.08
       },
       loading_content: {
-        label: "Loading rule and story content",
-        detail: "Reading the rule text and story materials needed for this opening.",
+        label: "Reading the dossier",
+        detail: "Rule text, story materials, and stage data are being read into the session.",
         progress: 0.2
       },
       assembling_prompt: {
-        label: "Assembling narrator input",
-        detail: "Combining the narrator prompt, rule.txt, story.txt, and player info.",
+        label: "Calibrating the narrative gate",
+        detail: "Player setup, rule text, and story materials are being packed into the opening.",
         progress: 0.42
       },
       requesting_narrator: {
-        label: "Requesting the narrator agent",
-        detail: "Sending the opening materials to the model and preparing the first narration.",
+        label: "Calling the narrator side",
+        detail: "The opening packet is being sent to the narrator and the first scene is being prepared.",
         progress: 0.64
       },
       waiting_first_reply: {
-        label: "Waiting for the first reply",
-        detail: "The model is processing the opening and we are waiting for the first narration.",
+        label: "Waiting for the first narration",
+        detail: "The model has accepted the opening packet and the first narration is on its way back.",
         progress: 0.84
       },
       finalizing_session: {
-        label: "Writing the session snapshot",
-        detail: "Saving the first narration and the current setup into the formal session.",
+        label: "Sealing the scene record",
+        detail: "The first narration and current setup are being written into the formal session record.",
         progress: 0.96
       }
     },
@@ -234,40 +246,39 @@ export const enUs = {
     quickEndingTestInput: "I force an immediate mock ending trigger and choose to escape."
   },
   mainMenu: {
-    eyebrow: "Main Menu",
-    title: "AI TRPG 3.0",
-    description:
-      "A text-first AI TRPG prototype. Start a new run, continue your latest progress, or adjust the current build's default model and language settings from here.",
+    eyebrow: "ANOMALY STORY SYSTEM",
+    title: "Enter the Anomaly Zone",
+    description: "Pick a story, connect to it, and see who slips out of focus first tonight.",
     buttons: {
-      newGame: "Start Game",
-      continue: "Continue",
-      records: "Records",
-      settings: "Settings",
-      exit: "Exit"
+      newGame: "Start New Run",
+      continue: "Resume Last Signal",
+      records: "Open Records",
+      settings: "System Console",
+      exit: "Leave Terminal"
     },
     footer: {
-      about: "About",
-      contact: "Contact"
+      about: "About This Terminal",
+      contact: "Contact Maintainer"
     },
     feed: {
-      eyebrow: "Updates",
-      title: "Announcements",
-      description: "Recent build notes and development updates appear here.",
-      showMore: "Show more..."
+      eyebrow: "Signal Feed",
+      title: "Latest Returns",
+      description: "Build changes, new hooks, and experiment notes land here first.",
+      showMore: "Load more"
     },
     recentProgress: {
-      label: "Recent Progress",
-      roundAndStatus: (round: number, status: string) => `Round ${round} / Status: ${status}`,
-      updatedAt: (value: string) => `Updated: ${value}`,
-      empty: "There is no local progress to continue yet."
+      label: "Recent Signal",
+      roundAndStatus: (round: number, status: string) => `Round ${round} / Current: ${status}`,
+      updatedAt: (value: string) => `Last written: ${value}`,
+      empty: "You have not left behind a recoverable scene record yet."
     },
     defaults: {
-      label: "Current Defaults",
-      locale: (value: string) => `Language: ${value}`,
-      playMode: (value: string) => `Mode: ${value}`,
+      label: "System Defaults",
+      locale: (value: string) => `Language channel: ${value}`,
+      playMode: (value: string) => `Access mode: ${value}`,
       gmArchitecture: (value: string) => `GM architecture: ${value}`,
-      modelAccessMode: (value: string) => `Model mode: ${value}`,
-      modelProfile: (value: string) => `Model profile: ${value}`
+      modelAccessMode: (value: string) => `Model link: ${value}`,
+      modelProfile: (value: string) => `Text model: ${value}`
     },
     uiLanguageAriaLabel: "Select UI language",
     splitterAriaLabel: "Drag to resize the main menu columns"
@@ -384,6 +395,7 @@ export const enUs = {
     gmArchitecture: "Default GM architecture",
     logViewMode: "Default log visibility",
     menuFontSize: "Menu font size",
+    frontendTheme: "Interface palette",
     debugOptions: "Debug options",
     enableDebug: "Enable debug information by default",
     showAiMetadata: "Show AI timing, tokens, and cost",
@@ -429,42 +441,41 @@ export const enUs = {
     resetDefaults: "Restore defaults"
   },
   storySelectScreen: {
-    title: "Start Game",
-    description:
-      "Pick the rule set and story for this run first. Choose a rule on the left, a story in the middle, and confirm the tone and details on the right.",
-    backLabel: "Back to Menu",
+    title: "Choose Tonight's Entry Point",
+    description: "Lock the rules on the left, pick a story in the middle, and read the dossier on the right.",
+    backLabel: "Back to Terminal",
     closeLabel: "Close",
     collapsedRuleLabel: "RULE",
     collapsedStoryLabel: "STORY",
     expandAction: "Expand",
     collapseAction: "Collapse",
-    ruleEyebrow: "Rule",
-    ruleListTitle: "Rule List",
-    storyEyebrow: "Story",
+    ruleEyebrow: "Rule Index",
+    ruleListTitle: "Rule Directory",
+    storyEyebrow: "Story Files",
     storyListTitle: "Story List",
-    storyPreviewEyebrow: "Story Preview",
+    storyPreviewEyebrow: "Dossier Preview",
     splitterRuleStoryAria: "Resize the rule and story columns",
     splitterStoryDetailAria: "Resize the story and detail columns",
     playerCountSingle: (count: number) => `${count} player`,
     playerCountRange: (min: number, max: number) => `${min}-${max} players`,
     defaultRuleIntro:
-      "This rule set does not provide `intro.txt` or `intro.md` yet, so a fallback summary is shown for now. You can still keep choosing a story and move into setup.",
+      "This rule pack does not have polished guidance copy yet, but you can still connect to it.",
     defaultStoryIntro:
-      "This story does not provide `intro.txt` or `intro.md` yet, so a fallback summary is shown for now. You can still continue into the game and add richer intro copy later.",
+      "There is no readable story dossier here yet. Check whether the content pack loaded correctly.",
     defaultCoverCopy:
-      "This story does not provide `cover.png` yet, so the default cover area is used for now. If you later place `cover.png`, `cover.jpg`, or `cover.webp` in the story folder, it will be loaded automatically.",
+      "This story does not provide a formal cover yet, so the default stage is used for now. Once you add a cover, this becomes the main visual stage.",
     defaultCoverQuote:
       "This story does not provide a dedicated cover quote yet, so the intro summary is used instead.",
     coverAlt: (storyTitle: string) => `${storyTitle} cover`,
     openCoverAria: "View full image",
     closeCoverAria: "Hide full image",
-    openCoverButton: "View full image",
+    openCoverButton: "Expand cover",
     storyIntroLabel: "Story Intro",
-    ruleIntroLabel: "Rule Intro",
-    tagsLabel: "Tags",
-    pacingLengthLabel: "Pacing & Length",
+    ruleIntroLabel: "Rule Summary",
+    tagsLabel: "Keywords",
+    pacingLengthLabel: "Pacing / Length",
     contentWarnings: (value: string) => `Content warnings: ${value}`,
-    startAdventure: "Start Adventure",
+    startAdventure: "Begin Link",
     empty: "No playable rules or stories are available yet. Check whether the content packs loaded correctly.",
     coverDialogAria: "Story cover preview",
     closeCoverDialogAria: "Close cover preview",
@@ -621,24 +632,27 @@ export const enUs = {
     coverDialogAlt: (storyTitle: string) => `${storyTitle} full cover image`
   },
   gameBootstrapScreen: {
-    fallbackStoryTitle: "Preparing Session",
-    progressTitle: "Initialization Progress",
+    fallbackStoryTitle: "Entering the Story Core",
+    progressTitle: "Link Progress",
     progressLabel: (percent: number) => `${percent}%`,
     waitHint:
-      "Game initialization usually takes around 30 seconds. Thank you for your patience!",
-    tipLabel: "Tips While You Wait",
+      "The first load can take a moment. The more dangerous the story, the less quickly it answers.",
+    tipLabel: "System Broadcast",
     defaultLoadingHint: (storyTitle: string) =>
-      `We are opening ${storyTitle} and preparing the first narration for the live scene.`,
+      `All clues are already on the move. ${storyTitle} is waiting for its first formal narration to return.`,
     coverAlt: (storyTitle: string) => `${storyTitle} cover art`,
-    fallbackCoverTitle: "Cover Preview Unavailable",
+    fallbackCoverTitle: "Cover Signal Not Connected",
     fallbackCoverDescription:
-      "If this story pack provides cover.png, it will appear here automatically.",
+      "If the story directory provides cover.png, the formal hero art will appear here automatically.",
     tips: [
-      "Save and Load stay on the main play screen, so you can checkpoint before an important choice.",
-      "Use the NPC panel to inspect current character notes and generate portraits later.",
-      "The Details drawer keeps ending-judge JSON, replay logs, and branch graphs out of the main reading area.",
-      "Text model, image model, and image prompt defaults can all be adjusted from Settings.",
-      "If the opening tone feels off, go back to Beginning and rewrite your character concept before starting again."
+      "The details drawer will later open up ending judges, replay logs, and branch graphs.",
+      "The NPC panel will later connect portraits and dossier lookup.",
+      "Once the opening returns, you can submit your first move immediately.",
+      "This loading pass does not break local records. You can still recover after an accidental close.",
+      "If nothing returns for too long, check the model connection status first.",
+      "The core experience here is still text narrative, not stat stacking.",
+      "Every move changes the next branch, but not always the truth.",
+      "Short input is not always weak, but specific action is usually more dramatic."
     ]
   },
   playthroughGraph: {

@@ -117,6 +117,18 @@ export const jaJp = {
         description: "大画面や離れた位置からの閲覧に向いています。"
       }
     ],
+    frontendThemes: [
+      {
+        value: "red_black_white",
+        label: "赤 / 黒 / 白",
+        description: "高コントラストで危険信号の強い異常端末テーマです。"
+      },
+      {
+        value: "blue_white_pink",
+        label: "青 / 白 / ピンク",
+        description: "より軽やかでネオン感のある夜景テーマです。"
+      }
+    ],
     openingPreviewDelivery: [
       {
         value: "stream",
@@ -394,6 +406,7 @@ export const jaJp = {
     gmArchitecture: "既定の GM 構成",
     logViewMode: "既定のログ表示",
     menuFontSize: "メニュー文字サイズ",
+    frontendTheme: "UI 配色",
     debugOptions: "デバッグオプション",
     enableDebug: "デバッグ情報を既定で有効にする",
     showAiMetadata: "AI の所要時間、Token、料金を表示する",

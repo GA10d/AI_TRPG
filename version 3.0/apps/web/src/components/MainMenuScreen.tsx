@@ -144,6 +144,32 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
 
   const visibleAnnouncements = MENU_ANNOUNCEMENTS.slice(0, visibleNoticeCount);
   const hasMoreAnnouncements = MENU_ANNOUNCEMENTS.length > visibleAnnouncements.length;
+  const recentSnapshotUpdatedAt = recentSnapshot
+    ? formatDateTime(recentSnapshot.session.updatedAt)
+    : null;
+  const signalPills = [
+    text.mainMenu.defaults.locale(locale),
+    text.mainMenu.defaults.playMode(playMode),
+    text.mainMenu.defaults.modelAccessMode(modelAccessMode)
+  ];
+  const systemCards = [
+    {
+      label: text.mainMenu.defaults.label,
+      lines: [
+        text.mainMenu.defaults.locale(locale),
+        text.mainMenu.defaults.playMode(playMode),
+        text.mainMenu.defaults.gmArchitecture(gmArchitecture)
+      ]
+    },
+    {
+      label: text.mainMenu.feed.title,
+      lines: [
+        text.mainMenu.defaults.modelAccessMode(modelAccessMode),
+        text.mainMenu.defaults.modelProfile(modelProfileId),
+        `UI / ${uiLocale.toUpperCase()}`
+      ]
+    }
+  ];
 
   return (
     <div
@@ -156,12 +182,14 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
       }
     >
       <section className="panel hero-panel menu-panel-left">
-        <div className="menu-panel-header">
-          <div aria-hidden="true" className="menu-panel-header-spacer" />
-          <div className="eyebrow">{text.mainMenu.eyebrow}</div>
+        <div className="menu-panel-header menu-panel-header-stage">
+          <div className="menu-brand-lockup">
+            <div className="eyebrow">{text.mainMenu.eyebrow}</div>
+            <div className="menu-brand-code">{text.appName}</div>
+          </div>
           <div className="menu-language-picker">
             <select
-              aria-label="Select UI language"
+              aria-label={text.mainMenu.uiLanguageAriaLabel}
               className="menu-language-select"
               onChange={(event) =>
                 onUiLocaleChange(resolveUiLocaleCode(event.currentTarget.value))
@@ -176,25 +204,73 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
             </select>
           </div>
         </div>
-        <h1>{text.mainMenu.title}</h1>
-        <p className="lead menu-lead">{text.mainMenu.description}</p>
 
-        <div className="menu-button-list">
-          <button className="menu-button" onClick={onOpenNewGame} type="button">
+        <div className="menu-hero-copy">
+          <div className="menu-hero-signal">
+            <span className="menu-hero-signal-dot" />
+            <span>{text.mainMenu.feed.eyebrow}</span>
+          </div>
+          <h1>{text.mainMenu.title}</h1>
+          <p className="lead menu-lead">{text.mainMenu.description}</p>
+
+          <div className="menu-signal-pill-list">
+            {signalPills.map((pill) => (
+              <span className="menu-signal-pill" key={pill}>
+                {pill}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="summary-card menu-recent-card">
+          <div className="meta-label">{text.mainMenu.recentProgress.label}</div>
+          {recentSnapshot ? (
+            <>
+              <div className="summary-title menu-recent-title">
+                {recentSnapshot.contentSummary.storyTitle}
+              </div>
+              <div className="summary-text">
+                {text.mainMenu.recentProgress.roundAndStatus(
+                  recentSnapshot.session.currentRound,
+                  recentSnapshot.session.status
+                )}
+              </div>
+              <div className="summary-text">
+                {text.mainMenu.recentProgress.updatedAt(recentSnapshotUpdatedAt ?? "")}
+              </div>
+            </>
+          ) : (
+            <div className="summary-text">{text.mainMenu.recentProgress.empty}</div>
+          )}
+        </div>
+
+        <div className="menu-button-stack">
+          <button
+            className="menu-button menu-button-hero-primary"
+            onClick={onOpenNewGame}
+            type="button"
+          >
             {text.mainMenu.buttons.newGame}
           </button>
-          <button className="menu-button" onClick={onOpenContinue} type="button">
-            {text.mainMenu.buttons.continue}
-          </button>
-          <button className="menu-button" onClick={onOpenRecords} type="button">
-            {text.mainMenu.buttons.records}
-          </button>
-          <button className="menu-button" onClick={onOpenSettings} type="button">
-            {text.mainMenu.buttons.settings}
-          </button>
-          <button className="menu-button menu-button-danger" onClick={onOpenExit} type="button">
-            {text.mainMenu.buttons.exit}
-          </button>
+
+          <div className="menu-button-list menu-button-list-secondary">
+            <button className="menu-button" onClick={onOpenContinue} type="button">
+              {text.mainMenu.buttons.continue}
+            </button>
+            <button className="menu-button" onClick={onOpenRecords} type="button">
+              {text.mainMenu.buttons.records}
+            </button>
+            <button className="menu-button" onClick={onOpenSettings} type="button">
+              {text.mainMenu.buttons.settings}
+            </button>
+            <button
+              className="menu-button menu-button-danger"
+              onClick={onOpenExit}
+              type="button"
+            >
+              {text.mainMenu.buttons.exit}
+            </button>
+          </div>
         </div>
 
         <div className="menu-footer-links">
@@ -222,14 +298,33 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
             <div className="eyebrow">{text.mainMenu.feed.eyebrow}</div>
             <h2>{text.mainMenu.feed.title}</h2>
           </div>
-          <div className="summary-text">{text.mainMenu.feed.description}</div>
+          <div className="menu-notice-count">
+            {String(MENU_ANNOUNCEMENTS.length).padStart(2, "0")}
+          </div>
+        </div>
+        <div className="summary-text menu-notice-description">{text.mainMenu.feed.description}</div>
+
+        <div className="menu-system-grid">
+          {systemCards.map((card) => (
+            <div className="summary-card menu-system-card" key={card.label}>
+              <div className="meta-label">{card.label}</div>
+              {card.lines.map((line) => (
+                <div className="summary-text" key={line}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
 
         <div className="menu-notice-section">
           <div className="menu-notice-list">
-            {visibleAnnouncements.map((announcement) => (
+            {visibleAnnouncements.map((announcement, index) => (
               <article className="menu-notice-card" key={announcement.id}>
-                <div className="menu-notice-meta">{announcement.publishedAt}</div>
+                <div className="menu-notice-meta-row">
+                  <div className="menu-notice-meta">{announcement.publishedAt}</div>
+                  <div className="menu-notice-index">{String(index + 1).padStart(2, "0")}</div>
+                </div>
                 <div className="summary-title menu-notice-title">{announcement.title}</div>
                 <p className="summary-text menu-notice-body">{announcement.body}</p>
               </article>
@@ -248,45 +343,6 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
                 </button>
               </div>
             ) : null}
-          </div>
-        </div>
-
-        <div className="menu-meta-strip">
-          <div className="summary-card">
-            <div className="meta-label">{text.mainMenu.recentProgress.label}</div>
-            {recentSnapshot ? (
-              <>
-                <div className="summary-title">{recentSnapshot.contentSummary.storyTitle}</div>
-                <div className="summary-text">
-                  {text.mainMenu.recentProgress.roundAndStatus(
-                    recentSnapshot.session.currentRound,
-                    recentSnapshot.session.status
-                  )}
-                </div>
-                <div className="summary-text">
-                  {text.mainMenu.recentProgress.updatedAt(
-                    formatDateTime(recentSnapshot.session.updatedAt)
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="summary-text">{text.mainMenu.recentProgress.empty}</div>
-            )}
-          </div>
-
-          <div className="summary-card">
-            <div className="meta-label">{text.mainMenu.defaults.label}</div>
-            <div className="summary-text">{text.mainMenu.defaults.locale(locale)}</div>
-            <div className="summary-text">{text.mainMenu.defaults.playMode(playMode)}</div>
-            <div className="summary-text">
-              {text.mainMenu.defaults.gmArchitecture(gmArchitecture)}
-            </div>
-            <div className="summary-text">
-              {text.mainMenu.defaults.modelAccessMode(modelAccessMode)}
-            </div>
-            <div className="summary-text">
-              {text.mainMenu.defaults.modelProfile(modelProfileId)}
-            </div>
           </div>
         </div>
       </section>

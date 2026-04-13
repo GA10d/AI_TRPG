@@ -30,6 +30,7 @@ import { ExitPage } from "./pages/ExitPage.tsx";
 import { GameBootstrapPage } from "./pages/GameBootstrapPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
 import { GameSetupPage } from "./pages/GameSetupPage.tsx";
+import { WaveFieldBackground } from "./components/WaveFieldBackground.tsx";
 import {
   UiTextProvider,
   getUiTextByLocale,
@@ -41,6 +42,7 @@ import { RecordsPage } from "./pages/RecordsPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { StorySelectPage } from "./pages/StorySelectPage.tsx";
 import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
+import { DEFAULT_FRONTEND_THEME } from "./themePresets.ts";
 import { getMenuFontScale, type AppView, type StatusState } from "./ui.ts";
 
 const initialStatus: StatusState = {
@@ -252,6 +254,7 @@ export function App() {
     showAiMetadata,
     markdownFontSize,
     menuFontSize,
+    frontendTheme,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setUiLocale,
@@ -271,7 +274,8 @@ export function App() {
     setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
-    setMenuFontSize
+    setMenuFontSize,
+    setFrontendTheme
   } = useBootstrapState({
     onStatusChange: setStatus
   });
@@ -469,7 +473,8 @@ export function App() {
       openingPreviewDeliveryMode,
       showAiMetadata,
       markdownFontSize,
-      menuFontSize
+      menuFontSize,
+      frontendTheme
     });
   }
 
@@ -494,7 +499,8 @@ export function App() {
       openingPreviewDeliveryMode,
       showAiMetadata,
       markdownFontSize,
-      menuFontSize
+      menuFontSize,
+      frontendTheme
     });
   }
 
@@ -1178,6 +1184,7 @@ export function App() {
     setShowAiMetadata(true);
     setMarkdownFontSize("large");
     setMenuFontSize("standard");
+    setFrontendTheme(DEFAULT_FRONTEND_THEME);
     setStatus({
       message: uiText.app.status.defaultsRestored,
       tone: "neutral"
@@ -1420,6 +1427,7 @@ export function App() {
           logViewMode={logViewMode}
           showAiMetadata={showAiMetadata}
           menuFontSize={menuFontSize}
+          frontendTheme={frontendTheme}
           onBack={() => setView("menu")}
           onSubmit={handleSaveSettings}
           onReset={handleResetSettings}
@@ -1435,6 +1443,7 @@ export function App() {
           onDebugEnabledChange={setDebugEnabled}
           onShowAiMetadataChange={setShowAiMetadata}
           onMenuFontSizeChange={setMenuFontSize}
+          onFrontendThemeChange={setFrontendTheme}
           onLogViewModeChange={setLogViewMode}
         />
       );
@@ -1512,17 +1521,20 @@ export function App() {
 
   return (
     <UiTextProvider locale={uiLocale}>
-      <main
-        className={view === "game_bootstrap" ? "app-shell app-shell-bootstrap" : "app-shell"}
-        style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
-      >
-        {content}
-        {status.message && view !== "game_bootstrap" ? (
-          <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
-            {status.message}
-          </p>
-        ) : null}
-      </main>
+      <div className="theme-root" data-theme={frontendTheme}>
+        <WaveFieldBackground />
+        <main
+          className={view === "game_bootstrap" ? "app-shell app-shell-bootstrap" : "app-shell"}
+          style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
+        >
+          {content}
+          {status.message && view !== "game_bootstrap" ? (
+            <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
+              {status.message}
+            </p>
+          ) : null}
+        </main>
+      </div>
     </UiTextProvider>
   );
 }

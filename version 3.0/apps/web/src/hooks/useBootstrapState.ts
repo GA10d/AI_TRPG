@@ -17,6 +17,7 @@ import {
   getGmArchitectureOptions,
   getLogViewOptions,
   getMarkdownFontSizeOptions,
+  getFrontendThemeOptions,
   getMenuFontSizeOptions,
   getPlayModeOptions,
   type MarkdownFontSizePreset,
@@ -29,6 +30,10 @@ import {
   resolveUiLocaleCode,
   type UiLocaleCode
 } from "../locales/index.tsx";
+import {
+  DEFAULT_FRONTEND_THEME,
+  type FrontendThemePreset
+} from "../themePresets.ts";
 
 type UseBootstrapStateArgs = {
   onStatusChange: (status: StatusState) => void;
@@ -257,6 +262,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const openingPreviewDeliveryOptions = getOpeningPreviewDeliveryOptions();
   const markdownFontSizeOptions = getMarkdownFontSizeOptions();
   const menuFontSizeOptions = getMenuFontSizeOptions();
+  const frontendThemeOptions = getFrontendThemeOptions();
   const { onStatusChange } = args;
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [ruleDirectoryName, setRuleDirectoryName] = useState("");
@@ -292,6 +298,8 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     useState<MarkdownFontSizePreset>("large");
   const [menuFontSize, setMenuFontSize] =
     useState<MenuFontSizePreset>("standard");
+  const [frontendTheme, setFrontendTheme] =
+    useState<FrontendThemePreset>(DEFAULT_FRONTEND_THEME);
 
   useEffect(() => {
     let cancelled = false;
@@ -418,6 +426,13 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             storedDefaults?.menuFontSize,
             menuFontSizeOptions.map((item) => item.value),
             "standard"
+          )
+        );
+        setFrontendTheme(
+          pickOption(
+            storedDefaults?.frontendTheme,
+            frontendThemeOptions.map((item) => item.value),
+            DEFAULT_FRONTEND_THEME
           )
         );
       } catch (error) {
@@ -562,6 +577,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     showAiMetadata,
     markdownFontSize,
     menuFontSize,
+    frontendTheme,
     setRuleDirectoryName,
     setStoryDirectoryName,
     setUiLocale,
@@ -583,6 +599,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
-    setMenuFontSize
+    setMenuFontSize,
+    setFrontendTheme
   };
 }

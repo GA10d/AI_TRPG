@@ -427,6 +427,21 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
   const ruleIntroText = pickRuleIntroText(selectedRule, text);
   const storyIntroText = pickStoryIntroText(selectedStory, text);
   const storyCoverQuote = pickStoryCoverQuote(selectedStory, text);
+  const playerCountLabel = selectedStory
+    ? selectedStory.playerCount.min === selectedStory.playerCount.max
+      ? storyText.playerCountSingle(selectedStory.playerCount.min)
+      : storyText.playerCountRange(
+          selectedStory.playerCount.min,
+          selectedStory.playerCount.max
+        )
+    : text.common.none;
+  const warningText = selectedStory
+    ? renderJoinedList(selectedStory.contentWarnings, text)
+    : text.common.none;
+  const tagText = selectedStory ? renderJoinedList(selectedStory.tags, text) : text.common.none;
+  const ruleThemeText = selectedRule
+    ? renderJoinedList(selectedRule.themes, text)
+    : text.common.none;
   const rulePaneStyle: CSSProperties = {
     width: layout.ruleWidth,
     minWidth: RULE_MIN_WIDTH
@@ -465,6 +480,30 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
         closeLabel={storyText.closeLabel}
       />
 
+      <div className="story-select-summary-strip">
+        <div className="summary-card story-select-summary-card">
+          <div className="meta-label">{storyText.ruleEyebrow}</div>
+          <div className="summary-title">{selectedRule?.ruleTitle ?? text.common.none}</div>
+          <div className="summary-text">{selectedRule?.ruleId ?? text.common.none}</div>
+        </div>
+        <div className="summary-card story-select-summary-card">
+          <div className="meta-label">{storyText.storyEyebrow}</div>
+          <div className="summary-title">{selectedStory?.title ?? text.common.none}</div>
+          <div className="summary-text">
+            {stories.length > 0 ? `${stories.length} / ${storyText.storyListTitle}` : storyText.empty}
+          </div>
+        </div>
+        <div className="summary-card story-select-summary-card">
+          <div className="meta-label">{storyText.pacingLengthLabel}</div>
+          <div className="summary-title">{playerCountLabel}</div>
+          <div className="summary-text">
+            {selectedStory
+              ? `${selectedStory.recommendedLength} / ${selectedStory.recommendedPacing}`
+              : text.common.none}
+          </div>
+        </div>
+      </div>
+
       <div
         className={`story-resizable-layout ${dragTarget ? "story-resizable-layout-dragging" : ""}`}
         ref={containerRef}
@@ -481,46 +520,69 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
         ) : (
           <>
             <section className="selection-column story-pane story-pane-rule" style={rulePaneStyle}>
-              <div className="selection-column-header">
-                <div>
+              <div className="selection-column-header selection-column-header-rich">
+                <div className="selection-column-copy">
                   <div className="eyebrow">{storyText.ruleEyebrow}</div>
                   <h2>{storyText.ruleListTitle}</h2>
+                  <p className="summary-text selection-column-hint">
+                    {bootstrap?.catalog.length
+                      ? ruleThemeText
+                      : text.storySelectScreen.defaultRuleIntro}
+                  </p>
                 </div>
-                <button
-                  className="ghost-button pane-toggle-button"
-                  onClick={handleToggleRuleCollapse}
-                  type="button"
-                >
-                  {storyText.collapseAction}
-                </button>
+                <div className="selection-column-tools">
+                  <div className="selection-column-count">
+                    {String(bootstrap?.catalog.length ?? 0).padStart(2, "0")}
+                  </div>
+                  <button
+                    className="ghost-button pane-toggle-button"
+                    onClick={handleToggleRuleCollapse}
+                    type="button"
+                  >
+                    {storyText.collapseAction}
+                  </button>
+                </div>
               </div>
+
               <div className="selection-card-list">
-                {bootstrap?.catalog.map((rule) => {
-                  const isActive = rule.directoryName === selectedRule?.directoryName;
-                  return (
-                    <button
-                      className={`selection-card ${isActive ? "selection-card-active" : ""}`}
-                      key={rule.directoryName}
-                      onClick={() => onRuleChange(rule.directoryName)}
-                      onMouseEnter={(event) =>
-                        scheduleHoverPreview(
-                          `rule:${rule.directoryName}`,
-                          buildRuleHoverPayload(rule, text),
-                          event
-                        )
-                      }
-                      onMouseLeave={clearHoverPreview}
-                      onMouseMove={handleHoverMove}
-                      type="button"
-                    >
-                      <div className="selection-card-title">{rule.ruleTitle}</div>
-                      <div className="selection-card-meta">{rule.ruleId}</div>
-                      <div className="selection-card-copy selection-card-copy-singleline">
-                        {clipText(rule.ruleIntro, 120, text)}
-                      </div>
-                    </button>
-                  );
-                })}
+                {bootstrap?.catalog.length ? (
+                  bootstrap.catalog.map((rule, index) => {
+                    const isActive = rule.directoryName === selectedRule?.directoryName;
+                    return (
+                      <button
+                        className={`selection-card selection-card-compact ${isActive ? "selection-card-active" : ""}`}
+                        key={rule.directoryName}
+                        onClick={() => onRuleChange(rule.directoryName)}
+                        onMouseEnter={(event) =>
+                          scheduleHoverPreview(
+                            `rule:${rule.directoryName}`,
+                            buildRuleHoverPayload(rule, text),
+                            event
+                          )
+                        }
+                        onMouseLeave={clearHoverPreview}
+                        onMouseMove={handleHoverMove}
+                        type="button"
+                      >
+                        <div className="selection-card-topline">
+                          <span className="selection-card-index">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <span
+                            className={`selection-card-marker ${isActive ? "selection-card-marker-active" : ""}`}
+                          />
+                        </div>
+                        <div className="selection-card-title">{rule.ruleTitle}</div>
+                        <div className="selection-card-meta">{rule.ruleId}</div>
+                        <div className="selection-card-copy selection-card-copy-singleline">
+                          {clipText(rule.ruleIntro, 120, text)}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="empty-state">{storyText.empty}</div>
+                )}
               </div>
             </section>
 
@@ -550,62 +612,86 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
               className="selection-column selection-column-emphasis story-pane story-pane-story"
               style={storyPaneStyle}
             >
-              <div className="selection-column-header">
-                <div>
+              <div className="selection-column-header selection-column-header-rich">
+                <div className="selection-column-copy">
                   <div className="eyebrow">{storyText.storyEyebrow}</div>
                   <h2>{storyText.storyListTitle}</h2>
+                  <p className="summary-text selection-column-hint">
+                    {selectedStory ? clipText(selectedStory.intro, 100, text) : storyText.empty}
+                  </p>
                 </div>
-                <button
-                  className="ghost-button pane-toggle-button"
-                  onClick={handleToggleStoryCollapse}
-                  type="button"
-                >
-                  {storyText.collapseAction}
-                </button>
+                <div className="selection-column-tools">
+                  <div className="selection-column-count">
+                    {String(stories.length).padStart(2, "0")}
+                  </div>
+                  <button
+                    className="ghost-button pane-toggle-button"
+                    onClick={handleToggleStoryCollapse}
+                    type="button"
+                  >
+                    {storyText.collapseAction}
+                  </button>
+                </div>
               </div>
+
               <div className="selection-card-list">
-                {stories.map((story) => {
-                  const isActive = story.directoryName === selectedStory?.directoryName;
-                  return (
-                    <button
-                      className={`selection-card story-card ${isActive ? "selection-card-active" : ""}`}
-                      key={story.directoryName}
-                      onClick={() => onStoryChange(story.directoryName)}
-                      onMouseEnter={(event) =>
-                        scheduleHoverPreview(
-                          `story:${story.directoryName}`,
-                          buildLocalizedStoryHoverPayload(story, text),
-                          event
-                        )
-                      }
-                      onMouseLeave={clearHoverPreview}
-                      onMouseMove={handleHoverMove}
-                      type="button"
-                    >
-                      <div className="selection-card-title">{story.title}</div>
-                      <div className="selection-card-meta">
-                        {story.playerCount.min === story.playerCount.max
-                          ? storyText.playerCountSingle(story.playerCount.min)
-                          : storyText.playerCountRange(
-                              story.playerCount.min,
-                              story.playerCount.max
-                            )}
-                        {" / "}
-                        {story.recommendedLength}
-                      </div>
-                      <div className="selection-card-copy selection-card-copy-singleline">
-                        {clipText(story.intro, 120, text)}
-                      </div>
-                      <div className="flag-list">
-                        {story.tags.slice(0, 3).map((tag) => (
-                          <span className="badge" key={tag}>
-                            {tag}
+                {stories.length ? (
+                  stories.map((story, index) => {
+                    const isActive = story.directoryName === selectedStory?.directoryName;
+                    const storyPlayerLabel =
+                      story.playerCount.min === story.playerCount.max
+                        ? storyText.playerCountSingle(story.playerCount.min)
+                        : storyText.playerCountRange(
+                            story.playerCount.min,
+                            story.playerCount.max
+                          );
+
+                    return (
+                      <button
+                        className={`selection-card story-card ${isActive ? "selection-card-active" : ""}`}
+                        key={story.directoryName}
+                        onClick={() => onStoryChange(story.directoryName)}
+                        onMouseEnter={(event) =>
+                          scheduleHoverPreview(
+                            `story:${story.directoryName}`,
+                            buildLocalizedStoryHoverPayload(story, text),
+                            event
+                          )
+                        }
+                        onMouseLeave={clearHoverPreview}
+                        onMouseMove={handleHoverMove}
+                        type="button"
+                      >
+                        <div className="selection-card-topline">
+                          <span className="selection-card-index">
+                            {String(index + 1).padStart(2, "0")}
                           </span>
-                        ))}
-                      </div>
-                    </button>
-                  );
-                })}
+                          <span
+                            className={`selection-card-marker ${isActive ? "selection-card-marker-active" : ""}`}
+                          />
+                        </div>
+                        <div className="selection-card-title">{story.title}</div>
+                        <div className="selection-card-meta">
+                          {storyPlayerLabel}
+                          {" / "}
+                          {story.recommendedLength}
+                        </div>
+                        <div className="selection-card-copy selection-card-copy-singleline">
+                          {clipText(story.intro, 120, text)}
+                        </div>
+                        <div className="flag-list">
+                          {story.tags.slice(0, 3).map((tag) => (
+                            <span className="badge" key={tag}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="empty-state">{storyText.empty}</div>
+                )}
               </div>
             </section>
 
@@ -626,6 +712,26 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
         >
           {selectedRule && selectedStory ? (
             <div className="story-detail-panel">
+              <div className="story-detail-stagebar">
+                <div className="summary-card story-detail-stage-card">
+                  <div className="meta-label">{storyText.ruleEyebrow}</div>
+                  <div className="summary-title">{selectedRule.ruleTitle}</div>
+                  <div className="summary-text">{selectedRule.ruleId}</div>
+                </div>
+                <div className="summary-card story-detail-stage-card">
+                  <div className="meta-label">{storyText.storyEyebrow}</div>
+                  <div className="summary-title">{selectedStory.title}</div>
+                  <div className="summary-text">{ruleThemeText}</div>
+                </div>
+                <div className="summary-card story-detail-stage-card">
+                  <div className="meta-label">{storyText.pacingLengthLabel}</div>
+                  <div className="summary-title">{playerCountLabel}</div>
+                  <div className="summary-text">
+                    {selectedStory.recommendedLength} / {selectedStory.recommendedPacing}
+                  </div>
+                </div>
+              </div>
+
               <div
                 className={`story-visual-card ${coverAsset ? "story-visual-card-covered" : "story-visual-card-fallback"}`}
               >
@@ -636,42 +742,57 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                     src={coverAsset.url}
                   />
                 ) : null}
-                {coverAsset ? (
-                  <button
-                    aria-label={
-                      isCoverExpanded ? storyText.closeCoverAria : storyText.openCoverAria
-                    }
-                    className="ghost-button story-cover-expand-button"
-                    onClick={() => setIsCoverExpanded(true)}
-                    type="button"
-                  >
-                    {storyText.openCoverButton}
-                  </button>
-                ) : null}
                 <div className="story-cover-placeholder story-cover-overlay">
-                  <div className="eyebrow">{storyText.storyPreviewEyebrow}</div>
-                  <h2>{selectedStory.title}</h2>
+                  <div className="story-cover-head">
+                    <div>
+                      <div className="eyebrow">{storyText.storyPreviewEyebrow}</div>
+                      <h2>{selectedStory.title}</h2>
+                    </div>
+                    {coverAsset ? (
+                      <button
+                        aria-label={
+                          isCoverExpanded ? storyText.closeCoverAria : storyText.openCoverAria
+                        }
+                        className="ghost-button story-cover-expand-button"
+                        onClick={() => setIsCoverExpanded(true)}
+                        type="button"
+                      >
+                        {storyText.openCoverButton}
+                      </button>
+                    ) : null}
+                  </div>
+
                   <p>{storyCoverQuote}</p>
+
+                  <div className="story-cover-chip-row">
+                    <span className="badge">{playerCountLabel}</span>
+                    <span className="badge">{selectedStory.recommendedLength}</span>
+                    <span className="badge">{selectedStory.recommendedPacing}</span>
+                  </div>
+
                   {!coverAsset ? (
                     <p className="story-cover-fallback-copy">{storyText.defaultCoverCopy}</p>
                   ) : null}
                 </div>
               </div>
 
-              <div className="summary-card story-detail-block">
-                <div className="meta-label">{storyText.storyIntroLabel}</div>
-                <MarkdownBlock className="story-markdown-block" content={storyIntroText} />
+              <div className="summary-card story-detail-cta-panel">
+                <div className="story-detail-cta-copy">
+                  <div className="meta-label">{storyText.storyPreviewEyebrow}</div>
+                  <div className="summary-title">{selectedStory.title}</div>
+                  <div className="summary-text">
+                    {selectedRule.ruleTitle} / {selectedRule.ruleId}
+                  </div>
+                </div>
+                <button className="primary-button story-detail-cta-button" onClick={onContinue} type="button">
+                  {storyText.startAdventure}
+                </button>
               </div>
 
-              <div className="summary-card story-detail-block">
-                <div className="meta-label">{storyText.ruleIntroLabel}</div>
-                <MarkdownBlock className="story-markdown-block" content={ruleIntroText} />
-              </div>
-
-              <div className="story-detail-meta-row">
+              <div className="story-detail-meta-grid">
                 <div className="summary-card">
                   <div className="meta-label">{storyText.tagsLabel}</div>
-                  <div className="summary-text">{renderJoinedList(selectedStory.tags, text)}</div>
+                  <div className="summary-text">{tagText}</div>
                 </div>
                 <div className="summary-card">
                   <div className="meta-label">{storyText.pacingLengthLabel}</div>
@@ -679,15 +800,26 @@ export function StorySelectScreen(props: StorySelectScreenProps) {
                     {selectedStory.recommendedPacing} / {selectedStory.recommendedLength}
                   </div>
                 </div>
+                <div className="summary-card">
+                  <div className="meta-label">Rule Themes</div>
+                  <div className="summary-text">{ruleThemeText}</div>
+                </div>
+                <div className="summary-card">
+                  <div className="meta-label">Warnings</div>
+                  <div className="summary-text">{warningText}</div>
+                </div>
               </div>
 
-              <div className="story-detail-footer">
-                <div className="summary-text">
-                  {storyText.contentWarnings(renderJoinedList(selectedStory.contentWarnings, text))}
+              <div className="story-detail-copy-grid">
+                <div className="summary-card story-detail-block">
+                  <div className="meta-label">{storyText.storyIntroLabel}</div>
+                  <MarkdownBlock className="story-markdown-block" content={storyIntroText} />
                 </div>
-                <button className="primary-button" onClick={onContinue} type="button">
-                  {storyText.startAdventure}
-                </button>
+
+                <div className="summary-card story-detail-block">
+                  <div className="meta-label">{storyText.ruleIntroLabel}</div>
+                  <MarkdownBlock className="story-markdown-block" content={ruleIntroText} />
+                </div>
               </div>
             </div>
           ) : (

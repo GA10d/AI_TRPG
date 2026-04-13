@@ -3,6 +3,10 @@ import type {
   CreateSessionRequest
 } from "../../../packages/shared-types/src/index.ts";
 import { zhCn, type UiText } from "./locales/index.tsx";
+import {
+  FRONTEND_THEME_PRESETS,
+  type FrontendThemePreset
+} from "./themePresets.ts";
 
 export type AppView =
   | "menu"
@@ -68,6 +72,8 @@ export type MenuFontSizePreset =
   | "xlarge"
   | "xxlarge";
 
+export type { FrontendThemePreset } from "./themePresets.ts";
+
 export function getMarkdownFontSizeOptions(
   text: UiText = zhCn
 ): Array<{
@@ -91,6 +97,21 @@ export function getMenuFontSizeOptions(
 }
 
 export const MENU_FONT_SIZE_OPTIONS = getMenuFontSizeOptions();
+
+export function getFrontendThemeOptions(
+  text: UiText = zhCn
+): Array<{
+  value: FrontendThemePreset;
+  label: string;
+  description: string;
+}> {
+  return FRONTEND_THEME_PRESETS.map((value) => {
+    const matched = text.options.frontendThemes.find((item) => item.value === value);
+    return matched ?? { value, label: value, description: value };
+  });
+}
+
+export const FRONTEND_THEME_OPTIONS = getFrontendThemeOptions();
 
 export function getMenuFontScale(value: MenuFontSizePreset): number {
   switch (value) {

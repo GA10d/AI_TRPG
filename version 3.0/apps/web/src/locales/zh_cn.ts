@@ -115,6 +115,18 @@ export const zhCn = {
         description: "适合大屏或较远距离观看。"
       }
     ],
+    frontendThemes: [
+      {
+        value: "red_black_white",
+        label: "红黑白",
+        description: "高对比、危险感更强的异常信号主题。"
+      },
+      {
+        value: "blue_white_pink",
+        label: "蓝白粉",
+        description: "更潮、更轻盈的霓虹夜色主题。"
+      }
+    ],
     openingPreviewDelivery: [
       {
         value: "stream",
@@ -194,33 +206,33 @@ export const zhCn = {
     },
     bootstrapStages: {
       entered_game: {
-        label: "进入游戏界面",
-        detail: "已经切换到核心游玩界面，正在准备正式会话。",
+        label: "正在进入故事核心区",
+        detail: "你已经抵达核心界面，系统正在锁定本局入口。",
         progress: 0.08
       },
       loading_content: {
-        label: "加载规则与剧本",
-        detail: "正在读取当前故事需要的规则文本和剧本内容。",
+        label: "正在读取卷宗",
+        detail: "规则文本、故事资料和当前故事的舞台信息正在被逐条读取。",
         progress: 0.2
       },
       assembling_prompt: {
-        label: "整理 Narrator 输入",
-        detail: "正在组合 narrator prompt、rule.txt、story.txt 和玩家设定。",
+        label: "正在校准叙事入口",
+        detail: "角色设定、规则文本和故事材料正在被封装成正式开场输入。",
         progress: 0.42
       },
       requesting_narrator: {
-        label: "请求 Narrator Agent",
-        detail: "正在把开场材料发给模型，并准备第一段叙事。",
+        label: "正在呼叫叙事端",
+        detail: "系统正在把开场材料送入 Narrator，并准备第一段正式叙事。",
         progress: 0.64
       },
       waiting_first_reply: {
         label: "等待首条叙事",
-        detail: "模型已经开始处理开场，正在等待第一段正式 narration 返回。",
+        detail: "模型已经接住开场材料，首段 narration 正在回传途中。",
         progress: 0.84
       },
       finalizing_session: {
-        label: "写入会话快照",
-        detail: "正在把首条叙事和当前设置写入正式会话。",
+        label: "正在封存本局现场",
+        detail: "首条叙事与当前设置正在写入正式会话，现场记录即将锁定。",
         progress: 0.96
       }
     },
@@ -232,40 +244,39 @@ export const zhCn = {
     quickEndingTestInput: "我强制触发一个立即发生的 mock 结局，并立刻 escape。"
   },
   mainMenu: {
-    eyebrow: "主菜单",
-    title: "AI TRPG 3.0",
-    description:
-      "以文字叙事为核心的 AI TRPG 原型。你可以从这里开始新游戏、继续最近进度，或调整当前版本的默认模型与语言配置。",
+    eyebrow: "ANOMALY STORY SYSTEM",
+    title: "进入异常区",
+    description: "选择一段故事，接入它，看看今夜是谁先失真。",
     buttons: {
-      newGame: "开始游戏",
-      continue: "继续游戏",
-      records: "记录",
-      settings: "设置",
-      exit: "退出"
+      newGame: "开始新局",
+      continue: "继续上次信号",
+      records: "查看档案",
+      settings: "系统控制台",
+      exit: "离开终端"
     },
     footer: {
-      about: "关于",
-      contact: "联系我们"
+      about: "关于这个终端",
+      contact: "联系维护者"
     },
     feed: {
-      eyebrow: "公告",
-      title: "公告与动态",
-      description: "这里会展示最近的版本更新与开发动态。",
-      showMore: "显示更多..."
+      eyebrow: "信号公告",
+      title: "最新回传",
+      description: "版本变动、功能接入与实验记录会优先写在这里。",
+      showMore: "载入更多"
     },
     recentProgress: {
-      label: "最近进度",
-      roundAndStatus: (round: number, status: string) => `回合 ${round} / 状态：${status}`,
-      updatedAt: (value: string) => `更新时间：${value}`,
-      empty: "还没有可继续的本地进度。"
+      label: "最近信号",
+      roundAndStatus: (round: number, status: string) => `回合 ${round} / 当前状态：${status}`,
+      updatedAt: (value: string) => `最后写入：${value}`,
+      empty: "你还没有留下可恢复的现场记录。"
     },
     defaults: {
-      label: "当前默认配置",
-      locale: (value: string) => `语言：${value}`,
-      playMode: (value: string) => `模式：${value}`,
+      label: "系统默认",
+      locale: (value: string) => `语言通道：${value}`,
+      playMode: (value: string) => `接入模式：${value}`,
       gmArchitecture: (value: string) => `主持架构：${value}`,
-      modelAccessMode: (value: string) => `模型模式：${value}`,
-      modelProfile: (value: string) => `模型档案：${value}`
+      modelAccessMode: (value: string) => `模型链路：${value}`,
+      modelProfile: (value: string) => `文本模型：${value}`
     },
     uiLanguageAriaLabel: "选择界面语言",
     splitterAriaLabel: "拖拽调整主菜单左右宽度"
@@ -377,6 +388,7 @@ export const zhCn = {
     gmArchitecture: "默认主持架构",
     logViewMode: "默认日志显示",
     menuFontSize: "菜单字号",
+    frontendTheme: "界面配色",
     debugOptions: "调试选项",
     enableDebug: "默认开启调试信息",
     showAiMetadata: "显示 AI 耗时、Token 与费用",
@@ -421,41 +433,41 @@ export const zhCn = {
     resetDefaults: "恢复默认"
   },
   storySelectScreen: {
-    title: "开始游戏",
-    description: "先从规则和剧本里挑出这一局的舞台。左侧选规则，中间挑故事，右侧确认氛围与信息。",
-    backLabel: "返回主菜单",
+    title: "选择今晚的入口",
+    description: "左侧锁定规则，中间挑选故事，右侧读取卷宗细节。",
+    backLabel: "返回终端",
     closeLabel: "关闭",
     collapsedRuleLabel: "规则",
     collapsedStoryLabel: "剧本",
     expandAction: "展开",
     collapseAction: "收起",
-    ruleEyebrow: "规则",
-    ruleListTitle: "规则列表",
-    storyEyebrow: "剧本",
-    storyListTitle: "剧本列表",
-    storyPreviewEyebrow: "剧本预览",
+    ruleEyebrow: "规则索引",
+    ruleListTitle: "规则目录",
+    storyEyebrow: "故事档案",
+    storyListTitle: "故事列表",
+    storyPreviewEyebrow: "卷宗预览",
     splitterRuleStoryAria: "调整规则栏和剧本栏宽度",
     splitterStoryDetailAria: "调整剧本栏和详情栏宽度",
     playerCountSingle: (count: number) => `${count} 人`,
     playerCountRange: (min: number, max: number) => `${min}-${max} 人`,
     defaultRuleIntro:
-      "这条规则暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你可以继续选择剧本并进入设置页，后续也可以再补完整的规则简介。",
+      "当前规则包还没有写好引导说明，但你依然可以继续接入。",
     defaultStoryIntro:
-      "这个剧本暂时还没有提供 `intro.txt` 或 `intro.md`，当前先使用默认说明。你仍然可以进入游戏，后续再补完整简介和演出文本。",
+      "还没有可读取的故事档案，请检查内容包是否接入成功。",
     defaultCoverCopy:
-      "当前剧本暂时没有提供 `cover.png`，这里先使用默认封面区。后续只要在剧本目录放入 `cover.png`、`cover.jpg` 或 `cover.webp`，这里就会自动读取。",
+      "当前故事没有提供正式封面，这里暂时用默认舞台代替。补上 cover 后，这里会变成你的主视觉舞台。",
     defaultCoverQuote:
-      "当前剧本还没有单独提供封面短句，所以这里先回退到剧本简介摘要。",
+      "当前故事还没有单独提供封面短句，所以这里先回退到故事简介摘要。",
     coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
     openCoverAria: "查看大图",
     closeCoverAria: "收起大图",
-    openCoverButton: "查看大图",
-    storyIntroLabel: "剧本简介",
-    ruleIntroLabel: "规则简介",
-    tagsLabel: "标签",
-    pacingLengthLabel: "节奏与时长",
+    openCoverButton: "展开封面",
+    storyIntroLabel: "故事简介",
+    ruleIntroLabel: "规则摘要",
+    tagsLabel: "关键词",
+    pacingLengthLabel: "节奏 / 时长",
     contentWarnings: (value: string) => `内容警告：${value}`,
-    startAdventure: "开始冒险",
+    startAdventure: "开始接入",
     empty: "还没有可用的规则与剧本，请先检查内容包是否已经加载成功。",
     coverDialogAria: "剧本封面大图预览",
     closeCoverDialogAria: "关闭大图预览",
@@ -606,22 +618,25 @@ export const zhCn = {
     coverDialogAlt: (storyTitle: string) => `${storyTitle} 封面大图`
   },
   gameBootstrapScreen: {
-    fallbackStoryTitle: "正在准备会话",
-    progressTitle: "初始化进度",
+    fallbackStoryTitle: "正在进入故事核心区",
+    progressTitle: "接入进度",
     progressLabel: (percent: number) => `${percent}%`,
-    waitHint: "游戏初始化通常需要等待30s左右，感谢您的耐心等待！",
-    tipLabel: "游玩小贴士",
+    waitHint: "首次加载通常需要一点时间。越危险的故事，越不会立刻回答。",
+    tipLabel: "系统广播",
     defaultLoadingHint: (storyTitle: string) =>
-      `正在载入《${storyTitle}》并准备第一段正式叙事。`,
+      `所有线索已经在路上。《${storyTitle}》正在等待第一段正式叙事回传。`,
     coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
-    fallbackCoverTitle: "暂无封面预览",
-    fallbackCoverDescription: "如果这个剧本包提供了 cover.png，这里会自动显示。",
+    fallbackCoverTitle: "封面信号暂未接入",
+    fallbackCoverDescription: "如果故事目录提供 cover.png，这里会自动切换成正式主视觉。",
     tips: [
-      "保存和读档保留在主界面一级入口，重要选择前可以随时留档。",
-      "NPC 面板里可以查看角色档案，后续也会在这里接入立绘生成。",
-      "详情面板集中放结局判定、回放日志和分支图，不会打扰主游玩视线。",
-      "设置页可以统一调整文本模型、图像模型和文生图模板。",
-      "如果开场气质不对，可以回到 beginning 重写角色设定后重新开始。"
+      "详情面板会在后续开放结局判定、回放日志与分支图。",
+      "NPC 面板后续会接入角色立绘与档案检索。",
+      "当开场正式回传后，你就可以提交第一轮行动。",
+      "本轮加载不会中断本地记录，异常关闭后仍可继续恢复。",
+      "如果长时间没有返回，优先检查模型接入状态。",
+      "本项目的主体验仍然是文本叙事，而不是数值堆叠。",
+      "每一轮行动都会改变后续分支，不一定会改变真相。",
+      "越短的输入不一定越差，但越具体的行动通常越有戏。"
     ]
   },
   playthroughGraph: {

@@ -6,6 +6,7 @@ import type {
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import {
+  getFrontendThemeOptions,
   getGmArchitectureOptions,
   getLogViewOptions,
   getMenuFontSizeOptions,
@@ -13,6 +14,7 @@ import {
 } from "../ui.ts";
 import { useUiText, type UiText } from "../locales/index.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
+import type { FrontendThemePreset } from "../themePresets.ts";
 
 type SettingsScreenProps = {
   bootstrap: BootstrapResponse | null;
@@ -31,6 +33,7 @@ type SettingsScreenProps = {
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   showAiMetadata: boolean;
   menuFontSize: import("../ui.ts").MenuFontSizePreset;
+  frontendTheme: FrontendThemePreset;
   onBack: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
@@ -49,6 +52,7 @@ type SettingsScreenProps = {
   onDebugEnabledChange: (value: boolean) => void;
   onShowAiMetadataChange: (value: boolean) => void;
   onMenuFontSizeChange: (value: import("../ui.ts").MenuFontSizePreset) => void;
+  onFrontendThemeChange: (value: FrontendThemePreset) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
@@ -100,6 +104,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const gmArchitectureOptions = getGmArchitectureOptions(text);
   const logViewOptions = getLogViewOptions(text);
   const menuFontSizeOptions = getMenuFontSizeOptions(text);
+  const frontendThemeOptions = getFrontendThemeOptions(text);
   const imageTriggerOptions = [...text.options.imageTriggers];
   const {
     bootstrap,
@@ -118,6 +123,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
     logViewMode,
     showAiMetadata,
     menuFontSize,
+    frontendTheme,
     onBack,
     onSubmit,
     onReset,
@@ -133,6 +139,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onDebugEnabledChange,
     onShowAiMetadataChange,
     onMenuFontSizeChange,
+    onFrontendThemeChange,
     onLogViewModeChange
   } = props;
 
@@ -315,6 +322,25 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="field">
+              <span>{settingsText.frontendTheme}</span>
+              <select
+                value={frontendTheme}
+                onChange={(event) =>
+                  onFrontendThemeChange(event.target.value as FrontendThemePreset)
+                }
+              >
+                {frontendThemeOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <div className="field-hint">
+                {frontendThemeOptions.find((item) => item.value === frontendTheme)?.description}
+              </div>
             </label>
 
             <div className="summary-card">

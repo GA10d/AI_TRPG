@@ -8,6 +8,7 @@ import type {
 } from "../../../packages/shared-types/src/index.ts";
 import type { UiLocaleCode } from "./locales/types.ts";
 import type { OpeningPreviewDeliveryMode } from "./openingPreviewPreferences.ts";
+import type { FrontendThemePreset } from "./themePresets.ts";
 import type { MarkdownFontSizePreset, MenuFontSizePreset } from "./ui.ts";
 
 const RECENT_SNAPSHOT_STORAGE_KEY = "trpg3.recentSnapshot";
@@ -36,6 +37,7 @@ export type StoredWebDefaults = {
   showAiMetadata: boolean;
   markdownFontSize: MarkdownFontSizePreset;
   menuFontSize: MenuFontSizePreset;
+  frontendTheme: FrontendThemePreset;
 };
 
 export type SessionRecord = {
