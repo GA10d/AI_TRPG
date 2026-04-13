@@ -33,6 +33,10 @@
   --wave-bg-bottom: #5e061f;
   --wave-cursor: #160000;
   --wave-line: #160000;
+  --wave-word-fill: rgba(255, 241, 245, 0.06);
+  --wave-word-outline: rgba(255, 229, 236, 0.22);
+  --wave-word-line: rgba(255, 244, 247, 0.72);
+  --wave-word-glow: rgba(255, 170, 196, 0.26);
   --hero-tint-rgb: 24, 4, 10;
   --panel-tint-rgb: 18, 3, 8;
   --cover-tint-rgb: 14, 4, 8;
@@ -64,6 +68,10 @@
   --wave-bg-bottom: #070d19;
   --wave-cursor: #ffffff;
   --wave-line: #0e1a39;
+  --wave-word-fill: rgba(255, 255, 255, 0.05);
+  --wave-word-outline: rgba(236, 244, 255, 0.24);
+  --wave-word-line: rgba(255, 255, 255, 0.76);
+  --wave-word-glow: rgba(128, 192, 255, 0.24);
   --hero-tint-rgb: 8, 18, 42;
   --panel-tint-rgb: 8, 16, 34;
   --cover-tint-rgb: 9, 19, 38;
@@ -136,6 +144,26 @@ body {
   stroke: var(--wave-line);
   stroke-width: 1.05;
   vector-effect: non-scaling-stroke;
+}
+
+.wave-field-word-outline {
+  fill: var(--wave-word-fill);
+  stroke: var(--wave-word-outline);
+  stroke-width: 1.4;
+  paint-order: stroke fill;
+  opacity: 0.94;
+}
+
+.wave-field-line-accent-soft {
+  stroke: var(--wave-word-glow);
+  stroke-width: 4;
+  opacity: 0.3;
+}
+
+.wave-field-line-accent {
+  stroke: var(--wave-word-line);
+  stroke-width: 1.7;
+  opacity: 0.88;
 }
 
 button,

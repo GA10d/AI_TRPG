@@ -1,5 +1,9 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const WAVE_WORDMARK = "TRPG";
+const WAVE_WORDMARK_FONT_FAMILY = "\"IBM Plex Sans\", \"Segoe UI\", sans-serif";
+
 type CursorState = {
   x: number;
   y: number;
@@ -33,6 +37,13 @@ type Bounds = {
   height: number;
   left: number;
   top: number;
+};
+
+type WaveWordLayout = {
+  x: number;
+  y: number;
+  fontSize: number;
+  textLength: number;
 };
 
 class PerlinNoise2D {
@@ -111,9 +122,70 @@ function grad(hash: number, x: number, y: number): number {
   }
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function createSvgElement<TagName extends keyof SVGElementTagNameMap>(
+  tagName: TagName
+): SVGElementTagNameMap[TagName] {
+  return document.createElementNS(SVG_NAMESPACE, tagName);
+}
+
+function createWaveFieldId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getWaveWordLayout(bounds: Bounds): WaveWordLayout {
+  const compact = bounds.width < 900;
+  const fontSize = clamp(Math.min(bounds.width * 0.15, bounds.height * 0.34), 96, 240);
+  const textLength = clamp(bounds.width * (compact ? 0.78 : 0.86), 320, 1500);
+  const targetY = bounds.height * (compact ? 0.43 : 0.47);
+
+  return {
+    x: bounds.width / 2,
+    y: clamp(targetY, fontSize * 0.8, bounds.height - fontSize * 0.8),
+    fontSize,
+    textLength
+  };
+}
+
+function createWaveWordText(
+  layout: WaveWordLayout,
+  options: {
+    className?: string;
+    fill?: string;
+  } = {}
+): SVGTextElement {
+  const text = createSvgElement("text");
+  text.textContent = WAVE_WORDMARK;
+  text.setAttribute("x", String(layout.x));
+  text.setAttribute("y", String(layout.y));
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("dominant-baseline", "middle");
+  text.setAttribute("font-size", String(layout.fontSize));
+  text.setAttribute("font-weight", "800");
+  text.setAttribute("font-family", WAVE_WORDMARK_FONT_FAMILY);
+  text.setAttribute("textLength", String(layout.textLength));
+  text.setAttribute("lengthAdjust", "spacing");
+
+  if (options.className) {
+    text.setAttribute("class", options.className);
+  }
+
+  if (options.fill) {
+    text.setAttribute("fill", options.fill);
+  }
+
+  return text;
+}
+
 export function WaveFieldBackground(): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const idsRef = useRef({
+    clipPathId: createWaveFieldId("wave-field-word-clip")
+  });
 
   useEffect(() => {
     const host = hostRef.current;
@@ -146,6 +218,8 @@ export function WaveFieldBackground(): JSX.Element {
     };
     let lines: WavePoint[][] = [];
     let paths: SVGPathElement[] = [];
+    let wordGlowPaths: SVGPathElement[] = [];
+    let wordPaths: SVGPathElement[] = [];
     let frameId = 0;
 
     function setMousePosition(clientX: number, clientY: number): void {
@@ -183,12 +257,33 @@ export function WaveFieldBackground(): JSX.Element {
       const pointCount = Math.ceil((height + overscanY) / yGap);
       const xStart = (width - xGap * lineCount) / 2;
       const yStart = (height - yGap * pointCount) / 2;
+      const wordLayout = getWaveWordLayout(bounds);
 
       svg.replaceChildren();
       lines = [];
       paths = [];
+      wordGlowPaths = [];
+      wordPaths = [];
 
       const fragment = document.createDocumentFragment();
+      const defs = createSvgElement("defs");
+      const clipPath = createSvgElement("clipPath");
+      clipPath.setAttribute("id", idsRef.current.clipPathId);
+      clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
+      clipPath.appendChild(createWaveWordText(wordLayout, { fill: "#ffffff" }));
+      defs.appendChild(clipPath);
+
+      const baseGroup = createSvgElement("g");
+      const wordGlowGroup = createSvgElement("g");
+      wordGlowGroup.setAttribute("clip-path", `url(#${idsRef.current.clipPathId})`);
+      const wordGroup = createSvgElement("g");
+      wordGroup.setAttribute("clip-path", `url(#${idsRef.current.clipPathId})`);
+
+      fragment.appendChild(defs);
+      fragment.appendChild(baseGroup);
+      fragment.appendChild(createWaveWordText(wordLayout, { className: "wave-field-word-outline" }));
+      fragment.appendChild(wordGlowGroup);
+      fragment.appendChild(wordGroup);
 
       for (let lineIndex = 0; lineIndex <= lineCount; lineIndex += 1) {
         const points: WavePoint[] = [];
@@ -202,10 +297,21 @@ export function WaveFieldBackground(): JSX.Element {
           });
         }
 
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const path = createSvgElement("path");
         path.classList.add("wave-field-line");
-        fragment.appendChild(path);
+        baseGroup.appendChild(path);
         paths.push(path);
+
+        const glowPath = createSvgElement("path");
+        glowPath.classList.add("wave-field-line", "wave-field-line-accent-soft");
+        wordGlowGroup.appendChild(glowPath);
+        wordGlowPaths.push(glowPath);
+
+        const wordPath = createSvgElement("path");
+        wordPath.classList.add("wave-field-line", "wave-field-line-accent");
+        wordGroup.appendChild(wordPath);
+        wordPaths.push(wordPath);
+
         lines.push(points);
       }
 
@@ -271,6 +377,8 @@ export function WaveFieldBackground(): JSX.Element {
         });
 
         paths[lineIndex]?.setAttribute("d", pathData);
+        wordGlowPaths[lineIndex]?.setAttribute("d", pathData);
+        wordPaths[lineIndex]?.setAttribute("d", pathData);
       });
     }
 
