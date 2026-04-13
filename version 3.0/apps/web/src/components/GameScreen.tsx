@@ -1,8 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 
 import type {
   ImageGenerationResponse,
   ImagePromptTemplateConfig,
+  Message,
   NpcRosterEntry,
   PlaythroughGraphBundle,
   RuntimeImageModelConfigInput,
@@ -42,7 +50,9 @@ type GameScreenProps = {
   isBootstrappingSession: boolean;
   isOpeningRevealInProgress: boolean;
   sessionBootstrapState: SessionBootstrapPanelState | null;
+  isPreparingRound: boolean;
   isSubmittingTurn: boolean;
+  isSendingPrivateChat: boolean;
   isSaving: boolean;
   isRestoring: boolean;
   isResumingBranch: boolean;
@@ -57,11 +67,41 @@ type GameScreenProps = {
   onLoadSavedGame: (record: SavedGameRecord) => Promise<void>;
   onQuickEndingTest: () => Promise<void>;
   onSaveGame: () => Promise<void>;
+  onSendPrivateChat: (targetParticipantId: string, content: string) => Promise<boolean>;
   onTurnInputChange: (value: string) => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-type GameDrawer = "none" | "saves" | "npcs" | "details";
+type SidePanelMode = "history" | "round";
+
+type GameDrawer = "none" | "saves" | "npcs" | "details" | "private_chat";
+
+function clampPanelSize(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function inferMessageChannel(message: Message): Message["channel"] {
+  if (message.channel) {
+    return message.channel;
+  }
+
+  if (message.visibility === "system" || message.kind === "system") {
+    return "system";
+  }
+
+  if (message.visibility === "private" || message.kind === "private_chat") {
+    return "private_chat";
+  }
+
+  return "public_story";
+}
+
+function buildPrivateChatThreadId(
+  localHumanParticipantId: string,
+  targetParticipantId: string
+): string {
+  return ["private_chat", localHumanParticipantId, targetParticipantId].join(":");
+}
 
 export function GameScreen(props: GameScreenProps) {
   const {
@@ -71,7 +111,9 @@ export function GameScreen(props: GameScreenProps) {
     isBootstrappingSession,
     isOpeningRevealInProgress,
     sessionBootstrapState,
+    isPreparingRound,
     isSubmittingTurn,
+    isSendingPrivateChat,
     isSaving,
     isRestoring,
     isResumingBranch,
@@ -86,34 +128,72 @@ export function GameScreen(props: GameScreenProps) {
     onLoadSavedGame,
     onQuickEndingTest,
     onSaveGame,
+    onSendPrivateChat,
     onTurnInputChange,
     onSubmitTurn
   } = props;
   const text = useUiText();
 
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const topPanelsRef = useRef<HTMLDivElement | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<GameDrawer>("none");
+  const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("history");
+  const [sidePanelWidth, setSidePanelWidth] = useState(420);
+  const [composerHeight, setComposerHeight] = useState(240);
+  const [isResizingPanels, setIsResizingPanels] = useState(false);
   const [npcRoster, setNpcRoster] = useState<NpcRosterEntry[]>([]);
   const [npcLoading, setNpcLoading] = useState(false);
   const [npcError, setNpcError] = useState<string | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
+  const [selectedPrivateChatTargetId, setSelectedPrivateChatTargetId] = useState<string | null>(null);
+  const [privateChatDrafts, setPrivateChatDrafts] = useState<Record<string, string>>({});
   const [generatedPortraits, setGeneratedPortraits] = useState<
     Record<string, ImageGenerationResponse>
   >({});
   const [generatingNpcId, setGeneratingNpcId] = useState<string | null>(null);
 
   const actionLocked = isBootstrappingSession || isOpeningRevealInProgress;
-  const visibleMessages =
-    snapshot?.messages.filter((message) => message.kind !== "system") ?? [];
+  const publicStoryMessages =
+    snapshot?.messages.filter((message) => inferMessageChannel(message) === "public_story") ?? [];
+  const companionIdSet = new Set(snapshot?.session.companionParticipantIds ?? []);
+  const companionParticipants =
+    snapshot?.session.participants.filter((participant) => companionIdSet.has(participant.id)) ?? [];
+  const localHumanParticipantId =
+    snapshot?.session.localHumanParticipantId ?? snapshot?.session.playerParticipantId ?? null;
+  const selectedPrivateChatTarget =
+    companionParticipants.find((participant) => participant.id === selectedPrivateChatTargetId) ??
+    companionParticipants[0] ??
+    null;
+  const privateThreadId =
+    localHumanParticipantId && selectedPrivateChatTarget
+      ? buildPrivateChatThreadId(localHumanParticipantId, selectedPrivateChatTarget.id)
+      : null;
+  const privateThreadMessages =
+    snapshot?.messages.filter(
+      (message) =>
+        inferMessageChannel(message) === "private_chat" && message.threadId === privateThreadId
+    ) ?? [];
+  const privateChatInput =
+    selectedPrivateChatTarget ? privateChatDrafts[selectedPrivateChatTarget.id] ?? "" : "";
+  const participantNameMap = new Map(
+    snapshot?.session.participants.map((participant) => [participant.id, participant.displayName]) ?? []
+  );
   const latestNarration =
-    [...visibleMessages]
+    [...publicStoryMessages]
       .reverse()
       .find((message) => message.kind === "gm_narration" || message.kind === "gm_dialogue") ??
     null;
   const recentHistory = latestNarration
-    ? visibleMessages.filter((message) => message.id !== latestNarration.id).slice(-8)
-    : visibleMessages.slice(-8);
+    ? publicStoryMessages.filter((message) => message.id !== latestNarration.id).slice(-8)
+    : publicStoryMessages.slice(-8);
   const isSessionEnded = snapshot?.session.status === "ended";
-  const composerDisabled = isSessionEnded || actionLocked;
+  const primaryPlayerMode = snapshot?.session.partySetup?.primaryPlayerMode ?? "human";
+  const roundPreparationRequired =
+    primaryPlayerMode === "ai" || (snapshot?.session.companionParticipantIds?.length ?? 0) > 0;
+  const roundInputState = snapshot?.session.gameState.roundInputState ?? null;
+  const roundDrafts = roundInputState?.drafts ?? [];
+  const primaryDraft = roundDrafts.find((draft) => draft.isPrimary) ?? null;
+  const composerDisabled = isSessionEnded || actionLocked || isPreparingRound || isSubmittingTurn;
   const endingJudgeJson = snapshot?.session.gameState.lastEndingJudgeResult
     ? JSON.stringify(snapshot.session.gameState.lastEndingJudgeResult, null, 2)
     : text.gameScreen.noEndingJudge;
@@ -122,7 +202,11 @@ export function GameScreen(props: GameScreenProps) {
   const canUseQuickEndingTest =
     snapshot?.session.modelAccessMode === "mock" &&
     snapshot.session.status !== "ended" &&
+    !roundPreparationRequired &&
+    !isPreparingRound &&
     !actionLocked;
+  const privateChatLocked =
+    actionLocked || isSessionEnded || isPreparingRound || isSubmittingTurn || isSendingPrivateChat;
   const bootstrapProgressPercent = Math.max(
     8,
     Math.min(100, Math.round((sessionBootstrapState?.progress ?? 0.08) * 100))
@@ -132,15 +216,107 @@ export function GameScreen(props: GameScreenProps) {
     sessionBootstrapState?.activeLabel ?? text.app.bootstrapStages.entered_game.label;
   const bootstrapStatusDetail =
     sessionBootstrapState?.activeDetail ?? text.app.bootstrapStages.waiting_first_reply.detail;
+  const composerHint = roundPreparationRequired
+    ? isPreparingRound
+      ? text.gameScreen.preparingRoundHint
+      : roundInputState
+        ? text.gameScreen.commitRoundHint(roundDrafts.length)
+        : primaryPlayerMode === "ai"
+          ? text.gameScreen.aiDraftHint
+          : text.gameScreen.prepareRoundHint
+    : composerDisabled
+      ? text.gameScreen.inputLocked
+      : text.gameScreen.submitTurnHint;
+  const submitButtonLabel = roundPreparationRequired
+    ? isPreparingRound
+      ? text.gameScreen.preparingRound
+      : isSubmittingTurn
+        ? text.common.creating
+      : roundInputState
+        ? text.gameScreen.commitRound
+        : text.gameScreen.prepareRound
+    : isSubmittingTurn
+      ? text.common.creating
+      : text.gameScreen.submitTurn;
+  const composerPlaceholder = actionLocked
+    ? text.gameScreen.initPlaceholder
+    : isPreparingRound
+      ? text.gameScreen.draftingPlaceholder
+      : primaryPlayerMode === "ai" && !primaryDraft
+        ? text.gameScreen.aiDraftPlaceholder
+        : text.gameScreen.actionPlaceholder;
+  const sidePanelEyebrow =
+    sidePanelMode === "round"
+      ? text.gameScreen.roundDraftsEyebrow
+      : text.gameScreen.recentContext;
+  const sidePanelTitle =
+    sidePanelMode === "round"
+      ? text.gameScreen.roundRepliesTitle
+      : text.gameScreen.recentContextTitle;
+  const sidePanelCountLabel =
+    sidePanelMode === "round"
+      ? roundDrafts.length
+        ? text.gameScreen.roundDraftCount(roundDrafts.length)
+        : text.gameScreen.roundDraftsEmpty
+      : text.gameScreen.recentItems(recentHistory.length);
+  const workspaceStyle = {
+    "--game-side-width": `${sidePanelWidth}px`,
+    "--game-composer-height": `${composerHeight}px`
+  } as CSSProperties;
 
   useEffect(() => {
     setNpcRoster([]);
     setNpcError(null);
     setSelectedNpcId(null);
+    setSelectedPrivateChatTargetId(null);
+    setPrivateChatDrafts({});
+    setSidePanelMode("history");
+    setSidePanelWidth(420);
+    setComposerHeight(240);
     setGeneratedPortraits({});
     setGeneratingNpcId(null);
     setActiveDrawer("none");
   }, [snapshot?.session.id]);
+
+  useEffect(() => {
+    function syncPanelBounds(): void {
+      const topPanelsRect = topPanelsRef.current?.getBoundingClientRect();
+      const workspaceRect = workspaceRef.current?.getBoundingClientRect();
+
+      if (topPanelsRect) {
+        const maxSideWidth = Math.max(300, Math.min(680, topPanelsRect.width - 260));
+        setSidePanelWidth((current) => clampPanelSize(current, 300, maxSideWidth));
+      }
+
+      if (workspaceRect) {
+        const maxComposerHeight = Math.max(220, workspaceRect.height - 240);
+        setComposerHeight((current) => clampPanelSize(current, 220, maxComposerHeight));
+      }
+    }
+
+    syncPanelBounds();
+    window.addEventListener("resize", syncPanelBounds);
+    return () => {
+      window.removeEventListener("resize", syncPanelBounds);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeDrawer !== "private_chat") {
+      return;
+    }
+
+    if (!companionParticipants.length) {
+      setSelectedPrivateChatTargetId(null);
+      return;
+    }
+
+    setSelectedPrivateChatTargetId((current) =>
+      current && companionParticipants.some((participant) => participant.id === current)
+        ? current
+        : companionParticipants[0]?.id ?? null
+    );
+  }, [activeDrawer, companionParticipants]);
 
   useEffect(() => {
     if (activeDrawer !== "npcs" || !snapshot || actionLocked) {
@@ -192,6 +368,60 @@ export function GameScreen(props: GameScreenProps) {
     };
   }, [activeDrawer, actionLocked, snapshot]);
 
+  function handleResizeSidePanel(event: ReactPointerEvent<HTMLDivElement>): void {
+    const containerRect = topPanelsRef.current?.getBoundingClientRect();
+    if (!containerRect || window.innerWidth <= 900) {
+      return;
+    }
+
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidePanelWidth;
+    const maxSideWidth = Math.max(300, Math.min(680, containerRect.width - 260));
+    setIsResizingPanels(true);
+
+    function handlePointerMove(moveEvent: PointerEvent): void {
+      const deltaX = moveEvent.clientX - startX;
+      setSidePanelWidth(clampPanelSize(startWidth - deltaX, 300, maxSideWidth));
+    }
+
+    function stopResize(): void {
+      setIsResizingPanels(false);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize, { once: true });
+  }
+
+  function handleResizeComposer(event: ReactPointerEvent<HTMLDivElement>): void {
+    const workspaceRect = workspaceRef.current?.getBoundingClientRect();
+    if (!workspaceRect || window.innerWidth <= 900) {
+      return;
+    }
+
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = composerHeight;
+    const maxComposerHeight = Math.max(220, workspaceRect.height - 240);
+    setIsResizingPanels(true);
+
+    function handlePointerMove(moveEvent: PointerEvent): void {
+      const deltaY = moveEvent.clientY - startY;
+      setComposerHeight(clampPanelSize(startHeight - deltaY, 220, maxComposerHeight));
+    }
+
+    function stopResize(): void {
+      setIsResizingPanels(false);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResize);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResize, { once: true });
+  }
+
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
     setActiveDrawer("none");
     await onLoadSavedGame(record);
@@ -232,6 +462,22 @@ export function GameScreen(props: GameScreenProps) {
     } finally {
       setGeneratingNpcId(null);
     }
+  }
+
+  async function handleSendPrivateChat(): Promise<void> {
+    if (!selectedPrivateChatTarget) {
+      return;
+    }
+
+    const didSend = await onSendPrivateChat(selectedPrivateChatTarget.id, privateChatInput);
+    if (!didSend) {
+      return;
+    }
+
+    setPrivateChatDrafts((current) => ({
+      ...current,
+      [selectedPrivateChatTarget.id]: ""
+    }));
   }
 
   if (!snapshot) {
@@ -292,6 +538,16 @@ export function GameScreen(props: GameScreenProps) {
           >
             {isRestoring ? text.common.loading : text.common.load}
           </button>
+          {companionParticipants.length ? (
+            <button
+              className="ghost-button"
+              disabled={actionLocked}
+              onClick={() => setActiveDrawer("private_chat")}
+              type="button"
+            >
+              {text.gameScreen.privateChatButton}
+            </button>
+          ) : null}
           <button
             className="ghost-button"
             disabled={actionLocked}
@@ -311,111 +567,226 @@ export function GameScreen(props: GameScreenProps) {
         </div>
       </header>
 
-      <div className="game-main">
-        <section className="summary-card game-focus-panel">
-          <div className="game-panel-head">
-            <div>
-              <div className="meta-label">{text.gameScreen.currentNarration}</div>
-              <div className="summary-title">
-                {isSessionEnded
-                  ? text.gameScreen.endedTitle
-                  : shouldShowBootstrapInline
-                    ? text.gameScreen.joiningSceneTitle
-                    : text.gameScreen.advancingStoryTitle}
-              </div>
-            </div>
-            {snapshot.session.gameState.endingState ? (
-              <span className="flag-chip">{snapshot.session.gameState.endingState.title}</span>
-            ) : null}
-          </div>
-
-          <div className="game-focus-scroll">
-            {shouldShowBootstrapInline ? (
-              <div className="game-inline-loading">
-                <div className="game-inline-loading-copy">
-                  <div className="meta-label">{text.gameScreen.bootstrapEyebrow}</div>
-                  <div className="summary-title">{bootstrapStatusLabel}</div>
-                  <p className="summary-text">{text.gameScreen.bootstrapWaiting}</p>
-                </div>
-
-                <div className="game-inline-loading-progress">
-                  <div className="game-loading-progress-meta">
-                    <span>{bootstrapStatusDetail}</span>
-                    <span>{bootstrapProgressPercent}%</span>
-                  </div>
-                  <div className="game-loading-progress-track" aria-hidden="true">
-                    <div
-                      className="game-loading-progress-bar"
-                      style={{ width: `${bootstrapProgressPercent}%` }}
-                    />
-                  </div>
+      <div
+        className={`game-workspace ${isResizingPanels ? "game-workspace-resizing" : ""}`}
+        ref={workspaceRef}
+        style={workspaceStyle}
+      >
+        <div className="game-top-panels" ref={topPanelsRef}>
+          <section className="summary-card game-focus-panel">
+            <div className="game-panel-head">
+              <div>
+                <div className="meta-label">{text.gameScreen.currentNarration}</div>
+                <div className="summary-title">
+                  {isSessionEnded
+                    ? text.gameScreen.endedTitle
+                    : shouldShowBootstrapInline
+                      ? text.gameScreen.joiningSceneTitle
+                      : text.gameScreen.advancingStoryTitle}
                 </div>
               </div>
-            ) : (
-              <>
-                <MarkdownBlock
-                  className="story-markdown-block game-focus-markdown"
-                  content={latestNarration?.content ?? text.gameScreen.noNarrationYet}
-                  fontSizePreset={markdownFontSize}
-                />
-
-                {showAiMetadata && latestNarration?.aiMetadata ? (
-                  <div className="ai-meta-line">
-                    {formatAiGenerationMeta(latestNarration.aiMetadata, text)}
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-        </section>
-
-        <section className="summary-card game-history-panel">
-          <div className="game-panel-head">
-            <div>
-              <div className="meta-label">{text.gameScreen.recentContext}</div>
-              <div className="summary-title">{text.gameScreen.recentContextTitle}</div>
+              {snapshot.session.gameState.endingState ? (
+                <span className="flag-chip">{snapshot.session.gameState.endingState.title}</span>
+              ) : null}
             </div>
-            <span className="summary-text">{text.gameScreen.recentItems(recentHistory.length)}</span>
-          </div>
 
-          <div className="game-history-scroll">
-            <div className="game-history-list">
-              {recentHistory.length ? (
-                recentHistory.map((message) => (
-                  <article
-                    className={`game-history-item ${
-                      message.kind === "player_input"
-                        ? "game-history-item-player"
-                        : "game-history-item-gm"
-                    }`}
-                    key={message.id}
-                  >
-                    <div className="game-history-meta">
-                      <span>
-                        {message.kind === "player_input"
-                          ? text.gameScreen.playerRound(message.round)
-                          : text.gameScreen.narratorRound(message.round)}
-                      </span>
-                      <span>{formatDateTime(message.createdAt)}</span>
+            <div className="game-focus-scroll">
+              {shouldShowBootstrapInline ? (
+                <div className="game-inline-loading">
+                  <div className="game-inline-loading-copy">
+                    <div className="meta-label">{text.gameScreen.bootstrapEyebrow}</div>
+                    <div className="summary-title">{bootstrapStatusLabel}</div>
+                    <p className="summary-text">{text.gameScreen.bootstrapWaiting}</p>
+                  </div>
+
+                  <div className="game-inline-loading-progress">
+                    <div className="game-loading-progress-meta">
+                      <span>{bootstrapStatusDetail}</span>
+                      <span>{bootstrapProgressPercent}%</span>
                     </div>
-
-                    {message.kind === "player_input" ? (
-                      <div className="message-body">{message.content}</div>
-                    ) : (
-                      <MarkdownBlock
-                        className="story-markdown-block message-body message-body-markdown"
-                        content={message.content}
-                        fontSizePreset={markdownFontSize}
+                    <div className="game-loading-progress-track" aria-hidden="true">
+                      <div
+                        className="game-loading-progress-bar"
+                        style={{ width: `${bootstrapProgressPercent}%` }}
                       />
-                    )}
-                  </article>
-                ))
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <div className="empty-state">{text.gameScreen.historyEmpty}</div>
+                <>
+                  <MarkdownBlock
+                    className="story-markdown-block game-focus-markdown"
+                    content={latestNarration?.content ?? text.gameScreen.noNarrationYet}
+                    fontSizePreset={markdownFontSize}
+                  />
+
+                  {showAiMetadata && latestNarration?.aiMetadata ? (
+                    <div className="ai-meta-line">
+                      {formatAiGenerationMeta(latestNarration.aiMetadata, text)}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
+          </section>
+
+          <div
+            aria-label={text.gameScreen.resizeSidePanel}
+            className="game-resizer game-resizer-column"
+            onPointerDown={handleResizeSidePanel}
+            role="separator"
+          />
+
+          <section className="summary-card game-side-panel">
+            <div className="game-panel-head">
+              <div>
+                <div className="meta-label">{sidePanelEyebrow}</div>
+                <div className="summary-title">{sidePanelTitle}</div>
+              </div>
+              <span className="summary-text">{sidePanelCountLabel}</span>
+            </div>
+
+            <div className="game-panel-toggle-row">
+              <button
+                className={`game-panel-toggle ${
+                  sidePanelMode === "history" ? "game-panel-toggle-active" : ""
+                }`}
+                onClick={() => setSidePanelMode("history")}
+                type="button"
+              >
+                {text.gameScreen.historyTab}
+              </button>
+              <button
+                className={`game-panel-toggle ${
+                  sidePanelMode === "round" ? "game-panel-toggle-active" : ""
+                }`}
+                disabled={!roundPreparationRequired}
+                onClick={() => setSidePanelMode("round")}
+                type="button"
+              >
+                {text.gameScreen.roundRepliesTab}
+              </button>
+            </div>
+
+            <div className="game-side-scroll">
+              {sidePanelMode === "history" ? (
+                <div className="game-history-list">
+                  {recentHistory.length ? (
+                    recentHistory.map((message) => (
+                      <article
+                        className={`game-history-item ${
+                          message.kind === "player_input"
+                            ? "game-history-item-player"
+                            : "game-history-item-gm"
+                        }`}
+                        key={message.id}
+                      >
+                        <div className="game-history-meta">
+                          <span>
+                            {message.kind === "player_input"
+                              ? text.gameScreen.participantRound(
+                                  participantNameMap.get(message.senderId) ??
+                                    text.app.pendingPlayerName,
+                                  message.round
+                                )
+                              : text.gameScreen.narratorRound(message.round)}
+                          </span>
+                          <span>{formatDateTime(message.createdAt)}</span>
+                        </div>
+
+                        {message.kind === "player_input" ? (
+                          <div className="message-body">{message.content}</div>
+                        ) : (
+                          <MarkdownBlock
+                            className="story-markdown-block message-body message-body-markdown"
+                            content={message.content}
+                            fontSizePreset={markdownFontSize}
+                          />
+                        )}
+                      </article>
+                    ))
+                  ) : (
+                    <div className="empty-state">{text.gameScreen.historyEmpty}</div>
+                  )}
+                </div>
+              ) : isPreparingRound ? (
+                <div className="empty-state">{text.gameScreen.draftingPlaceholder}</div>
+              ) : roundDrafts.length ? (
+                <div className="game-draft-list">
+                  {roundDrafts.map((draft) => (
+                    <article className="game-draft-item" key={draft.participantId}>
+                      <div className="game-draft-item-head">
+                        <div>
+                          <div className="summary-title">{draft.displayName}</div>
+                          <div className="summary-text">
+                            {draft.isPrimary
+                              ? text.gameScreen.primaryDraftLabel
+                              : text.gameScreen.companionDraftLabel}
+                          </div>
+                        </div>
+                        <div className="game-draft-item-flags">
+                          <span className="badge">
+                            {draft.source === "ai"
+                              ? text.gameScreen.aiDraftBadge
+                              : text.gameScreen.humanDraftBadge}
+                          </span>
+                          {draft.editable ? (
+                            <span className="badge">{text.gameScreen.editableDraftBadge}</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="message-body">{draft.content}</div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  {roundPreparationRequired
+                    ? primaryPlayerMode === "ai"
+                      ? text.gameScreen.aiDraftWaiting
+                      : text.gameScreen.roundDraftsDescription
+                    : text.gameScreen.roundRepliesEmpty}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div
+          aria-label={text.gameScreen.resizeComposer}
+          className="game-resizer game-resizer-row"
+          onPointerDown={handleResizeComposer}
+          role="separator"
+        />
+
+        <form className="summary-card game-composer" onSubmit={onSubmitTurn}>
+          <div className="game-panel-head">
+            <div>
+              <div className="meta-label">{text.gameScreen.yourAction}</div>
+              <div className="summary-title">{text.gameScreen.actionTitle}</div>
+            </div>
+            <span className="summary-text">{composerHint}</span>
           </div>
-        </section>
+
+          <textarea
+            disabled={composerDisabled}
+            rows={5}
+            placeholder={composerPlaceholder}
+            value={turnInput}
+            onChange={(event) => onTurnInputChange(event.target.value)}
+          />
+
+          <div className="button-row">
+            <button
+              className="primary-button"
+              disabled={isSubmittingTurn || composerDisabled}
+              type="submit"
+            >
+              {submitButtonLabel}
+            </button>
+          </div>
+        </form>
       </div>
 
       {snapshot.session.gameState.endingState ? (
@@ -425,40 +796,6 @@ export function GameScreen(props: GameScreenProps) {
           <div className="summary-text">{snapshot.session.gameState.endingState.summary}</div>
         </div>
       ) : null}
-
-      <form className="summary-card game-composer" onSubmit={onSubmitTurn}>
-        <div className="game-panel-head">
-          <div>
-            <div className="meta-label">{text.gameScreen.yourAction}</div>
-            <div className="summary-title">{text.gameScreen.actionTitle}</div>
-          </div>
-          <span className="summary-text">
-            {composerDisabled ? text.gameScreen.inputLocked : text.gameScreen.submitTurnHint}
-          </span>
-        </div>
-
-        <textarea
-          disabled={composerDisabled}
-          rows={5}
-          placeholder={
-            actionLocked
-              ? text.gameScreen.initPlaceholder
-              : text.gameScreen.actionPlaceholder
-          }
-          value={turnInput}
-          onChange={(event) => onTurnInputChange(event.target.value)}
-        />
-
-        <div className="button-row">
-          <button
-            className="primary-button"
-            disabled={isSubmittingTurn || composerDisabled}
-            type="submit"
-          >
-            {isSubmittingTurn ? text.common.creating : text.gameScreen.submitTurn}
-          </button>
-        </div>
-      </form>
 
       {activeDrawer !== "none" ? (
         <div className="game-drawer-backdrop" onClick={() => setActiveDrawer("none")}>
@@ -510,6 +847,127 @@ export function GameScreen(props: GameScreenProps) {
                   ) : (
                     <div className="empty-state">{text.gameScreen.noLocalSaves}</div>
                   )}
+                </div>
+              </div>
+            ) : null}
+
+            {activeDrawer === "private_chat" ? (
+              <div className="game-drawer-body">
+                <div className="screen-header">
+                  <div>
+                    <div className="eyebrow">{text.gameScreen.privateChatEyebrow}</div>
+                    <h2>{text.gameScreen.privateChatTitle}</h2>
+                    <p className="lead">{text.gameScreen.privateChatDescription}</p>
+                  </div>
+                  <div className="button-row header-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => setActiveDrawer("none")}
+                      type="button"
+                    >
+                      {text.common.close}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="game-private-chat-layout">
+                  <div className="game-private-chat-list">
+                    {companionParticipants.length ? (
+                      companionParticipants.map((participant) => (
+                        <button
+                          className={`selection-card ${
+                            selectedPrivateChatTarget?.id === participant.id
+                              ? "selection-card-active"
+                              : ""
+                          }`}
+                          key={participant.id}
+                          onClick={() => setSelectedPrivateChatTargetId(participant.id)}
+                          type="button"
+                        >
+                          <div className="selection-card-title">{participant.displayName}</div>
+                          <div className="selection-card-copy">{text.gameScreen.privateChatTeammateHint}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="empty-state">{text.gameScreen.privateChatEmpty}</div>
+                    )}
+                  </div>
+
+                  <div className="summary-card game-private-chat-panel">
+                    {selectedPrivateChatTarget ? (
+                      <>
+                        <div className="game-panel-head">
+                          <div>
+                            <div className="meta-label">{text.gameScreen.privateChatWithEyebrow}</div>
+                            <div className="summary-title">{selectedPrivateChatTarget.displayName}</div>
+                          </div>
+                          <span className="summary-text">{text.gameScreen.privateChatHistoryHint}</span>
+                        </div>
+
+                        <div className="game-private-chat-scroll">
+                          <div className="game-private-chat-thread">
+                            {privateThreadMessages.length ? (
+                              privateThreadMessages.map((message) => {
+                                const isSelf = message.senderId === localHumanParticipantId;
+                                const senderLabel =
+                                  participantNameMap.get(message.senderId) ??
+                                  (isSelf ? text.gameScreen.privateChatYou : text.app.pendingPlayerName);
+
+                                return (
+                                  <article
+                                    className={`game-private-chat-message ${
+                                      isSelf
+                                        ? "game-private-chat-message-self"
+                                        : "game-private-chat-message-peer"
+                                    }`}
+                                    key={message.id}
+                                  >
+                                    <div className="game-private-chat-meta">
+                                      <span>{senderLabel}</span>
+                                      <span>{formatDateTime(message.createdAt)}</span>
+                                    </div>
+                                    <div className="message-body">{message.content}</div>
+                                  </article>
+                                );
+                              })
+                            ) : (
+                              <div className="empty-state">{text.gameScreen.privateChatEmpty}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="game-private-chat-composer">
+                          <div className="meta-label">{text.gameScreen.privateChatInputLabel}</div>
+                          <textarea
+                            disabled={privateChatLocked}
+                            placeholder={text.gameScreen.privateChatInputPlaceholder}
+                            rows={4}
+                            value={privateChatInput}
+                            onChange={(event) =>
+                              setPrivateChatDrafts((current) => ({
+                                ...current,
+                                [selectedPrivateChatTarget.id]: event.target.value
+                              }))
+                            }
+                          />
+                          <div className="button-row">
+                            <button
+                              className="primary-button"
+                              disabled={privateChatLocked || !privateChatInput.trim()}
+                              onClick={() => void handleSendPrivateChat()}
+                              type="button"
+                            >
+                              {isSendingPrivateChat
+                                ? text.gameScreen.privateChatSending
+                                : text.gameScreen.privateChatSend}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="empty-state">{text.gameScreen.privateChatSelectHint}</div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : null}

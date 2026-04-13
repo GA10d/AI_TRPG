@@ -8,8 +8,10 @@
 
 import type {
   AiGenerationMetadata,
+  AiPersonalityTag,
   BootstrapResponse,
   CharacterConceptAssistMode,
+  CreateSessionAiCompanionInput,
   CreateSessionRequest,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
@@ -47,6 +49,7 @@ type GameSetupScreenProps = {
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
   markdownFontSize: MarkdownFontSizePreset;
   characterConcept: string;
+  aiCompanions: CreateSessionAiCompanionInput[];
   characterConceptAssistLoading: boolean;
   characterConceptAssistMode: CharacterConceptAssistMode;
   isCreating: boolean;
@@ -73,6 +76,10 @@ type GameSetupScreenProps = {
   onOpeningPreviewDeliveryModeChange: (value: OpeningPreviewDeliveryMode) => void;
   onMarkdownFontSizeChange: (value: MarkdownFontSizePreset) => void;
   onCharacterConceptChange: (value: string) => void;
+  onAddAiCompanion: () => void;
+  onRemoveAiCompanion: (index: number) => void;
+  onUpdateAiCompanionName: (index: number, value: string) => void;
+  onToggleAiCompanionPersonalityTag: (index: number, personalityTagId: string) => void;
 };
 
 type DragTarget = "left" | "right" | null;
@@ -269,6 +276,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     openingPreviewDeliveryMode,
     markdownFontSize,
     characterConcept,
+    aiCompanions,
     characterConceptAssistLoading,
     characterConceptAssistMode,
     isCreating,
@@ -292,7 +300,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onLogViewModeChange,
     onOpeningPreviewDeliveryModeChange,
     onMarkdownFontSizeChange,
-    onCharacterConceptChange
+    onCharacterConceptChange,
+    onAddAiCompanion,
+    onRemoveAiCompanion,
+    onUpdateAiCompanionName,
+    onToggleAiCompanionPersonalityTag
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -301,6 +313,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const [isCoverExpanded, setIsCoverExpanded] = useState(false);
   const [isSettingsDetailOpen, setIsSettingsDetailOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<SetupDetailTab>("game");
+  const [personalityEditorIndex, setPersonalityEditorIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -395,6 +408,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     setIsCoverExpanded(false);
   }, [ruleDirectoryName, storyDirectoryName]);
 
+  useEffect(() => {
+    if (personalityEditorIndex === null) {
+      return;
+    }
+
+    if (personalityEditorIndex < aiCompanions.length) {
+      return;
+    }
+
+    setPersonalityEditorIndex(aiCompanions.length ? aiCompanions.length - 1 : null);
+  }, [aiCompanions.length, personalityEditorIndex]);
+
   function handleSplitterPointerDown(
     target: DragTarget,
     event: ReactPointerEvent<HTMLButtonElement>
@@ -424,6 +449,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
   function handleCloseSettingsDetail(): void {
     setIsSettingsDetailOpen(false);
+  }
+
+  function handleOpenPersonalityEditor(index: number): void {
+    setPersonalityEditorIndex(index);
+  }
+
+  function handleClosePersonalityEditor(): void {
+    setPersonalityEditorIndex(null);
   }
 
   const selectedRule =
@@ -477,6 +510,48 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     !openingPreviewLoading &&
     hasPreviewText &&
     profileReady;
+  const personalityTags = bootstrap?.personalityTags ?? [];
+  const isStoryMode = playMode === "story_mode";
+  const companionLimitReached = aiCompanions.length >= 3;
+  const editingCompanion =
+    personalityEditorIndex !== null ? aiCompanions[personalityEditorIndex] ?? null : null;
+  const editingCompanionSelectedTags = editingCompanion
+    ? personalityTags.filter((tag) => editingCompanion.personalityTagIds.includes(tag.id))
+    : [];
+  const personalityTagSections: Array<{
+    key: string;
+    title: string;
+    tags: AiPersonalityTag[];
+  }> = [
+    {
+      key: "basic_positive",
+      title: setupText.companions.basicPositiveLabel,
+      tags: personalityTags.filter(
+        (tag) => tag.group === "basic" && tag.polarity === "positive"
+      )
+    },
+    {
+      key: "basic_negative",
+      title: setupText.companions.basicNegativeLabel,
+      tags: personalityTags.filter(
+        (tag) => tag.group === "basic" && tag.polarity === "negative"
+      )
+    },
+    {
+      key: "advanced_positive",
+      title: setupText.companions.advancedPositiveLabel,
+      tags: personalityTags.filter(
+        (tag) => tag.group === "advanced" && tag.polarity === "positive"
+      )
+    },
+    {
+      key: "advanced_negative",
+      title: setupText.companions.advancedNegativeLabel,
+      tags: personalityTags.filter(
+        (tag) => tag.group === "advanced" && tag.polarity === "negative"
+      )
+    }
+  ].filter((section) => section.tags.length > 0);
 
   const leftPaneStyle: CSSProperties = {
     width: layout.leftWidth,
@@ -703,20 +778,226 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     );
   }
 
+  function renderPersonalityTagSection(
+    companionIndex: number,
+    section: {
+      key: string;
+      title: string;
+      tags: AiPersonalityTag[];
+    }
+  ): React.ReactNode {
+    const selectedTagIds = aiCompanions[companionIndex]?.personalityTagIds ?? [];
+
+    return (
+      <div className="companion-tag-section" key={section.key}>
+        <div className="companion-tag-section-title">{section.title}</div>
+        <div className="companion-tag-list">
+          {section.tags.map((tag) => {
+            const isSelected = selectedTagIds.includes(tag.id);
+
+            return (
+              <button
+                className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
+                key={tag.id}
+                onClick={() => onToggleAiCompanionPersonalityTag(companionIndex, tag.id)}
+                title={tag.description}
+                type="button"
+              >
+                <span>{tag.keyword}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function renderCompanionEditor(
+    companion: CreateSessionAiCompanionInput,
+    index: number
+  ): React.ReactNode {
+    const selectedTags = personalityTags.filter((tag) =>
+      companion.personalityTagIds.includes(tag.id)
+    );
+    const companionDisplayName =
+      companion.displayName.trim() || setupText.companions.namePlaceholder(index + 1);
+    const previewTags = selectedTags.slice(0, 6);
+    const hiddenTagCount = selectedTags.length - previewTags.length;
+
+    return (
+      <div className="companion-card companion-editor-card" key={`companion-${index}`}>
+        <div className="companion-editor-head">
+          <div>
+            <div className="selection-card-title">
+              {setupText.companions.memberTitle(index + 1)}
+            </div>
+            <div className="summary-text">
+              {setupText.companions.selectedCount(selectedTags.length)}
+            </div>
+          </div>
+          <button
+            className="ghost-button ghost-button-small"
+            onClick={() => onRemoveAiCompanion(index)}
+            type="button"
+          >
+            {setupText.companions.removeButton}
+          </button>
+        </div>
+
+        <label className="companion-editor-field">
+          <span>{setupText.companions.nameLabel}</span>
+          <input
+            type="text"
+            value={companion.displayName}
+            placeholder={setupText.companions.namePlaceholder(index + 1)}
+            onChange={(event) => onUpdateAiCompanionName(index, event.target.value)}
+          />
+        </label>
+
+        <div className="companion-editor-selection">
+          <div className="summary-text">{companionDisplayName}</div>
+          {selectedTags.length ? (
+            <div className="companion-selected-tags">
+              {previewTags.map((tag) => (
+                <span className="badge" key={tag.id}>
+                  {tag.keyword}
+                </span>
+              ))}
+              {hiddenTagCount > 0 ? <span className="badge">+{hiddenTagCount}</span> : null}
+            </div>
+          ) : (
+            <div className="companion-selected-placeholder">
+              {setupText.companions.selectedPreviewEmpty}
+            </div>
+          )}
+        </div>
+
+        <div className="companion-editor-actions">
+          <button
+            className="ghost-button"
+            onClick={() => handleOpenPersonalityEditor(index)}
+            type="button"
+          >
+            {setupText.companions.configureButton}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPersonalityEditorModal(): React.ReactNode {
+    if (editingCompanion === null || personalityEditorIndex === null) {
+      return null;
+    }
+
+    const companionDisplayName =
+      editingCompanion.displayName.trim() ||
+      setupText.companions.namePlaceholder(personalityEditorIndex + 1);
+
+    return (
+      <div
+        aria-label={setupText.companions.configureButton}
+        className="companion-personality-modal-backdrop"
+        onClick={handleClosePersonalityEditor}
+        role="dialog"
+      >
+        <div
+          className="companion-personality-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="companion-personality-modal-header">
+            <div>
+              <div className="eyebrow">{setupText.companions.eyebrow}</div>
+              <h2>{companionDisplayName}</h2>
+              <div className="summary-text">
+                {setupText.companions.configureDescription}
+              </div>
+            </div>
+            <button
+              className="ghost-button ghost-button-small"
+              onClick={handleClosePersonalityEditor}
+              type="button"
+            >
+              {setupText.modal.close}
+            </button>
+          </div>
+
+          <div className="companion-personality-modal-summary">
+            <div className="companion-personality-modal-selection">
+              <div className="companion-personality-modal-selection-head">
+                <div className="companion-personality-modal-selection-title">
+                  {setupText.companions.selectedCount(editingCompanionSelectedTags.length)}
+                </div>
+                <div className="summary-text">{setupText.companions.tagHint}</div>
+              </div>
+              {editingCompanionSelectedTags.length ? (
+                <div className="companion-selected-tags">
+                  {editingCompanionSelectedTags.map((tag) => (
+                    <span className="badge" key={tag.id}>
+                      {tag.keyword}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="companion-selected-placeholder">
+                  {setupText.companions.selectedPreviewEmpty}
+                </div>
+              )}
+            </div>
+
+            {personalityTagSections.length ? (
+              <div className="companion-tag-sections">
+                {personalityTagSections.map((section) =>
+                  renderPersonalityTagSection(personalityEditorIndex, section)
+                )}
+              </div>
+            ) : (
+              <div className="empty-state companion-personality-modal-empty">
+                {setupText.companions.noTags}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderCompanionCards(gridClassName?: string): React.ReactNode {
     return (
       <div className={gridClassName ?? "companion-list"}>
         <div className="companion-card">
           <div className="selection-card-title">{setupText.companions.entryTitle}</div>
           <div className="summary-text">
-            {setupText.companions.entryDescription}
+            {isStoryMode
+              ? setupText.companions.storyModeDescription
+              : setupText.companions.entryDescription}
+          </div>
+          <div className="summary-text">
+            {setupText.companions.count(aiCompanions.length)}
           </div>
         </div>
+
+        {aiCompanions.length ? (
+          aiCompanions.map((companion, index) => renderCompanionEditor(companion, index))
+        ) : (
+          <div className="companion-card">
+            <div className="selection-card-title">{setupText.companions.emptyTitle}</div>
+            <div className="summary-text">{setupText.companions.emptyDescription}</div>
+          </div>
+        )}
 
         <div className="companion-card">
           <div className="selection-card-title">{setupText.companions.addTitle}</div>
           <div className="summary-text">{setupText.companions.addDescription}</div>
-          <button className="ghost-button" disabled type="button">
+          {companionLimitReached ? (
+            <div className="summary-text">{setupText.companions.limitReached}</div>
+          ) : null}
+          <button
+            className="ghost-button"
+            disabled={companionLimitReached}
+            onClick={onAddAiCompanion}
+            type="button"
+          >
             {setupText.companions.addButton}
           </button>
         </div>
@@ -1405,6 +1686,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           </div>
         </div>
       ) : null}
+
+      {renderPersonalityEditorModal()}
 
       {coverAsset && isCoverExpanded ? (
         <div

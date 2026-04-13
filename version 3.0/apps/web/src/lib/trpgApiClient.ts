@@ -2,6 +2,7 @@ import type {
   BootstrapResponse,
   CharacterConceptAssistRequest,
   CharacterConceptAssistResponse,
+  CommitRoundRequest,
   CreateSaveResponse,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
@@ -9,7 +10,9 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
   NpcRosterEntry,
+  PrepareRoundRequest,
   SaveBundle,
+  SendPrivateChatRequest,
   SessionCreateStreamEvent,
   SessionSnapshot,
   SubmitTurnRequest
@@ -400,6 +403,63 @@ export async function submitTurn(
 ): Promise<SessionSnapshot> {
   try {
     const response = await fetch(`/api/sessions/${sessionId}/turns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function prepareRound(
+  sessionId: string,
+  payload: PrepareRoundRequest
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/rounds/prepare`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function commitPreparedRound(
+  sessionId: string,
+  payload: CommitRoundRequest = {}
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/rounds/commit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function sendPrivateChat(
+  sessionId: string,
+  payload: SendPrivateChatRequest
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/private-chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

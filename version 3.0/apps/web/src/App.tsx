@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type {
   AiGenerationMetadata,
   CharacterConceptAssistMode,
+  CreateSessionAiCompanionInput,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   Message,
@@ -10,14 +11,18 @@ import type {
   SaveBundle,
   SaveRuntimeConfig,
   SessionCreateStage,
+  RoundDraft,
   SessionSnapshot
 } from "../../../packages/shared-types/src/index.ts";
 import {
   assistCharacterConcept,
+  commitPreparedRound,
   createSave,
   fetchSession,
   generateOpeningPreview,
   loadSaveBundle,
+  prepareRound,
+  sendPrivateChat,
   streamCreateSession,
   streamOpeningPreview,
   submitTurn
@@ -202,17 +207,64 @@ function isAbortError(error: unknown): boolean {
     : error instanceof Error && error.name === "AbortError";
 }
 
+function buildEmptyAiCompanion(): CreateSessionAiCompanionInput {
+  return {
+    displayName: "",
+    personalityTagIds: []
+  };
+}
+
+function sessionNeedsPreparedRound(snapshot: SessionSnapshot | null): boolean {
+  if (!snapshot) {
+    return false;
+  }
+
+  const primaryPlayerMode = snapshot.session.partySetup?.primaryPlayerMode ?? "human";
+  const companionCount = snapshot.session.companionParticipantIds?.length ?? 0;
+  return primaryPlayerMode === "ai" || companionCount > 0;
+}
+
+function getPreparedPrimaryDraft(snapshot: SessionSnapshot | null): RoundDraft | null {
+  return snapshot?.session.gameState.roundInputState?.drafts.find((draft) => draft.isPrimary) ?? null;
+}
+
+function buildPreparedTurnCapturePreview(
+  snapshot: SessionSnapshot,
+  primaryOverride?: string
+): string {
+  const normalizedOverride = primaryOverride?.trim() ?? "";
+  const drafts = (snapshot.session.gameState.roundInputState?.drafts ?? []).map((draft) =>
+    draft.isPrimary && normalizedOverride.length > 0
+      ? {
+          ...draft,
+          content: normalizedOverride
+        }
+      : draft
+  );
+
+  if (!drafts.length) {
+    return "";
+  }
+
+  return drafts
+    .map((draft) => `${draft.displayName}: ${draft.content}`)
+    .join(" | ");
+}
+
 export function App() {
   const [view, setView] = useState<AppView>("menu");
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const [status, setStatus] = useState<StatusState>(initialStatus);
   const [isCreating, setIsCreating] = useState(false);
+  const [isPreparingRound, setIsPreparingRound] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
+  const [isSendingPrivateChat, setIsSendingPrivateChat] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
+  const [aiCompanions, setAiCompanions] = useState<CreateSessionAiCompanionInput[]>([]);
   const [characterConceptAssistLoading, setCharacterConceptAssistLoading] = useState(false);
   const [characterConceptAssistMode, setCharacterConceptAssistMode] =
     useState<CharacterConceptAssistMode>("generate");
@@ -229,6 +281,7 @@ export function App() {
   const lastHandledOpeningPreviewRegenerateNonceRef = useRef(0);
   const stagedOpeningRevealTimerRef = useRef<number | null>(null);
   const stagedSessionBootTokenRef = useRef(0);
+  const autoPreparedRoundKeyRef = useRef<string | null>(null);
 
   const {
     bootstrap,
@@ -304,6 +357,7 @@ export function App() {
     modelProfileId,
     runtimeModelConfig
   );
+  const roundPreparationRequired = sessionNeedsPreparedRound(snapshot);
 
   useEffect(() => {
     if (view !== "game_setup") {
@@ -440,6 +494,60 @@ export function App() {
     []
   );
 
+  useEffect(() => {
+    if (!snapshot || view !== "game") {
+      return;
+    }
+
+    if (!sessionNeedsPreparedRound(snapshot)) {
+      return;
+    }
+
+    if (snapshot.session.partySetup?.primaryPlayerMode !== "ai") {
+      return;
+    }
+
+    if (snapshot.session.status === "ended") {
+      return;
+    }
+
+    if (snapshot.session.gameState.roundInputState) {
+      return;
+    }
+
+    if (
+      isCreating ||
+      isBootstrappingSession ||
+      isOpeningRevealInProgress ||
+      isPreparingRound ||
+      isSubmittingTurn
+    ) {
+      return;
+    }
+
+    const autoPrepareKey = `${snapshot.session.id}:${snapshot.session.currentRound}`;
+    if (autoPreparedRoundKeyRef.current === autoPrepareKey) {
+      return;
+    }
+
+    autoPreparedRoundKeyRef.current = autoPrepareKey;
+
+    void prepareRoundDrafts(snapshot, "", {
+      pendingMessage: uiText.app.status.preparingAiLeaderDraft,
+      successMessage: uiText.app.status.roundDraftsReady
+    });
+  }, [
+    isBootstrappingSession,
+    isCreating,
+    isOpeningRevealInProgress,
+    isPreparingRound,
+    isSubmittingTurn,
+    snapshot,
+    uiText.app.status.preparingAiLeaderDraft,
+    uiText.app.status.roundDraftsReady,
+    view
+  ]);
+
   function buildSaveRuntimeConfig(
     profileIdOverride?: string
   ): SaveRuntimeConfig {
@@ -496,6 +604,50 @@ export function App() {
       markdownFontSize,
       menuFontSize
     });
+  }
+
+  function handleAddAiCompanion(): void {
+    setAiCompanions((current) =>
+      current.length >= 3 ? current : [...current, buildEmptyAiCompanion()]
+    );
+  }
+
+  function handleRemoveAiCompanion(index: number): void {
+    setAiCompanions((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function handleUpdateAiCompanionName(index: number, displayName: string): void {
+    setAiCompanions((current) =>
+      current.map((companion, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...companion,
+              displayName
+            }
+          : companion
+      )
+    );
+  }
+
+  function handleToggleAiCompanionPersonalityTag(
+    index: number,
+    personalityTagId: string
+  ): void {
+    setAiCompanions((current) =>
+      current.map((companion, itemIndex) => {
+        if (itemIndex !== index) {
+          return companion;
+        }
+
+        const hasTag = companion.personalityTagIds.includes(personalityTagId);
+        return {
+          ...companion,
+          personalityTagIds: hasTag
+            ? companion.personalityTagIds.filter((tagId) => tagId !== personalityTagId)
+            : [...companion.personalityTagIds, personalityTagId]
+        };
+      })
+    );
   }
 
   function commitSnapshot(nextSnapshot: SessionSnapshot): void {
@@ -764,6 +916,85 @@ export function App() {
     }, 46);
   }
 
+  async function prepareRoundDrafts(
+    currentSnapshot: SessionSnapshot,
+    playerInput: string,
+    options?: {
+      pendingMessage?: string;
+      successMessage?: string;
+    }
+  ): Promise<SessionSnapshot | null> {
+    setIsPreparingRound(true);
+    setStatus({
+      message: options?.pendingMessage ?? uiText.app.status.preparingRoundDrafts,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await prepareRound(currentSnapshot.session.id, {
+        playerInput
+      });
+      commitSnapshot(nextSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? playerInput);
+      setStatus({
+        message: options?.successMessage ?? uiText.app.status.roundDraftsReady,
+        tone: "neutral"
+      });
+      return nextSnapshot;
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+      return null;
+    } finally {
+      setIsPreparingRound(false);
+    }
+  }
+
+  async function commitPreparedRoundDrafts(
+    currentSnapshot: SessionSnapshot,
+    options?: {
+      pendingMessage?: string;
+      successMessage?: string;
+      endingSuccessMessage?: string;
+    }
+  ): Promise<void> {
+    setIsSubmittingTurn(true);
+    setStatus({
+      message: options?.pendingMessage ?? uiText.app.status.submitTurnPending,
+      tone: "neutral"
+    });
+
+    try {
+      const capturePreview = buildPreparedTurnCapturePreview(currentSnapshot, turnInput);
+      const nextSnapshot = await commitPreparedRound(currentSnapshot.session.id, {
+        playerInput: turnInput.trim() || undefined
+      });
+      commitSnapshot(nextSnapshot);
+      captureTurn(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        capturePreview
+      );
+      setTurnInput("");
+      setStatus({
+        message:
+          nextSnapshot.session.status === "ended"
+            ? options?.endingSuccessMessage ?? uiText.app.status.turnCompleteEnded
+            : options?.successMessage ?? uiText.app.status.turnComplete,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsSubmittingTurn(false);
+    }
+  }
+
   async function submitPlayerTurn(
     currentSnapshot: SessionSnapshot,
     playerInput: string,
@@ -807,6 +1038,55 @@ export function App() {
     }
   }
 
+  async function handleSendPrivateChat(
+    targetParticipantId: string,
+    content: string
+  ): Promise<boolean> {
+    if (!snapshot) {
+      setStatus({
+        message: uiText.app.status.startGameFirst,
+        tone: "error"
+      });
+      return false;
+    }
+
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      setStatus({
+        message: uiText.app.status.enterPrivateChat,
+        tone: "error"
+      });
+      return false;
+    }
+
+    setIsSendingPrivateChat(true);
+    setStatus({
+      message: uiText.app.status.sendingPrivateChat,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await sendPrivateChat(snapshot.session.id, {
+        targetParticipantId,
+        content: trimmedContent
+      });
+      commitSnapshot(nextSnapshot);
+      setStatus({
+        message: uiText.app.status.privateChatSent,
+        tone: "neutral"
+      });
+      return true;
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+      return false;
+    } finally {
+      setIsSendingPrivateChat(false);
+    }
+  }
+
   async function handleCreateSession(
     event: React.FormEvent<HTMLFormElement>
   ): Promise<void> {
@@ -832,6 +1112,15 @@ export function App() {
       openingPreviewText.trim().split("\n").find((line) => line.trim().length > 0)?.trim() ||
       selectedStory.intro?.trim() ||
       uiText.gameBootstrapScreen.defaultLoadingHint(selectedStory.title);
+    const normalizedAiCompanions = aiCompanions
+      .map((companion) => ({
+        displayName: companion.displayName.trim(),
+        personalityTagIds: companion.personalityTagIds
+      }))
+      .filter(
+        (companion) =>
+          companion.displayName.length > 0 || companion.personalityTagIds.length > 0
+      );
 
     setIsCreating(true);
     setIsBootstrappingSession(true);
@@ -875,6 +1164,7 @@ export function App() {
           characterConcept,
           modelProfileId,
           runtimeModelConfig,
+          aiCompanions: normalizedAiCompanions,
           debugEnabled,
           promptDebugEnabled: false,
           logViewMode
@@ -952,6 +1242,27 @@ export function App() {
     }
 
     const trimmedInput = turnInput.trim();
+    if (roundPreparationRequired) {
+      if (snapshot.session.gameState.roundInputState?.phase === "ready_to_commit") {
+        await commitPreparedRoundDrafts(snapshot);
+        return;
+      }
+
+      if (
+        snapshot.session.partySetup?.primaryPlayerMode !== "ai" &&
+        !trimmedInput
+      ) {
+        setStatus({
+          message: uiText.app.status.enterAction,
+          tone: "error"
+        });
+        return;
+      }
+
+      await prepareRoundDrafts(snapshot, trimmedInput);
+      return;
+    }
+
     if (!trimmedInput) {
       setStatus({
         message: uiText.app.status.enterAction,
@@ -967,6 +1278,14 @@ export function App() {
     if (!snapshot) {
       setStatus({
         message: uiText.app.status.startGameFirst,
+        tone: "error"
+      });
+      return;
+    }
+
+    if (sessionNeedsPreparedRound(snapshot)) {
+      setStatus({
+        message: uiText.app.status.quickEndingDraftModeUnavailable,
         tone: "error"
       });
       return;
@@ -1034,6 +1353,7 @@ export function App() {
     try {
       const nextSnapshot = await loadSaveBundle(saveBundle);
       commitSnapshot(nextSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
       relinkSaveBundle(
         saveBundle,
         nextSnapshot,
@@ -1084,6 +1404,7 @@ export function App() {
     try {
       const nextSnapshot = await fetchSession(recentSnapshot.session.id);
       commitSnapshot(nextSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
       relinkSnapshot(
         nextSnapshot,
         buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
@@ -1095,6 +1416,7 @@ export function App() {
       });
     } catch {
       commitSnapshot(recentSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(recentSnapshot)?.content ?? "");
       relinkSnapshot(
         recentSnapshot,
         buildSaveRuntimeConfig(recentSnapshot.session.settings.modelProfileId)
@@ -1132,7 +1454,7 @@ export function App() {
     try {
       const nextSnapshot = await loadSaveBundle(prepared.saveBundle);
       commitSnapshot(nextSnapshot);
-      setTurnInput("");
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
       setView("game");
       setStatus({
         message: uiText.app.status.switchedNode,
@@ -1230,6 +1552,7 @@ export function App() {
 
   function handleOpenStorySelect(): void {
     setCharacterConcept("");
+    setAiCompanions([]);
     setView("story_select");
   }
 
@@ -1347,6 +1670,7 @@ export function App() {
           logViewMode={logViewMode}
           openingPreviewDeliveryMode={openingPreviewDeliveryMode}
           characterConcept={characterConcept}
+          aiCompanions={aiCompanions}
           characterConceptAssistLoading={characterConceptAssistLoading}
           characterConceptAssistMode={characterConceptAssistMode}
           isCreating={isCreating}
@@ -1372,6 +1696,10 @@ export function App() {
           onOpeningPreviewDeliveryModeChange={setOpeningPreviewDeliveryMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}
+          onAddAiCompanion={handleAddAiCompanion}
+          onRemoveAiCompanion={handleRemoveAiCompanion}
+          onUpdateAiCompanionName={handleUpdateAiCompanionName}
+          onToggleAiCompanionPersonalityTag={handleToggleAiCompanionPersonalityTag}
         />
       );
       break;
@@ -1458,7 +1786,9 @@ export function App() {
           isBootstrappingSession={isBootstrappingSession}
           isOpeningRevealInProgress={isOpeningRevealInProgress}
           sessionBootstrapState={sessionBootstrapState}
+          isPreparingRound={isPreparingRound}
           isSubmittingTurn={isSubmittingTurn}
+          isSendingPrivateChat={isSendingPrivateChat}
           isSaving={isSaving}
           savedGames={savedGames}
           isRestoring={isRestoring}
@@ -1475,6 +1805,7 @@ export function App() {
           onLoadSavedGame={handleLoadSavedGame}
           onQuickEndingTest={handleQuickEndingTest}
           onSaveGame={handleSaveGame}
+          onSendPrivateChat={handleSendPrivateChat}
           onTurnInputChange={setTurnInput}
           onSubmitTurn={handleSubmitTurn}
         />

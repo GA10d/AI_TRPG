@@ -43,6 +43,11 @@ export type Visibility =
   | "gm_only"
   | "system";
 
+export type MessageChannel =
+  | "public_story"
+  | "private_chat"
+  | "system";
+
 export type EndingType =
   | "preset"
   | "hidden"
@@ -88,11 +93,49 @@ export type PlaythroughVisualFamily =
 
 export type Participant = {
   id: string;
-  role: "human_player" | "npc" | "gm" | "system";
+  role: "human_player" | "ai_player" | "npc" | "gm" | "system";
   displayName: string;
   isAiControlled?: boolean;
   isLocalUser?: boolean;
   locale?: LocaleCode;
+};
+
+export type AiPersonalityTag = {
+  id: string;
+  group: string;
+  polarity: string;
+  keyword: string;
+  description: string;
+};
+
+export type SessionAiCompanion = {
+  participantId: string;
+  displayName: string;
+  personalityTags: AiPersonalityTag[];
+};
+
+export type SessionPartySetup = {
+  primaryPlayerMode: "human" | "ai";
+  aiCompanions: SessionAiCompanion[];
+};
+
+export type RoundDraft = {
+  participantId: string;
+  displayName: string;
+  role: Participant["role"];
+  isPrimary: boolean;
+  status: "ready";
+  source: "human" | "ai";
+  content: string;
+  editable: boolean;
+  generatedAt?: string | null;
+};
+
+export type RoundInputState = {
+  round: number;
+  phase: "collecting" | "ready_to_commit";
+  preparedAt: string;
+  drafts: RoundDraft[];
 };
 
 export type SessionSettings = {
@@ -106,6 +149,7 @@ export type GameState = {
   phase?: "setup" | "playing" | "ending" | "ended";
   endingState?: EndingState | null;
   lastEndingJudgeResult?: EndingAdjudication | null;
+  roundInputState?: RoundInputState | null;
 };
 
 export type Session = {
@@ -123,7 +167,10 @@ export type Session = {
   updatedAt: string;
   participants: Participant[];
   playerParticipantId: string;
+  localHumanParticipantId?: string | null;
+  companionParticipantIds?: string[];
   settings: SessionSettings;
+  partySetup?: SessionPartySetup;
   gameState: GameState;
 };
 
@@ -137,10 +184,14 @@ export type Message = {
   kind:
     | "player_input"
     | "npc_chat"
+    | "private_chat"
     | "gm_narration"
     | "gm_dialogue"
     | "system"
     | "debug";
+  channel?: MessageChannel;
+  threadId?: string | null;
+  relatedParticipantId?: string | null;
   content: string;
   tags?: string[];
   aiMetadata?: AiGenerationMetadata | null;
@@ -153,6 +204,7 @@ export type ReplayEvent = {
   actorId?: string;
   type:
     | "session_created"
+    | "round_prepared"
     | "message_created"
     | "turn_submitted"
     | "gm_response_received"

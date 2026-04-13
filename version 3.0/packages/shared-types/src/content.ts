@@ -2,6 +2,7 @@ export type LocaleCode = "zh-CN" | "en-US" | string;
 
 export type PlayMode =
   | "single_player"
+  | "story_mode"
   | "single_player_with_npc"
   | "multiplayer";
 

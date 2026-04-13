@@ -12,11 +12,14 @@ import {
 import type {
   BootstrapResponse,
   CharacterConceptAssistRequest,
+  CommitRoundRequest,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
   ImageGenerationRequest,
   LoadSaveRequest,
+  PrepareRoundRequest,
+  SendPrivateChatRequest,
   SessionCreateStreamEvent,
   SubmitTurnRequest
 } from "../../../packages/shared-types/src/index.ts";
@@ -25,6 +28,7 @@ import {
   loadPlayableContentBundle,
   loadStoryNpcRoster
 } from "./content/index.ts";
+import { loadAiPersonalityTags } from "./ai_players/index.ts";
 import {
   listImageProfileSummaries
 } from "./image_generation/config.ts";
@@ -34,10 +38,13 @@ import {
 } from "./image_generation/service.ts";
 import {
   buildDefaultCreateSessionRequest,
+  commitPreparedRound,
   createSaveBundleForSession,
   createSessionSnapshot,
   createSessionSnapshotWithProgress,
   loadSessionFromSaveBundle,
+  prepareRound,
+  sendPrivateChat,
   submitTurn
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
@@ -179,6 +186,7 @@ async function buildBootstrapResponse(
 ): Promise<BootstrapResponse> {
   const serverProxyStatus = getServerProxyStatus();
   const imagePromptTemplateConfig = await loadImagePromptTemplateConfig();
+  const personalityTags = await loadAiPersonalityTags();
 
   return {
     defaults: {
@@ -190,6 +198,7 @@ async function buildBootstrapResponse(
       imageProfileId: PHASE1_DEFAULTS.imageProfileId,
       logViewMode: PHASE1_DEFAULTS.logViewMode
     },
+    personalityTags,
     languages: listEnabledLanguages().map((item) => toLanguageOptionPayload(item.code)),
     modelAccessModes: PHASE1_MODEL_ACCESS_MODE_OPTIONS.map((item) => ({
       code: item.code,
@@ -439,6 +448,69 @@ async function handleApiRequest(
   if (url.pathname === "/api/saves/load" && request.method === "POST") {
     const payload = await readJsonBody<LoadSaveRequest>(request);
     const snapshot = loadSessionFromSaveBundle(payload.saveBundle, store);
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/rounds/prepare") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/rounds/prepare", "");
+    const payload = await readJsonBody<PrepareRoundRequest>(request);
+    const snapshot = await prepareRound(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/rounds/commit") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/rounds/commit", "");
+    const payload = await readJsonBody<CommitRoundRequest>(request);
+    const snapshot = await commitPreparedRound(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/private-chat") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/private-chat", "");
+    const payload = await readJsonBody<SendPrivateChatRequest>(request);
+    const snapshot = await sendPrivateChat(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
     sendJson(response, 200, snapshot);
     return true;
   }

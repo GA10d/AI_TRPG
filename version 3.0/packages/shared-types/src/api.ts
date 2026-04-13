@@ -5,6 +5,7 @@ import type {
   PlayMode
 } from "./content.ts";
 import type {
+  AiPersonalityTag,
   AiGenerationMetadata,
   Message,
   ModelAccessMode,
@@ -44,6 +45,11 @@ export type ImagePromptTemplateConfig = {
   characterEntryTemplate: string;
 };
 
+export type CreateSessionAiCompanionInput = {
+  displayName: string;
+  personalityTagIds: string[];
+};
+
 export type CreateSessionRequest = {
   ruleDirectoryName: string;
   storyDirectoryName: string;
@@ -54,6 +60,7 @@ export type CreateSessionRequest = {
   characterConcept?: string;
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
+  aiCompanions?: CreateSessionAiCompanionInput[];
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
   logViewMode?: "all" | "compact" | "hidden";
@@ -87,6 +94,19 @@ export type CharacterConceptAssistResponse = {
 
 export type SubmitTurnRequest = {
   playerInput: string;
+};
+
+export type PrepareRoundRequest = {
+  playerInput?: string;
+};
+
+export type CommitRoundRequest = {
+  playerInput?: string;
+};
+
+export type SendPrivateChatRequest = {
+  targetParticipantId: string;
+  content: string;
 };
 
 export type LoadSaveRequest = {
@@ -246,6 +266,7 @@ export type BootstrapResponse = {
     imageProfileId: string;
     logViewMode: "all" | "compact" | "hidden";
   };
+  personalityTags: AiPersonalityTag[];
   languages: Array<{
     id: number;
     code: LocaleCode;
