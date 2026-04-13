@@ -1825,6 +1825,11 @@ pre {
   gap: 16px;
 }
 
+.playthrough-panel-embedded {
+  min-height: 100%;
+  gap: 0;
+}
+
 .playthrough-panel-tools {
   display: contents;
 }
@@ -1872,6 +1877,14 @@ pre {
 .playthrough-panel-expanded .playthrough-graph-scroll {
   min-height: min(68vh, 720px);
   max-height: min(68vh, 720px);
+}
+
+.playthrough-panel-embedded.playthrough-panel-expanded .playthrough-graph-scroll,
+.playthrough-panel-embedded.playthrough-panel-collapsed .playthrough-graph-scroll {
+  min-height: min(56vh, 640px);
+  max-height: none;
+  height: 100%;
+  padding-bottom: 12px;
 }
 
 .playthrough-graph-canvas {
@@ -2495,6 +2508,28 @@ pre {
   padding-right: 6px;
 }
 
+.game-judge-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.game-judge-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 251, 246, 0.94);
+}
+
+.game-judge-json {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .game-history-list,
 .game-save-list {
   min-height: 0;
@@ -2561,15 +2596,6 @@ pre {
   border-color: rgba(122, 50, 32, 0.36);
   background: rgba(122, 50, 32, 0.12);
   color: var(--accent-strong);
-}
-
-.game-side-judge-card {
-  display: grid;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(99, 63, 36, 0.1);
-  background: rgba(255, 251, 246, 0.9);
 }
 
 .game-side-judge-head {
@@ -2698,6 +2724,123 @@ pre {
 
 .game-drawer-body > .summary-card:last-child {
   min-height: 0;
+}
+
+.settlement-screen {
+  display: grid;
+  gap: 18px;
+}
+
+.settlement-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.playthrough-timeline {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.playthrough-timeline-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  margin-left: calc(var(--timeline-depth, 0) * 24px);
+}
+
+.playthrough-timeline-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.playthrough-timeline-rail::before {
+  content: "";
+  position: absolute;
+  inset: 16px auto -18px 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    rgba(122, 50, 32, 0.26),
+    rgba(122, 50, 32, 0.08)
+  );
+}
+
+.playthrough-timeline-item:last-child .playthrough-timeline-rail::before {
+  display: none;
+}
+
+.playthrough-timeline-dot {
+  position: relative;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  margin-top: 10px;
+  border-radius: 999px;
+  border: 3px solid rgba(122, 50, 32, 0.18);
+  background: rgba(122, 50, 32, 0.88);
+  box-shadow: 0 0 0 4px rgba(255, 247, 240, 0.96);
+}
+
+.playthrough-timeline-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.12);
+  background: rgba(255, 251, 246, 0.96);
+}
+
+.playthrough-timeline-item-current .playthrough-timeline-card {
+  border-color: rgba(122, 50, 32, 0.28);
+  box-shadow: 0 12px 28px rgba(99, 63, 36, 0.08);
+}
+
+.playthrough-timeline-item-terminal .playthrough-timeline-dot {
+  background: rgba(122, 50, 32, 0.78);
+}
+
+.playthrough-timeline-meta,
+.playthrough-timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.playthrough-timeline-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.playthrough-timeline-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.playthrough-timeline-copy {
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.playthrough-timeline-button {
+  min-height: 34px;
+}
+
+.playthrough-timeline-compact .playthrough-timeline-item {
+  margin-left: calc(var(--timeline-depth, 0) * 16px);
+}
+
+.playthrough-timeline-compact .playthrough-timeline-card {
+  padding: 12px 14px;
+}
+
+.playthrough-timeline-compact .playthrough-timeline-title {
+  font-size: 16px;
 }
 
 .game-npc-layout {

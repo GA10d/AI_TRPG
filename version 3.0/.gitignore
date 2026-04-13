@@ -6,3 +6,4 @@ logs/*.txt
 /*.err.log
 /*.out.log
 !logs/.gitkeep
+/local_data/

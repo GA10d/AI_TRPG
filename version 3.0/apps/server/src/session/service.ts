@@ -99,6 +99,14 @@ function formatParticipantActionLabel(
   participantId: string,
   fallbackName: string
 ): string {
+  if (
+    session.localHumanParticipantId &&
+    participantId === session.localHumanParticipantId &&
+    participantId !== session.playerParticipantId
+  ) {
+    return `Primary Player Action - ${fallbackName}`;
+  }
+
   if (participantId === session.playerParticipantId) {
     return session.partySetup?.primaryPlayerMode === "ai"
       ? `AI Protagonist Action - ${fallbackName}`
@@ -1015,10 +1023,6 @@ export async function submitManualNarration(
     return null;
   }
 
-  if (current.session.status === "ended") {
-    throw new Error("The current session has already ended. Resume from a previous node or start a new run before testing again.");
-  }
-
   const timestamp = nowIso();
   const gmParticipant = findGmParticipant(current.session);
   const runtimeConfig = store.getRuntimeConfig(sessionId);
@@ -1117,7 +1121,9 @@ export async function submitManualNarration(
         phase:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? "ended"
-            : "playing",
+            : current.session.gameState.endingState
+              ? "ended"
+              : "playing",
         lastEndingJudgeResult: endingAdjudication,
         lastEndingJudgeDecision: endingJudge.judgeDecision,
         endingState:
@@ -1287,14 +1293,13 @@ export async function submitTurn(
     return null;
   }
 
-  if (current.session.status === "ended") {
-    throw new Error("当前会话已经进入结局，不能继续普通剧情。请从历史节点继续，或重新开始。");
-  }
-
   const timestamp = nowIso();
   const nextRound = current.session.currentRound + 1;
+  const submittingParticipantId = current.session.gameState.endingState
+    ? current.session.localHumanParticipantId ?? current.session.playerParticipantId
+    : current.session.playerParticipantId;
   const playerParticipant = current.session.participants.find(
-    (participant) => participant.id === current.session.playerParticipantId
+    (participant) => participant.id === submittingParticipantId
   );
   const gmParticipant = current.session.participants.find(
     (participant) => participant.role === "gm"
@@ -1352,7 +1357,7 @@ export async function submitTurn(
     round: nextRound,
     createdAt: timestamp,
     senderId: gmParticipant.id,
-    recipientIds: [playerParticipant.id],
+    recipientIds: buildStoryRecipientIds(current.session),
     visibility: "public",
     kind: "gm_narration",
     channel: "public_story",
@@ -1440,7 +1445,9 @@ export async function submitTurn(
         phase:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? "ended"
-            : "playing",
+            : current.session.gameState.endingState
+              ? "ended"
+              : "playing",
         lastEndingJudgeResult: endingAdjudication,
         lastEndingJudgeDecision: endingJudge.judgeDecision,
         endingState:

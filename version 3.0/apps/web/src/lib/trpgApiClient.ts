@@ -11,6 +11,7 @@ import type {
   ImageGenerationResponse,
   NpcRosterEntry,
   PrepareRoundRequest,
+  SavedGameRecord,
   SaveBundle,
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
@@ -377,6 +378,48 @@ export async function createSave(sessionId: string): Promise<CreateSaveResponse>
       method: "POST"
     });
     return parseJson<CreateSaveResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchSavedGames(): Promise<SavedGameRecord[]> {
+  try {
+    const response = await fetch("/api/saves");
+    return parseJson<SavedGameRecord[]>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function loadSavedGame(saveId: string): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/saves/${encodeURIComponent(saveId)}/load`, {
+      method: "POST"
+    });
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function deleteSavedGame(saveId: string): Promise<void> {
+  try {
+    const response = await fetch(`/api/saves/${encodeURIComponent(saveId)}`, {
+      method: "DELETE"
+    });
+    await parseJson<{ ok: true }>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function clearSavedGames(): Promise<void> {
+  try {
+    const response = await fetch("/api/saves", {
+      method: "DELETE"
+    });
+    await parseJson<{ ok: true }>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

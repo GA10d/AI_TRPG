@@ -13,7 +13,8 @@ export type AppView =
   | "records"
   | "settings"
   | "exit"
-  | "game";
+  | "game"
+  | "settlement";
 
 export type StatusState = {
   message: string;

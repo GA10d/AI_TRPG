@@ -17,6 +17,8 @@ type PlaythroughGraphPanelProps = {
   graphBundle: PlaythroughGraphBundle | null;
   isResuming: boolean;
   onContinueFromNode: (nodeId: string) => Promise<void>;
+  variant?: "full" | "embedded";
+  defaultExpanded?: boolean;
 };
 
 type NodePosition = {
@@ -53,9 +55,10 @@ function buildEdgeColor(edge: PlaythroughEdge): string {
     return `hsl(${hue} 58% ${lightness}%)`;
   }
 
-  const hue = edge.visualFamily === "branch"
-    ? 160 + (hashToInt(edge.routeId) % 44)
-    : 16 + (hashToInt(edge.routeId) % 18);
+  const hue =
+    edge.visualFamily === "branch"
+      ? 160 + (hashToInt(edge.routeId) % 44)
+      : 16 + (hashToInt(edge.routeId) % 18);
   const lightness = Math.max(30, 56 - edge.depthInRoute * 4);
   return `hsl(${hue} 62% ${lightness}%)`;
 }
@@ -137,9 +140,7 @@ function saveStoredGraphLayout(
   window.localStorage.setItem(NODE_LAYOUT_STORAGE_KEY, JSON.stringify(nextLayouts));
 }
 
-function buildDefaultPositions(
-  nodes: PlaythroughNode[]
-): Record<string, NodePosition> {
+function buildDefaultPositions(nodes: PlaythroughNode[]): Record<string, NodePosition> {
   const nodesById = new Map(nodes.map((node) => [node.id, node] as const));
   const depthCache = new Map<string, number>();
   const nextPositions: Record<string, NodePosition> = {};
@@ -175,13 +176,16 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
   const {
     graphBundle,
     isResuming,
-    onContinueFromNode
+    onContinueFromNode,
+    variant = "full",
+    defaultExpanded = false
   } = props;
 
+  const isEmbedded = variant === "embedded";
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
   const [dragState, setDragState] = useState<DragState>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const orderedNodes = useMemo(() => {
     if (!graphBundle?.graph.unlockedAtEnding) {
@@ -337,38 +341,39 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
   }
 
   return (
-    <section className={`summary-card playthrough-panel ${isExpanded ? "playthrough-panel-expanded" : "playthrough-panel-collapsed"}`}>
-      <div className="record-header">
-        <div>
-          <div className="meta-label">{text.eyebrow}</div>
-          <div className="summary-title">
-            {text.title(graphBundle.graph.nodeCount)}
+    <section
+      className={`${
+        isEmbedded ? "playthrough-panel playthrough-panel-embedded" : "summary-card playthrough-panel"
+      } ${isExpanded ? "playthrough-panel-expanded" : "playthrough-panel-collapsed"}`}
+    >
+      {!isEmbedded ? (
+        <div className="record-header">
+          <div>
+            <div className="meta-label">{text.eyebrow}</div>
+            <div className="summary-title">{text.title(graphBundle.graph.nodeCount)}</div>
+            <div className="summary-text">{text.description}</div>
           </div>
-          <div className="summary-text">
-            {text.description}
+          <div className="playthrough-panel-tools">
+            <button
+              aria-label={isExpanded ? text.collapseAriaLabel : text.expandAriaLabel}
+              className="ghost-button playthrough-expand-button"
+              onClick={() => setIsExpanded((current) => !current)}
+              type="button"
+            >
+              <span aria-hidden="true" className="playthrough-expand-icon">
+                {isExpanded ? "-" : "+"}
+              </span>
+              <span>{isExpanded ? text.collapseButton : text.expandButton}</span>
+            </button>
+
+            <div className="flag-list">
+              <span className="badge">{text.legendMainline}</span>
+              <span className="badge">{text.legendBranch}</span>
+              <span className="badge">{text.legendAfterEnding}</span>
+            </div>
           </div>
         </div>
-        <div className="playthrough-panel-tools">
-          <button
-            aria-label={isExpanded ? text.collapseAriaLabel : text.expandAriaLabel}
-            className="ghost-button playthrough-expand-button"
-            onClick={() => setIsExpanded((current) => !current)}
-            type="button"
-          >
-            <span aria-hidden="true" className="playthrough-expand-icon">
-              {isExpanded ? "⊟" : "⊞"}
-            </span>
-            <span>{isExpanded ? text.collapseButton : text.expandButton}</span>
-          </button>
-
-          <div className="flag-list">
-            <span className="badge">{text.legendMainline}</span>
-            <span className="badge">{text.legendBranch}</span>
-            <span className="badge">{text.legendAfterEnding}</span>
-          </div>
-        </div>
-
-      </div>
+      ) : null}
 
       <div className="playthrough-graph-scroll" ref={scrollRef}>
         <div
@@ -408,13 +413,17 @@ export function PlaythroughGraphPanel(props: PlaythroughGraphPanelProps) {
 
           {positionedNodes.map(({ node, x, y }) => {
             const incomingEdge = edgesByTarget.get(node.id);
-            const borderColor = incomingEdge ? buildEdgeColor(incomingEdge) : "rgba(122, 50, 32, 0.24)";
+            const borderColor = incomingEdge
+              ? buildEdgeColor(incomingEdge)
+              : "rgba(122, 50, 32, 0.24)";
             const canContinue = !node.terminalState.isTerminal;
             const isCurrent = graphBundle.graph.currentNodeId === node.id;
 
             return (
               <article
-                className={`playthrough-node ${isCurrent ? "playthrough-node-current" : ""} ${dragState?.nodeId === node.id ? "playthrough-node-dragging" : ""}`}
+                className={`playthrough-node ${
+                  isCurrent ? "playthrough-node-current" : ""
+                } ${dragState?.nodeId === node.id ? "playthrough-node-dragging" : ""}`}
                 key={node.id}
                 onPointerDown={(event) => handleNodePointerDown(node.id, event)}
                 style={{

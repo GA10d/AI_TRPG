@@ -6,8 +6,8 @@ type RecordsScreenProps = {
   savedGames: SavedGameRecord[];
   isRestoring: boolean;
   onBack: () => void;
-  onClearSavedGames: () => void;
-  onDeleteSavedGame: (saveId: string) => void;
+  onClearSavedGames: () => Promise<void>;
+  onDeleteSavedGame: (saveId: string) => Promise<void>;
   onLoadSavedGame: (record: SavedGameRecord) => Promise<void>;
 };
 

@@ -176,6 +176,8 @@ export const jaJp = {
         "自動進行中は個別チャットを使えません。先にプレイヤー介入へ切り替えてください。",
       turnComplete: "このターンは完了しました。",
       turnCompleteEnded: "このターンは完了し、セッションはエンディングに入りました。",
+      endingFollowupComplete:
+        "エンディング後の追問を送信しました。ナレーターはこの世界線で応答を続けます。",
       createSessionPending: "ゲームに入り、セッションを作成しています...",
       narratorConnected: "ナレーターに接続しました。正式な導入が始まっています...",
       sessionCreated: "セッションを作成しました。",
@@ -367,7 +369,17 @@ export const jaJp = {
     recentItems: (count: number) => `${count} ?`,
     historyTab: "履歴",
     roundRepliesTab: "このラウンド",
+    worldlineTab: "世界線",
+    judgeTab: "補助AI",
     endingJudgeSideLabel: "補助判定",
+    worldlineEyebrow: "世界線検索",
+    worldlineTitle: "分岐タイムライン",
+    worldlineNodeCount: (count: number) => `${count} ノード`,
+    worldlineEmpty:
+      "まだ参照できる世界線ノードは解放されていません。真のエンディング到達後に、ここへ上から下へ表示されます。",
+    worldlineEmptyShort: "未解放",
+    worldlineLockedTitle: "世界線はまだ未解放",
+    judgeTabTitle: "補助AIの返信",
     playerRound: (round: number) => `????? / R${round}`,
     participantRound: (name: string, round: number) => `${name} / R${round}`,
     narratorRound: (round: number) => `????? / R${round}`,
@@ -388,6 +400,7 @@ export const jaJp = {
     editableDraftBadge: "???",
     yourAction: "??????",
     actionTitle: "????????????",
+    endingFollowupTitle: "結末後の追問や振り返り",
     storyControlLabel: "ストーリー制御",
     storyControlAuto: "自動進行",
     storyControlIntervene: "プレイヤー介入",
@@ -406,6 +419,8 @@ export const jaJp = {
     prepareRoundHint:
       "????????????AI?????????????????????",
     submitTurnHint: "????????????",
+    endingFollowupHint:
+      "このゲーム自体は終了していますが、ナレーターへの追問や復盤は続けられます。別ノードから分岐し直したい場合は結算ページを開いてください。",
     autoSubmittingRound: "自動送信中...",
     autoRunning: "自動進行中",
     autoCommitCountdown: (seconds: number) => `${seconds}s 後に自動送信`,
@@ -418,10 +433,22 @@ export const jaJp = {
       "自動進行では準備済みの AI 草稿をそのまま使います。編集したい場合はプレイヤー介入に切り替えてください。",
     actionPlaceholder:
       "?: ??????????????????????????????????",
+    endingFollowupPlaceholder:
+      "例: もう結末だけど、西棟で本当は何が起きていたのか改めて知りたい。",
     prepareRound: "??????",
     preparingRound: "???...",
     commitRound: "??????",
     submitTurn: "?????",
+    endingFollowupSubmit: "追問を送信",
+    openSettlementPage: "結算ページ",
+    settlementPageTitle: "結算ページ",
+    settlementPageDescription:
+      "解放済みの世界線ノードをまとめて確認し、再開可能なノードから新しい分岐を始められます。",
+    settlementPageHint:
+      "再開可能なノードを選ぶと、すぐにゲーム画面へ戻り、その地点から再開します。",
+    settlementNoEnding:
+      "このセッションではまだエンディングが確定していないため、専用の結算内容はありません。",
+    backToGame: "ゲームへ戻る",
     saveLoadEyebrow: "?? / ????",
     loadSaveTitle: "????????",
     saveLoadDescription: "Saving and loading stay as first-level actions inside the core play screen.",
@@ -779,6 +806,11 @@ export const jaJp = {
     debriefTitle: "振り返り",
     epilogueTitle: "後日談",
     roundTitle: (round: number) => `ラウンド ${round}`,
+    endingShortLabel: "ENDING",
+    debriefShortLabel: "振り返り",
+    epilogueShortLabel: "後日談",
+    manualShortLabel: "手動",
+    roundShortLabel: "ラウンド",
     eyebrow: "分岐回溯ツリー",
     title: (count: number) => `エンディング後に解放済み / 全 ${count} ノード`,
     description: "ノードを直接ドラッグして配置を変えられます。接続線もリアルタイムで追従します。",

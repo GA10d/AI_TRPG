@@ -11,6 +11,8 @@ import type {
 
 const PLAYTHROUGH_GRAPHS_STORAGE_KEY = "trpg3.playthroughGraphs";
 const ACTIVE_PLAYTHROUGH_GRAPH_ID_STORAGE_KEY = "trpg3.activePlaythroughGraphId";
+let inMemoryGraphBundles: PlaythroughGraphBundle[] = [];
+let inMemoryActiveGraphId: string | null = null;
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -38,7 +40,11 @@ function writeJson(storageKey: string, value: unknown): void {
     return;
   }
 
-  window.localStorage.setItem(storageKey, JSON.stringify(value));
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  } catch {
+    // Keep an in-memory fallback so the current session can still render its worldline tree.
+  }
 }
 
 function generateId(prefix: string): string {
@@ -78,18 +84,36 @@ function buildSaveBundleFromSnapshot(
 }
 
 function loadGraphBundles(): PlaythroughGraphBundle[] {
-  return readJson<PlaythroughGraphBundle[]>(PLAYTHROUGH_GRAPHS_STORAGE_KEY) ?? [];
+  if (inMemoryGraphBundles.length > 0) {
+    return inMemoryGraphBundles;
+  }
+
+  const storedBundles = readJson<PlaythroughGraphBundle[]>(PLAYTHROUGH_GRAPHS_STORAGE_KEY) ?? [];
+  if (storedBundles.length > 0) {
+    inMemoryGraphBundles = storedBundles;
+  }
+  return storedBundles;
 }
 
 function saveGraphBundles(bundles: PlaythroughGraphBundle[]): void {
+  inMemoryGraphBundles = bundles;
   writeJson(PLAYTHROUGH_GRAPHS_STORAGE_KEY, bundles);
 }
 
 function loadActiveGraphId(): string | null {
-  return readJson<string>(ACTIVE_PLAYTHROUGH_GRAPH_ID_STORAGE_KEY);
+  if (inMemoryActiveGraphId) {
+    return inMemoryActiveGraphId;
+  }
+
+  const storedGraphId = readJson<string>(ACTIVE_PLAYTHROUGH_GRAPH_ID_STORAGE_KEY);
+  if (storedGraphId) {
+    inMemoryActiveGraphId = storedGraphId;
+  }
+  return storedGraphId;
 }
 
 function saveActiveGraphId(graphId: string | null): void {
+  inMemoryActiveGraphId = graphId;
   if (graphId === null) {
     if (canUseStorage()) {
       window.localStorage.removeItem(ACTIVE_PLAYTHROUGH_GRAPH_ID_STORAGE_KEY);
@@ -145,8 +169,25 @@ function getPlayerPreviewForRound(snapshot: SessionSnapshot): string | null {
   return playerMessage?.content ?? null;
 }
 
+function hasConfirmedEnding(snapshot: SessionSnapshot): boolean {
+  return Boolean(snapshot.session.gameState.endingState);
+}
+
+function isPostEndingFollowup(snapshot: SessionSnapshot): boolean {
+  const endingState = snapshot.session.gameState.endingState;
+  if (!endingState) {
+    return false;
+  }
+
+  return snapshot.session.currentRound > endingState.confirmedAtRound;
+}
+
 function deriveNodeKind(snapshot: SessionSnapshot): PlaythroughNode["nodeKind"] {
-  if (snapshot.session.gameState.endingState) {
+  if (isPostEndingFollowup(snapshot)) {
+    return "debrief";
+  }
+
+  if (hasConfirmedEnding(snapshot)) {
     return "ending";
   }
 
@@ -158,7 +199,7 @@ function deriveNodeKind(snapshot: SessionSnapshot): PlaythroughNode["nodeKind"] 
 }
 
 function deriveCheckpointKind(snapshot: SessionSnapshot): PlaythroughNode["checkpointKind"] {
-  if (snapshot.session.gameState.endingState) {
+  if (hasConfirmedEnding(snapshot) && !isPostEndingFollowup(snapshot)) {
     return "ending";
   }
 
@@ -170,7 +211,13 @@ function deriveCheckpointKind(snapshot: SessionSnapshot): PlaythroughNode["check
 }
 
 function deriveExpandability(snapshot: SessionSnapshot): PlaythroughNode["expandability"] {
-  if (snapshot.session.gameState.endingState) {
+  if (isPostEndingFollowup(snapshot)) {
+    return {
+      mode: "open"
+    };
+  }
+
+  if (hasConfirmedEnding(snapshot)) {
     return {
       mode: "special_followup_only",
       reason: "ending_confirmed"
@@ -183,11 +230,20 @@ function deriveExpandability(snapshot: SessionSnapshot): PlaythroughNode["expand
 }
 
 function deriveTerminalState(snapshot: SessionSnapshot): PlaythroughNode["terminalState"] {
-  if (snapshot.session.gameState.endingState) {
+  if (isPostEndingFollowup(snapshot)) {
+    return {
+      isTerminal: false,
+      reason: "open",
+      adjudicationSource: "unknown"
+    };
+  }
+
+  if (hasConfirmedEnding(snapshot)) {
     return {
       isTerminal: true,
       reason: "ending_confirmed",
-      adjudicationSource: "mock"
+      adjudicationSource:
+        snapshot.session.gameState.lastEndingJudgeResult?.adjudicationSource ?? "unknown"
     };
   }
 
@@ -258,11 +314,17 @@ function findNextRouteDepth(
 function buildEdge(
   graph: PlaythroughGraph,
   parentNodeId: string,
-  childNodeId: string
+  childNode: PlaythroughNode
 ): PlaythroughEdge {
   const isBranchResume = graph.pendingContinuationFromNodeId === parentNodeId;
+  const currentBundle = findGraphBundle(graph.id);
+  const parentNode = currentBundle?.nodes.find((node) => node.id === parentNodeId) ?? null;
+  const isAfterEndingFollowupEdge =
+    childNode.nodeKind === "debrief" ||
+    childNode.nodeKind === "epilogue" ||
+    parentNode?.terminalState.isTerminal === true;
   const depthInRoute = findNextRouteDepth(
-    findGraphBundle(graph.id)?.edges ?? [],
+    currentBundle?.edges ?? [],
     graph.activeRouteId
   );
 
@@ -270,12 +332,17 @@ function buildEdge(
     id: generateId("edge"),
     graphId: graph.id,
     fromNodeId: parentNodeId,
-    toNodeId: childNodeId,
-    edgeKind: isBranchResume ? "branch_resume" : "turn_progression",
+    toNodeId: childNode.id,
+    edgeKind: isAfterEndingFollowupEdge
+      ? "after_ending_followup"
+      : isBranchResume
+        ? "branch_resume"
+        : "turn_progression",
     routeId: graph.activeRouteId,
     depthInRoute,
-    visualFamily:
-      graph.activeRouteId.startsWith("route_main_") && !isBranchResume
+    visualFamily: isAfterEndingFollowupEdge
+      ? "after_ending"
+      : graph.activeRouteId.startsWith("route_main_") && !isBranchResume
         ? "mainline"
         : "branch"
   };
@@ -358,7 +425,7 @@ export function appendSnapshotToActivePlaythrough(
       parentNodeId
     }
   );
-  const edge = buildEdge(currentBundle.graph, parentNodeId, node.id);
+  const edge = buildEdge(currentBundle.graph, parentNodeId, node);
   const nextTerminalNodeIds = node.terminalState.isTerminal
     ? [...currentBundle.graph.terminalNodeIds, node.id]
     : currentBundle.graph.terminalNodeIds;

@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import type { SaveBundle, SessionSnapshot } from "../../../../packages/shared-types/src/index.ts";
+import type {
+  SavedGameRecord,
+  SessionSnapshot
+} from "../../../../packages/shared-types/src/index.ts";
+import {
+  clearSavedGames,
+  deleteSavedGame,
+  fetchSavedGames
+} from "../lib/trpgApiClient.ts";
 import {
   clearRecentSessionSnapshot,
-  clearSavedGames,
   clearSessionRecords,
   loadRecentSessionSnapshot,
-  loadSavedGames,
   loadSessionRecords,
-  removeSavedGame,
-  storeSaveBundle,
   storeSessionSnapshot,
-  type SavedGameRecord,
   type SessionRecord
 } from "../storage.ts";
 
@@ -20,15 +23,39 @@ export function useStoredProgress() {
     () => loadRecentSessionSnapshot()
   );
   const [records, setRecords] = useState<SessionRecord[]>(() => loadSessionRecords());
-  const [savedGames, setSavedGames] = useState<SavedGameRecord[]>(() => loadSavedGames());
+  const [savedGames, setSavedGames] = useState<SavedGameRecord[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetchSavedGames()
+      .then((records) => {
+        if (!cancelled) {
+          setSavedGames(records);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSavedGames([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function commitSnapshot(snapshot: SessionSnapshot): void {
     setRecentSnapshot(snapshot);
     setRecords(storeSessionSnapshot(snapshot));
   }
 
-  function commitSaveBundle(saveBundle: SaveBundle): void {
-    setSavedGames(storeSaveBundle(saveBundle));
+  function commitSaveRecord(saveRecord: SavedGameRecord): void {
+    setSavedGames((current) =>
+      [saveRecord, ...current.filter((item) => item.saveId !== saveRecord.saveId)].sort((left, right) =>
+        right.savedAt.localeCompare(left.savedAt)
+      )
+    );
   }
 
   function clearRecent(): void {
@@ -41,13 +68,18 @@ export function useStoredProgress() {
     setRecords([]);
   }
 
-  function clearSavedGamesList(): void {
-    clearSavedGames();
+  async function refreshSavedGamesList(): Promise<void> {
+    setSavedGames(await fetchSavedGames());
+  }
+
+  async function clearSavedGamesList(): Promise<void> {
+    await clearSavedGames();
     setSavedGames([]);
   }
 
-  function removeSavedGameById(saveId: string): void {
-    setSavedGames(removeSavedGame(saveId));
+  async function removeSavedGameById(saveId: string): Promise<void> {
+    await deleteSavedGame(saveId);
+    setSavedGames((current) => current.filter((item) => item.saveId !== saveId));
   }
 
   return {
@@ -55,9 +87,10 @@ export function useStoredProgress() {
     records,
     savedGames,
     commitSnapshot,
-    commitSaveBundle,
+    commitSaveRecord,
     clearRecent,
     clearRecordsList,
+    refreshSavedGamesList,
     clearSavedGamesList,
     removeSavedGameById
   };

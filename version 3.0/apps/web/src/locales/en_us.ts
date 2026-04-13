@@ -174,6 +174,8 @@ export const enUs = {
         "Private chat is unavailable during auto play. Switch back to player intervene first.",
       turnComplete: "This turn has been completed.",
       turnCompleteEnded: "This turn has been completed and the session has entered an ending.",
+      endingFollowupComplete:
+        "Your post-ending follow-up was sent and the narrator continued along this worldline.",
       createSessionPending: "Entering the game and creating the session...",
       narratorConnected: "Narrator connected. The formal opening is now unfolding...",
       sessionCreated: "Session created.",
@@ -356,7 +358,17 @@ export const enUs = {
     recentItems: (count: number) => `${count} items`,
     historyTab: "History",
     roundRepliesTab: "Round Replies",
+    worldlineTab: "Worldline",
+    judgeTab: "Helper AI",
     endingJudgeSideLabel: "Ending Judge",
+    worldlineEyebrow: "Worldline Query",
+    worldlineTitle: "Branch Timeline",
+    worldlineNodeCount: (count: number) => `${count} nodes`,
+    worldlineEmpty:
+      "No worldline nodes are unlocked yet. Once you reach a true ending, the full branching timeline will appear here from top to bottom.",
+    worldlineEmptyShort: "Locked",
+    worldlineLockedTitle: "Worldline Not Unlocked Yet",
+    judgeTabTitle: "Helper AI Reply",
     playerRound: (round: number) => `Player / R${round}`,
     participantRound: (name: string, round: number) => `${name} / R${round}`,
     narratorRound: (round: number) => `Narrator / R${round}`,
@@ -377,6 +389,7 @@ export const enUs = {
     editableDraftBadge: "Editable",
     yourAction: "Your Action",
     actionTitle: "Enter the next action or line of dialogue",
+    endingFollowupTitle: "Ask follow-up questions or debrief the ending",
     storyControlLabel: "Story Control",
     storyControlAuto: "Auto Play",
     storyControlIntervene: "Player Intervene",
@@ -395,6 +408,8 @@ export const enUs = {
     prepareRoundHint:
       "Prepare the round first so AI teammates can react before everything is submitted together.",
     submitTurnHint: "Submit this turn.",
+    endingFollowupHint:
+      "The run is already over, but you can still question the narrator, debrief, or ask for hidden information. Use the settlement page if you want to jump back to a node and branch again.",
     autoSubmittingRound: "Auto committing...",
     autoRunning: "Auto Running",
     autoCommitCountdown: (seconds: number) => `Auto commit in ${seconds}s`,
@@ -406,10 +421,22 @@ export const enUs = {
       "Auto play uses the prepared AI draft directly. Switch to Player Intervene if you want to edit it.",
     actionPlaceholder:
       "For example: I examine the marks behind the door first, then ask why this happened at this exact time.",
+    endingFollowupPlaceholder:
+      "For example: The ending is locked now, but I want to review what really happened in the west wing.",
     prepareRound: "Prepare Round",
     preparingRound: "Preparing...",
     commitRound: "Commit Round",
     submitTurn: "Submit Turn",
+    endingFollowupSubmit: "Send Follow-up",
+    openSettlementPage: "Settlement Page",
+    settlementPageTitle: "Settlement Page",
+    settlementPageDescription:
+      "Review unlocked worldline nodes here and restart from any resumable node to grow a new branch.",
+    settlementPageHint:
+      "Picking a resumable node will immediately return you to the game screen and restart from that point.",
+    settlementNoEnding:
+      "This session has not locked an ending yet, so there is no dedicated settlement content yet.",
+    backToGame: "Back to Game",
     saveLoadEyebrow: "Save / Load",
     loadSaveTitle: "Load Save",
     saveLoadDescription: "Saving and loading stay as first-level actions inside the core play screen.",
@@ -767,6 +794,11 @@ export const enUs = {
     debriefTitle: "Debrief",
     epilogueTitle: "Epilogue",
     roundTitle: (round: number) => `Round ${round}`,
+    endingShortLabel: "ENDING",
+    debriefShortLabel: "DEBRIEF",
+    epilogueShortLabel: "EPILOGUE",
+    manualShortLabel: "MANUAL",
+    roundShortLabel: "ROUND",
     eyebrow: "Branch Backtrack Tree",
     title: (count: number) => `Unlocked after the ending, with ${count} nodes`,
     description: "You can drag nodes to rearrange the view now, and the links will update in real time.",

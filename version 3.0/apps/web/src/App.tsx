@@ -21,6 +21,7 @@ import {
   createSave,
   fetchSession,
   generateOpeningPreview,
+  loadSavedGame,
   loadSaveBundle,
   prepareRound,
   sendPrivateChat,
@@ -46,6 +47,7 @@ import {
 } from "./locales/index.tsx";
 import { MenuPage } from "./pages/MenuPage.tsx";
 import { RecordsPage } from "./pages/RecordsPage.tsx";
+import { SettlementPage } from "./pages/SettlementPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { StorySelectPage } from "./pages/StorySelectPage.tsx";
 import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
@@ -223,6 +225,10 @@ function sessionNeedsPreparedRound(snapshot: SessionSnapshot | null): boolean {
     return false;
   }
 
+  if (snapshot.session.gameState.endingState) {
+    return false;
+  }
+
   const primaryPlayerMode = snapshot.session.partySetup?.primaryPlayerMode ?? "human";
   const companionCount = snapshot.session.companionParticipantIds?.length ?? 0;
   return primaryPlayerMode === "ai" || companionCount > 0;
@@ -233,7 +239,11 @@ function getPreparedPrimaryDraft(snapshot: SessionSnapshot | null): RoundDraft |
 }
 
 function getStoryControlMode(snapshot: SessionSnapshot | null): StoryControlMode | null {
-  if (!snapshot || snapshot.session.partySetup?.primaryPlayerMode !== "ai") {
+  if (
+    !snapshot ||
+    snapshot.session.partySetup?.primaryPlayerMode !== "ai" ||
+    snapshot.session.gameState.endingState
+  ) {
     return null;
   }
 
@@ -273,6 +283,7 @@ export function App() {
   const [isInjectingManualNarration, setIsInjectingManualNarration] = useState(false);
   const [isSendingPrivateChat, setIsSendingPrivateChat] = useState(false);
   const [isUpdatingStoryControl, setIsUpdatingStoryControl] = useState(false);
+  const [storyControlModeOverride, setStoryControlModeOverride] = useState<StoryControlMode | null>(null);
   const [autoCommitCountdown, setAutoCommitCountdown] = useState<number | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
@@ -349,7 +360,7 @@ export function App() {
     recentSnapshot,
     savedGames,
     commitSnapshot: persistStoredSnapshot,
-    commitSaveBundle,
+    commitSaveRecord,
     clearRecent,
     clearSavedGamesList,
     removeSavedGameById
@@ -374,7 +385,51 @@ export function App() {
     runtimeModelConfig
   );
   const roundPreparationRequired = sessionNeedsPreparedRound(snapshot);
-  const storyControlMode = getStoryControlMode(snapshot);
+  const snapshotStoryControlMode = getStoryControlMode(snapshot);
+  const storyControlMode = storyControlModeOverride ?? snapshotStoryControlMode;
+
+  useEffect(() => {
+    setStoryControlModeOverride(null);
+  }, [snapshot?.session.id]);
+
+  useEffect(() => {
+    if (storyControlModeOverride === null) {
+      return;
+    }
+
+    if (snapshotStoryControlMode === null) {
+      setStoryControlModeOverride(null);
+      return;
+    }
+
+    if (snapshotStoryControlMode === storyControlModeOverride) {
+      setStoryControlModeOverride(null);
+    }
+  }, [snapshotStoryControlMode, storyControlModeOverride]);
+
+  useEffect(() => {
+    if (!snapshot || view === "game_bootstrap" || isBootstrappingSession) {
+      return;
+    }
+
+    const graphHasCurrentSession =
+      activeGraphBundle?.nodes.some((node) => node.sourceSessionId === snapshot.session.id) ?? false;
+
+    if (graphHasCurrentSession) {
+      return;
+    }
+
+    relinkSnapshot(
+      snapshot,
+      buildSaveRuntimeConfig(snapshot.session.settings.modelProfileId)
+    );
+  }, [
+    activeGraphBundle,
+    isBootstrappingSession,
+    relinkSnapshot,
+    snapshot,
+    view
+  ]);
 
   useEffect(() => {
     autoPreparedRoundKeyRef.current = null;
@@ -582,7 +637,7 @@ export function App() {
       return;
     }
 
-    if ((snapshot.session.gameState.storyControlMode ?? "intervene") !== "auto") {
+    if (storyControlMode !== "auto") {
       autoCommittedRoundKeyRef.current = null;
       setAutoCommitCountdown(null);
       return;
@@ -661,6 +716,7 @@ export function App() {
     uiText.app.status.autoRoundSubmitting,
     uiText.app.status.turnComplete,
     uiText.app.status.turnCompleteEnded,
+    storyControlMode,
     view
   ]);
 
@@ -1124,8 +1180,10 @@ export function App() {
       pendingMessage?: string;
       successMessage?: string;
       endingSuccessMessage?: string;
+      followupSuccessMessage?: string;
     }
   ): Promise<void> {
+    const wasAlreadyEnded = Boolean(currentSnapshot.session.gameState.endingState);
     setIsSubmittingTurn(true);
     setStatus({
       message: options?.pendingMessage ?? uiText.app.status.submitTurnPending,
@@ -1145,7 +1203,9 @@ export function App() {
       setTurnInput("");
       setStatus({
         message:
-          nextSnapshot.session.status === "ended"
+          wasAlreadyEnded
+            ? options?.followupSuccessMessage ?? uiText.app.status.endingFollowupComplete
+            : nextSnapshot.session.status === "ended"
             ? options?.endingSuccessMessage ?? uiText.app.status.turnCompleteEnded
             : options?.successMessage ?? uiText.app.status.turnComplete,
         tone: "neutral"
@@ -1172,7 +1232,7 @@ export function App() {
       return false;
     }
 
-    if (getStoryControlMode(snapshot) === "auto") {
+    if (storyControlMode === "auto") {
       setStatus({
         message: uiText.app.status.privateChatAutoModeUnavailable,
         tone: "error"
@@ -1230,9 +1290,14 @@ export function App() {
       return;
     }
 
-    const currentMode = snapshot.session.gameState.storyControlMode ?? "intervene";
+    const currentMode = storyControlMode ?? "intervene";
     if (currentMode === mode) {
       return;
+    }
+
+    setStoryControlModeOverride(mode);
+    if (mode === "intervene") {
+      setAutoCommitCountdown(null);
     }
 
     setIsUpdatingStoryControl(true);
@@ -1246,6 +1311,7 @@ export function App() {
         mode
       });
       commitSnapshot(nextSnapshot);
+      setStoryControlModeOverride(null);
       setStatus({
         message:
           mode === "auto"
@@ -1417,7 +1483,7 @@ export function App() {
       return;
     }
 
-    if (getStoryControlMode(snapshot) === "auto") {
+    if (!snapshot.session.gameState.endingState && storyControlMode === "auto") {
       setStatus({
         message: uiText.app.status.autoModeSubmitLocked,
         tone: "error"
@@ -1519,13 +1585,16 @@ export function App() {
         narrationText: trimmedNarration
       });
       commitSnapshot(nextSnapshot);
-      relinkSnapshot(
+      captureTurn(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        uiText.gameScreen.manualNarrationTest
       );
       setStatus({
         message:
-          nextSnapshot.session.status === "ended"
+          snapshot.session.gameState.endingState
+            ? uiText.app.status.manualNarrationSuccess
+            : nextSnapshot.session.status === "ended"
             ? uiText.app.status.manualNarrationEnded
             : uiText.app.status.manualNarrationSuccess,
         tone: "neutral"
@@ -1560,7 +1629,7 @@ export function App() {
     try {
       const result = await createSave(snapshot.session.id);
       commitSnapshot(result.snapshot);
-      commitSaveBundle(result.saveBundle);
+      commitSaveRecord(result.saveRecord);
       syncSavedBundle(result.saveBundle);
       setStatus({
         message: uiText.app.status.localSaveCreated,
@@ -1619,7 +1688,34 @@ export function App() {
       return;
     }
 
-    return restoreFromSaveBundle(recentSave.bundle, uiText.continueScreen.continueSave);
+    setIsRestoring(true);
+    setStatus({
+      message: uiText.app.status.loadingSelectedSave,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await loadSavedGame(recentSave.saveId);
+      commitSnapshot(nextSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      relinkSnapshot(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+      );
+      setView("game");
+      setStatus({
+        message: uiText.continueScreen.continueSave,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStoryControlModeOverride(null);
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsRestoring(false);
+    }
   }
 
   async function handleContinueRecentSnapshot(): Promise<void> {
@@ -1668,7 +1764,33 @@ export function App() {
   }
 
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
-    return restoreFromSaveBundle(record.bundle, `${uiText.common.load}: ${record.storyTitle}`);
+    setIsRestoring(true);
+    setStatus({
+      message: uiText.app.status.loadingSelectedSave,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await loadSavedGame(record.saveId);
+      commitSnapshot(nextSnapshot);
+      setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      relinkSnapshot(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+      );
+      setView("game");
+      setStatus({
+        message: `${uiText.common.load}: ${record.storyTitle}`,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsRestoring(false);
+    }
   }
 
   async function handleContinueFromNode(nodeId: string): Promise<void> {
@@ -1750,32 +1872,53 @@ export function App() {
     });
   }
 
-  function handleClearSavedGames(): void {
-    clearSavedGamesList();
-    setStatus({
-      message: uiText.app.status.localSavesCleared,
-      tone: "neutral"
-    });
+  async function handleClearSavedGames(): Promise<void> {
+    try {
+      await clearSavedGamesList();
+      setStatus({
+        message: uiText.app.status.localSavesCleared,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    }
   }
 
-  function handleRemoveRecentSave(): void {
+  async function handleRemoveRecentSave(): Promise<void> {
     if (!recentSave) {
       return;
     }
 
-    removeSavedGameById(recentSave.saveId);
-    setStatus({
-      message: uiText.app.status.recentSaveDeleted,
-      tone: "neutral"
-    });
+    try {
+      await removeSavedGameById(recentSave.saveId);
+      setStatus({
+        message: uiText.app.status.recentSaveDeleted,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    }
   }
 
-  function handleDeleteSavedGame(saveId: string): void {
-    removeSavedGameById(saveId);
-    setStatus({
-      message: uiText.app.status.saveDeleted,
-      tone: "neutral"
-    });
+  async function handleDeleteSavedGame(saveId: string): Promise<void> {
+    try {
+      await removeSavedGameById(saveId);
+      setStatus({
+        message: uiText.app.status.saveDeleted,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    }
   }
 
   function handleExit(): void {
@@ -2049,7 +2192,19 @@ export function App() {
           onSendPrivateChat={handleSendPrivateChat}
           onStoryControlModeChange={handleStoryControlModeChange}
           onTurnInputChange={setTurnInput}
+          onOpenSettlement={() => setView("settlement")}
           onSubmitTurn={handleSubmitTurn}
+        />
+      );
+      break;
+    case "settlement":
+      content = (
+        <SettlementPage
+          snapshot={snapshot}
+          activeGraphBundle={activeGraphBundle}
+          isResumingBranch={isResumingBranch}
+          onBackToGame={() => setView("game")}
+          onContinueFromNode={handleContinueFromNode}
         />
       );
       break;

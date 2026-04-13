@@ -10,6 +10,7 @@ import type {
   Message,
   ModelAccessMode,
   ReplayEvent,
+  SavedGameRecord,
   SaveBundle,
   Session,
   SessionContentSummary
@@ -156,6 +157,7 @@ export type SessionCreateStreamEvent =
 export type CreateSaveResponse = {
   snapshot: SessionSnapshot;
   saveBundle: SaveBundle;
+  saveRecord: SavedGameRecord;
 };
 
 export type ModelFeatureSummary = {

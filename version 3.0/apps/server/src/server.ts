@@ -57,12 +57,20 @@ import {
   listModelProfileSummaries
 } from "./model_gateway/config.ts";
 import { resolveStoryOpening } from "./opening/service.ts";
+import {
+  clearSavedGamesFromDisk,
+  deleteSavedGameFromDisk,
+  listSavedGamesFromDisk,
+  loadSaveBundleFromDisk,
+  saveBundleToDisk
+} from "./save_repository.ts";
 import { generateCharacterConcept } from "./text_completion/service.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
 const contentRoot = join(projectRoot, "content");
 const webDistRoot = join(projectRoot, "apps", "web", "dist");
+const localSaveRoot = join(projectRoot, "local_data", "saves");
 const store = new InMemorySessionStore();
 const port = Number(process.env.PORT ?? 4316);
 
@@ -456,6 +464,42 @@ async function handleApiRequest(
     return true;
   }
 
+  if (url.pathname === "/api/saves" && request.method === "GET") {
+    const saves = await listSavedGamesFromDisk(localSaveRoot);
+    sendJson(response, 200, saves);
+    return true;
+  }
+
+  if (url.pathname === "/api/saves" && request.method === "DELETE") {
+    await clearSavedGamesFromDisk(localSaveRoot);
+    sendJson(response, 200, {
+      ok: true
+    });
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/saves/") &&
+    url.pathname.endsWith("/load") &&
+    request.method === "POST"
+  ) {
+    const saveId = decodeURIComponent(url.pathname.replace("/api/saves/", "").replace("/load", ""));
+    const saveBundle = await loadSaveBundleFromDisk(localSaveRoot, saveId);
+    const snapshot = loadSessionFromSaveBundle(saveBundle, store);
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/saves/") && request.method === "DELETE") {
+    const saveId = decodeURIComponent(url.pathname.replace("/api/saves/", ""));
+    const deleted = await deleteSavedGameFromDisk(localSaveRoot, saveId);
+    sendJson(response, deleted ? 200 : 404, deleted ? { ok: true } : {
+      error: "SAVE_NOT_FOUND",
+      message: `Local save not found: ${saveId}`
+    });
+    return true;
+  }
+
   if (
     url.pathname.startsWith("/api/sessions/") &&
     url.pathname.endsWith("/rounds/prepare") &&
@@ -590,7 +634,11 @@ async function handleApiRequest(
       return true;
     }
 
-    sendJson(response, 200, result);
+    const saveRecord = await saveBundleToDisk(localSaveRoot, result.saveBundle);
+    sendJson(response, 200, {
+      ...result,
+      saveRecord
+    });
     return true;
   }
 

@@ -259,6 +259,21 @@ export type SaveBundle = {
   runtimeConfig?: SaveRuntimeConfig;
 };
 
+export type SavedGameRecord = {
+  saveId: string;
+  savedAt: string;
+  sessionId: string;
+  ruleTitle: string;
+  storyTitle: string;
+  locale: string;
+  status: string;
+  round: number;
+  updatedAt: string;
+  modelAccessMode: string;
+  modelProfileId: string;
+  storagePath?: string | null;
+};
+
 export type PlaythroughGraph = {
   id: string;
   ruleId: string;

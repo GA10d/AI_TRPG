@@ -76,10 +76,11 @@ type GameScreenProps = {
   onSendPrivateChat: (targetParticipantId: string, content: string) => Promise<boolean>;
   onStoryControlModeChange: (mode: StoryControlMode) => Promise<void>;
   onTurnInputChange: (value: string) => void;
+  onOpenSettlement: () => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-type SidePanelMode = "history" | "round";
+type SidePanelMode = "history" | "round" | "worldline" | "judge";
 
 type GameDrawer = "none" | "saves" | "npcs" | "details" | "private_chat";
 
@@ -143,6 +144,7 @@ export function GameScreen(props: GameScreenProps) {
     onSendPrivateChat,
     onStoryControlModeChange,
     onTurnInputChange,
+    onOpenSettlement,
     onSubmitTurn
   } = props;
   const text = useUiText();
@@ -197,21 +199,22 @@ export function GameScreen(props: GameScreenProps) {
       .reverse()
       .find((message) => message.kind === "gm_narration" || message.kind === "gm_dialogue") ??
     null;
-  const recentHistory = latestNarration
-    ? publicStoryMessages.filter((message) => message.id !== latestNarration.id).slice(-8)
-    : publicStoryMessages.slice(-8);
+  const historyContextMessages = latestNarration
+    ? publicStoryMessages.filter((message) => message.id !== latestNarration.id)
+    : publicStoryMessages;
   const isSessionEnded = snapshot?.session.status === "ended";
+  const hasEndingState = Boolean(snapshot?.session.gameState.endingState);
   const primaryPlayerMode = snapshot?.session.partySetup?.primaryPlayerMode ?? "human";
   const resolvedStoryControlMode =
-    primaryPlayerMode === "ai" ? storyControlMode ?? "intervene" : null;
+    primaryPlayerMode === "ai" && !hasEndingState ? storyControlMode ?? "intervene" : null;
   const storyAutoMode = resolvedStoryControlMode === "auto";
   const roundPreparationRequired =
-    primaryPlayerMode === "ai" || (snapshot?.session.companionParticipantIds?.length ?? 0) > 0;
+    !hasEndingState &&
+    (primaryPlayerMode === "ai" || (snapshot?.session.companionParticipantIds?.length ?? 0) > 0);
   const roundInputState = snapshot?.session.gameState.roundInputState ?? null;
   const roundDrafts = roundInputState?.drafts ?? [];
   const primaryDraft = roundDrafts.find((draft) => draft.isPrimary) ?? null;
   const composerDisabled =
-    isSessionEnded ||
     actionLocked ||
     isPreparingRound ||
     isSubmittingTurn ||
@@ -238,12 +241,7 @@ export function GameScreen(props: GameScreenProps) {
     !isPreparingRound &&
     !actionLocked;
   const storyControlLocked =
-    actionLocked ||
-    isSessionEnded ||
-    isPreparingRound ||
-    isSubmittingTurn ||
-    isSendingPrivateChat ||
-    isUpdatingStoryControl;
+    actionLocked || isSubmittingTurn || isUpdatingStoryControl;
   const privateChatLocked =
     actionLocked ||
     isSessionEnded ||
@@ -254,7 +252,6 @@ export function GameScreen(props: GameScreenProps) {
     storyAutoMode;
   const manualNarrationLocked =
     actionLocked ||
-    isSessionEnded ||
     isPreparingRound ||
     isSubmittingTurn ||
     isInjectingManualNarration;
@@ -267,7 +264,9 @@ export function GameScreen(props: GameScreenProps) {
     sessionBootstrapState?.activeLabel ?? text.app.bootstrapStages.entered_game.label;
   const bootstrapStatusDetail =
     sessionBootstrapState?.activeDetail ?? text.app.bootstrapStages.waiting_first_reply.detail;
-  const composerHint = roundPreparationRequired
+  const composerHint = hasEndingState
+    ? text.gameScreen.endingFollowupHint
+    : roundPreparationRequired
     ? isPreparingRound
       ? text.gameScreen.preparingRoundHint
       : storyAutoMode
@@ -284,7 +283,9 @@ export function GameScreen(props: GameScreenProps) {
     : composerDisabled
       ? text.gameScreen.inputLocked
       : text.gameScreen.submitTurnHint;
-  const submitButtonLabel = storyAutoMode
+  const submitButtonLabel = hasEndingState
+    ? text.gameScreen.endingFollowupSubmit
+    : storyAutoMode
     ? autoCommitCountdown !== null
       ? text.gameScreen.autoCommitCountdown(autoCommitCountdown)
       : isPreparingRound
@@ -307,25 +308,43 @@ export function GameScreen(props: GameScreenProps) {
     ? text.gameScreen.initPlaceholder
     : isPreparingRound
       ? text.gameScreen.draftingPlaceholder
+      : hasEndingState
+        ? text.gameScreen.endingFollowupPlaceholder
       : storyAutoMode
         ? text.gameScreen.autoModeLockedInput
       : primaryPlayerMode === "ai" && !primaryDraft
         ? text.gameScreen.aiDraftPlaceholder
         : text.gameScreen.actionPlaceholder;
+  const worldlineNodeCount =
+    activeGraphBundle?.graph.unlockedAtEnding ? activeGraphBundle.graph.nodeCount : 0;
   const sidePanelEyebrow =
     sidePanelMode === "round"
       ? text.gameScreen.roundDraftsEyebrow
-      : text.gameScreen.recentContext;
+      : sidePanelMode === "worldline"
+        ? text.gameScreen.worldlineEyebrow
+        : sidePanelMode === "judge"
+          ? text.gameScreen.endingJudgeSideLabel
+          : text.gameScreen.recentContext;
   const sidePanelTitle =
     sidePanelMode === "round"
       ? text.gameScreen.roundRepliesTitle
-      : text.gameScreen.recentContextTitle;
+      : sidePanelMode === "worldline"
+        ? text.gameScreen.worldlineTitle
+        : sidePanelMode === "judge"
+          ? text.gameScreen.judgeTabTitle
+          : text.gameScreen.recentContextTitle;
   const sidePanelCountLabel =
     sidePanelMode === "round"
       ? roundDrafts.length
         ? text.gameScreen.roundDraftCount(roundDrafts.length)
         : text.gameScreen.roundDraftsEmpty
-      : text.gameScreen.recentItems(recentHistory.length);
+      : sidePanelMode === "worldline"
+        ? worldlineNodeCount > 0
+          ? text.gameScreen.worldlineNodeCount(worldlineNodeCount)
+          : text.gameScreen.worldlineEmptyShort
+        : sidePanelMode === "judge"
+          ? endingJudgeStatusLabel
+          : text.gameScreen.recentItems(historyContextMessages.length);
   const workspaceStyle = {
     "--game-side-width": `${sidePanelWidth}px`,
     "--game-composer-height": `${composerHeight}px`
@@ -748,30 +767,31 @@ export function GameScreen(props: GameScreenProps) {
               >
                 {text.gameScreen.roundRepliesTab}
               </button>
-            </div>
-
-            <div className="game-side-judge-card">
-              <div className="game-side-judge-head">
-                <span className="meta-label">{text.gameScreen.endingJudgeSideLabel}</span>
-                <span
-                  className={`flag-chip ${
-                    endingJudgeDecision?.GameOver ? "flag-chip-warning" : ""
-                  }`}
-                >
-                  {endingJudgeStatusLabel}
-                </span>
-              </div>
-              <div className="summary-text">{endingJudgeStatusCopy}</div>
-              {endingJudgeDecision?.GameOver && endingJudgeDecision.EndingTitle ? (
-                <div className="ai-meta-line">{endingJudgeDecision.EndingTitle}</div>
-              ) : null}
+              <button
+                className={`game-panel-toggle ${
+                  sidePanelMode === "worldline" ? "game-panel-toggle-active" : ""
+                }`}
+                onClick={() => setSidePanelMode("worldline")}
+                type="button"
+              >
+                {text.gameScreen.worldlineTab}
+              </button>
+              <button
+                className={`game-panel-toggle ${
+                  sidePanelMode === "judge" ? "game-panel-toggle-active" : ""
+                }`}
+                onClick={() => setSidePanelMode("judge")}
+                type="button"
+              >
+                {text.gameScreen.judgeTab}
+              </button>
             </div>
 
             <div className="game-side-scroll">
               {sidePanelMode === "history" ? (
                 <div className="game-history-list">
-                  {recentHistory.length ? (
-                    recentHistory.map((message) => (
+                  {historyContextMessages.length ? (
+                    historyContextMessages.map((message) => (
                       <article
                         className={`game-history-item ${
                           message.kind === "player_input"
@@ -808,44 +828,93 @@ export function GameScreen(props: GameScreenProps) {
                     <div className="empty-state">{text.gameScreen.historyEmpty}</div>
                   )}
                 </div>
-              ) : isPreparingRound ? (
-                <div className="empty-state">{text.gameScreen.draftingPlaceholder}</div>
-              ) : roundDrafts.length ? (
-                <div className="game-draft-list">
-                  {roundDrafts.map((draft) => (
-                    <article className="game-draft-item" key={draft.participantId}>
-                      <div className="game-draft-item-head">
-                        <div>
-                          <div className="summary-title">{draft.displayName}</div>
-                          <div className="summary-text">
-                            {draft.isPrimary
-                              ? text.gameScreen.primaryDraftLabel
-                              : text.gameScreen.companionDraftLabel}
+              ) : sidePanelMode === "round" ? (
+                isPreparingRound ? (
+                  <div className="empty-state">{text.gameScreen.draftingPlaceholder}</div>
+                ) : roundDrafts.length ? (
+                  <div className="game-draft-list">
+                    {roundDrafts.map((draft) => (
+                      <article className="game-draft-item" key={draft.participantId}>
+                        <div className="game-draft-item-head">
+                          <div>
+                            <div className="summary-title">{draft.displayName}</div>
+                            <div className="summary-text">
+                              {draft.isPrimary
+                                ? text.gameScreen.primaryDraftLabel
+                                : text.gameScreen.companionDraftLabel}
+                            </div>
+                          </div>
+                          <div className="game-draft-item-flags">
+                            <span className="badge">
+                              {draft.source === "ai"
+                                ? text.gameScreen.aiDraftBadge
+                                : text.gameScreen.humanDraftBadge}
+                            </span>
+                            {draft.editable ? (
+                              <span className="badge">{text.gameScreen.editableDraftBadge}</span>
+                            ) : null}
                           </div>
                         </div>
-                        <div className="game-draft-item-flags">
-                          <span className="badge">
-                            {draft.source === "ai"
-                              ? text.gameScreen.aiDraftBadge
-                              : text.gameScreen.humanDraftBadge}
-                          </span>
-                          {draft.editable ? (
-                            <span className="badge">{text.gameScreen.editableDraftBadge}</span>
-                          ) : null}
-                        </div>
-                      </div>
 
-                      <div className="message-body">{draft.content}</div>
-                    </article>
-                  ))}
-                </div>
+                        <div className="message-body">{draft.content}</div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    {roundPreparationRequired
+                      ? primaryPlayerMode === "ai"
+                        ? text.gameScreen.aiDraftWaiting
+                        : text.gameScreen.roundDraftsDescription
+                      : text.gameScreen.roundRepliesEmpty}
+                  </div>
+                )
+              ) : sidePanelMode === "worldline" ? (
+                activeGraphBundle?.graph.unlockedAtEnding ? (
+                  <PlaythroughGraphPanel
+                    defaultExpanded
+                    graphBundle={activeGraphBundle}
+                    isResuming={isResumingBranch}
+                    onContinueFromNode={onContinueFromNode}
+                    variant="embedded"
+                  />
+                ) : (
+                  <div className="empty-state">{text.gameScreen.worldlineEmpty}</div>
+                )
               ) : (
-                <div className="empty-state">
-                  {roundPreparationRequired
-                    ? primaryPlayerMode === "ai"
-                      ? text.gameScreen.aiDraftWaiting
-                      : text.gameScreen.roundDraftsDescription
-                    : text.gameScreen.roundRepliesEmpty}
+                <div className="game-judge-panel">
+                  {hasEndingState ? (
+                    <article className="game-judge-item">
+                      <div className="game-side-judge-head">
+                        <span className="meta-label">{text.gameScreen.endingState}</span>
+                        <span className="flag-chip">
+                          {snapshot?.session.gameState.endingState?.title}
+                        </span>
+                      </div>
+                      <div className="summary-text">
+                        {snapshot?.session.gameState.endingState?.summary}
+                      </div>
+                    </article>
+                  ) : null}
+
+                  <article className="game-judge-item">
+                    <div className="game-side-judge-head">
+                      <span className="meta-label">{text.gameScreen.judgeTabTitle}</span>
+                      <span
+                        className={`flag-chip ${
+                          endingJudgeDecision?.GameOver ? "flag-chip-warning" : ""
+                        }`}
+                      >
+                        {endingJudgeStatusLabel}
+                      </span>
+                    </div>
+                    <div className="summary-text">{endingJudgeStatusCopy}</div>
+                    {endingJudgeDecision?.EndingTitle ? (
+                      <div className="ai-meta-line">{endingJudgeDecision.EndingTitle}</div>
+                    ) : null}
+                    <div className="meta-label">{text.gameScreen.endingJudgeStructuredJson}</div>
+                    <pre className="game-judge-json">{endingJudgeJson}</pre>
+                  </article>
                 </div>
               )}
             </div>
@@ -863,7 +932,9 @@ export function GameScreen(props: GameScreenProps) {
           <div className="game-panel-head">
             <div>
               <div className="meta-label">{text.gameScreen.yourAction}</div>
-              <div className="summary-title">{text.gameScreen.actionTitle}</div>
+              <div className="summary-title">
+                {hasEndingState ? text.gameScreen.endingFollowupTitle : text.gameScreen.actionTitle}
+              </div>
             </div>
             <span className="summary-text">{composerHint}</span>
           </div>
@@ -877,7 +948,7 @@ export function GameScreen(props: GameScreenProps) {
           />
 
           <div className="button-row game-composer-actions">
-            {primaryPlayerMode === "ai" ? (
+            {primaryPlayerMode === "ai" && !hasEndingState ? (
               <div className="game-story-control">
                 <div className="meta-label">{text.gameScreen.storyControlLabel}</div>
                 <div className="game-panel-toggle-row">
@@ -903,6 +974,11 @@ export function GameScreen(props: GameScreenProps) {
                   </button>
                 </div>
               </div>
+            ) : null}
+            {hasEndingState ? (
+              <button className="ghost-button" onClick={onOpenSettlement} type="button">
+                {text.gameScreen.openSettlementPage}
+              </button>
             ) : null}
             <button
               className="primary-button"
@@ -1297,12 +1373,6 @@ export function GameScreen(props: GameScreenProps) {
                   ) : null}
                   <pre>{endingJudgeJson}</pre>
                 </div>
-
-                <PlaythroughGraphPanel
-                  graphBundle={activeGraphBundle}
-                  isResuming={isResumingBranch}
-                  onContinueFromNode={onContinueFromNode}
-                />
 
                 <div className="summary-card">
                   <div className="meta-label">{text.gameScreen.replayLog}</div>

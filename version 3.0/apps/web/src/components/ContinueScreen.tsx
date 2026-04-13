@@ -12,7 +12,7 @@ type ContinueScreenProps = {
   onContinueSavedGame: () => Promise<void>;
   onContinueSnapshot: () => Promise<void>;
   onClearRecent: () => void;
-  onRemoveRecentSave: () => void;
+  onRemoveRecentSave: () => Promise<void>;
 };
 
 export function ContinueScreen(props: ContinueScreenProps) {
@@ -102,7 +102,11 @@ export function ContinueScreen(props: ContinueScreenProps) {
             ) : null}
 
             {recentSave ? (
-              <button className="ghost-button" onClick={onRemoveRecentSave} type="button">
+              <button
+                className="ghost-button"
+                onClick={() => void onRemoveRecentSave()}
+                type="button"
+              >
                 {text.continueScreen.removeRecentSave}
               </button>
             ) : null}
