@@ -157,6 +157,10 @@ export const jaJp = {
     }
   },
   app: {
+    saveDirectoryPrompt: {
+      title: "ローカル保存先フォルダを入力してください。",
+      hint: "保存先は後から設定画面でも変更できます。"
+    },
     status: {
       submitTurnPending: "このターンを送信しています...",
       preparingRoundDrafts: "このラウンドのパーティ草稿を準備しています...",
@@ -199,6 +203,8 @@ export const jaJp = {
       noActiveSessionToSave: "保存できるアクティブなセッションがありません。",
       creatingLocalSave: "ローカルセーブを作成しています...",
       localSaveCreated: "ローカルセーブを作成しました。",
+      localSaveDirectorySelectionCancelled:
+        "保存先の選択がキャンセルされたため、今回の保存は続行されませんでした。",
       loadingSelectedSave: "選択したセーブを読み込んでいます...",
       noRecentSave: "最近のセーブはまだありません。",
       noRecentSnapshot: "最近のローカルスナップショットはまだありません。",
@@ -522,6 +528,14 @@ export const jaJp = {
     debugOptions: "デバッグオプション",
     enableDebug: "デバッグ情報を既定で有効にする",
     showAiMetadata: "AI の所要時間、Token、料金を表示する",
+    localSaveDirectory: "ローカル保存先フォルダ",
+    localSaveDirectoryPlaceholder: "空欄なら既定の保存先に戻ります",
+    localSaveDirectoryBrowse: "フォルダを選ぶ",
+    localSaveDirectoryBrowsing: "開いています...",
+    localSaveDirectoryHint: "ローカルサーバーがセーブファイルを書き込むディレクトリを指定します。",
+    localSaveDirectoryEffective: (value: string) => `現在の実際の保存先: ${value}`,
+    localSaveDirectoryUsingDefault:
+      "現在は既定の保存先を使用しています。この欄を空にして保存してもここへ戻ります。",
     textModelEyebrow: "テキストモデル",
     textModelTitle: "テキストモデル設定",
     imageModelEyebrow: "画像モデル",

@@ -59,11 +59,45 @@ type PricingLookupInput = {
 
 const OPENAI_PRICING_URL = "https://platform.openai.com/docs/pricing";
 const GEMINI_PRICING_URL = "https://ai.google.dev/gemini-api/docs/pricing";
-const DEEPSEEK_PRICING_URL =
-  "https://api-docs.deepseek.com/quick_start/pricing-details-usd";
+const DEEPSEEK_PRICING_URL = "https://api-docs.deepseek.com/quick_start/pricing/";
 const DOUBAO_PRICING_URL = "https://www.volcengine.com/docs/84458/1585097";
 
 const MODEL_PRICING_CATALOG: ModelPricingCatalogEntry[] = [
+  {
+    modelNames: ["gpt-5.4"],
+    pricing: {
+      kind: "flat",
+      currency: "USD",
+      inputPerMillion: 2.5,
+      cachedInputPerMillion: 0.25,
+      outputPerMillion: 15,
+      sourceUrl: OPENAI_PRICING_URL,
+      note:
+        "OpenAI notes that prompts above 272K input tokens are billed at a higher long-context rate for the full session."
+    }
+  },
+  {
+    modelNames: ["gpt-5.4-mini"],
+    pricing: {
+      kind: "flat",
+      currency: "USD",
+      inputPerMillion: 0.75,
+      cachedInputPerMillion: 0.075,
+      outputPerMillion: 4.5,
+      sourceUrl: OPENAI_PRICING_URL
+    }
+  },
+  {
+    modelNames: ["gpt-5.4-nano"],
+    pricing: {
+      kind: "flat",
+      currency: "USD",
+      inputPerMillion: 0.2,
+      cachedInputPerMillion: 0.02,
+      outputPerMillion: 1.25,
+      sourceUrl: OPENAI_PRICING_URL
+    }
+  },
   {
     modelNames: ["gpt-5.2", "gpt-5.2-chat-latest"],
     pricing: {
@@ -102,9 +136,9 @@ const MODEL_PRICING_CATALOG: ModelPricingCatalogEntry[] = [
     pricing: {
       kind: "flat",
       currency: "USD",
-      inputPerMillion: 0.27,
-      cachedInputPerMillion: 0.07,
-      outputPerMillion: 1.1,
+      inputPerMillion: 0.28,
+      cachedInputPerMillion: 0.028,
+      outputPerMillion: 0.42,
       sourceUrl: DEEPSEEK_PRICING_URL,
       note: "If DeepSeek does not return cache-hit tokens, the estimate assumes cache miss."
     }
@@ -114,11 +148,37 @@ const MODEL_PRICING_CATALOG: ModelPricingCatalogEntry[] = [
     pricing: {
       kind: "flat",
       currency: "USD",
-      inputPerMillion: 0.55,
-      cachedInputPerMillion: 0.14,
-      outputPerMillion: 2.19,
+      inputPerMillion: 0.28,
+      cachedInputPerMillion: 0.028,
+      outputPerMillion: 0.42,
       sourceUrl: DEEPSEEK_PRICING_URL,
-      note: "If DeepSeek does not return cache-hit tokens, the estimate assumes cache miss."
+      note:
+        "The current official Models & Pricing page lists DeepSeek-V3.2 pricing as a shared rate for deepseek-chat and deepseek-reasoner. If cache-hit tokens are unavailable, the estimate assumes cache miss."
+    }
+  },
+  {
+    modelNames: ["gemini-3-pro-preview"],
+    pricing: {
+      kind: "gemini-tiered",
+      currency: "USD",
+      promptThresholdTokens: 200_000,
+      inputPerMillionBelowOrEqualThreshold: 2,
+      inputPerMillionAboveThreshold: 4,
+      outputPerMillionBelowOrEqualThreshold: 12,
+      outputPerMillionAboveThreshold: 18,
+      sourceUrl: GEMINI_PRICING_URL,
+      note: "Gemini 3 Pro is currently a preview model."
+    }
+  },
+  {
+    modelNames: ["gemini-3-flash-preview"],
+    pricing: {
+      kind: "flat",
+      currency: "USD",
+      inputPerMillion: 0.5,
+      outputPerMillion: 3,
+      sourceUrl: GEMINI_PRICING_URL,
+      note: "Gemini 3 Flash is currently a preview model."
     }
   },
   {

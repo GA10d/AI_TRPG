@@ -757,18 +757,18 @@ export async function prepareRound(
     ]
   };
 
-  return store.update(sessionId, () => ({
-    ...current,
+  return store.update(sessionId, (latest) => ({
+    ...latest,
     session: {
-      ...current.session,
+      ...latest.session,
       updatedAt: timestamp,
       gameState: {
-        ...current.session.gameState,
+        ...latest.session.gameState,
         roundInputState: nextRoundState
       }
     },
     replay: [
-      ...current.replay,
+      ...latest.replay,
       {
         id: `evt_${randomUUID()}`,
         round: targetRound,
@@ -941,18 +941,18 @@ export async function commitPreparedRound(
     });
   }
 
-  return store.update(sessionId, () => ({
-    ...current,
+  return store.update(sessionId, (latest) => ({
+    ...latest,
     session: {
-      ...current.session,
+      ...latest.session,
       status:
         endingAdjudication?.isGameOver && endingAdjudication.endingState
           ? "ended"
-          : current.session.status,
+          : latest.session.status,
       currentRound: nextRound,
       updatedAt: timestamp,
       gameState: {
-        ...current.session.gameState,
+        ...latest.session.gameState,
         phase:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? "ended"
@@ -962,17 +962,17 @@ export async function commitPreparedRound(
         endingState:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? endingAdjudication.endingState
-            : current.session.gameState.endingState ?? null,
+            : latest.session.gameState.endingState ?? null,
         roundInputState: null
       }
     },
     messages: [
-      ...current.messages,
+      ...latest.messages,
       ...playerMessages,
       gmMessage
     ],
     replay: [
-      ...current.replay,
+      ...latest.replay,
       ...replayEntries
     ]
   }));
@@ -995,13 +995,13 @@ export async function updateStoryControlMode(
   const nextMode: StoryControlMode = request.mode === "auto" ? "auto" : "intervene";
   const timestamp = nowIso();
 
-  return store.update(sessionId, () => ({
-    ...current,
+  return store.update(sessionId, (latest) => ({
+    ...latest,
     session: {
-      ...current.session,
+      ...latest.session,
       updatedAt: timestamp,
       gameState: {
-        ...current.session.gameState,
+        ...latest.session.gameState,
         storyControlMode: nextMode
       }
     }

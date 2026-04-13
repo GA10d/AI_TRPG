@@ -813,7 +813,9 @@ export async function generateInitialSessionNarrationViaServerProxy(
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig
   });
-  const systemPrompt = await buildNarratorSystemPrompt(input.locale);
+  const systemPrompt = await buildNarratorSystemPrompt(input.locale, {
+    profileId: config.profileId
+  });
   const userPrompt = buildSessionOpeningTaskText({
     locale: input.locale,
     ruleTitle: input.ruleTitle,
@@ -848,7 +850,9 @@ export async function generateTurnNarrationViaSingleAgentServerProxy(
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig
   });
-  const systemPrompt = await buildNarratorSystemPrompt(input.locale);
+  const systemPrompt = await buildNarratorSystemPrompt(input.locale, {
+    profileId: config.profileId
+  });
   const completion = await callChatCompletion(config, [
     {
       role: "system",
@@ -881,7 +885,9 @@ export async function judgeEndingViaServerProxy(
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig
   });
-  const systemPrompt = await buildEndingJudgeSystemPrompt(input.locale);
+  const systemPrompt = await buildEndingJudgeSystemPrompt(input.locale, {
+    profileId: config.profileId
+  });
   const messages: ChatMessage[] = [
     {
       role: "system",

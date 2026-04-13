@@ -9,7 +9,10 @@ import type {
   GenerateOpeningPreviewResponse,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  LocalSaveSettings,
   NpcRosterEntry,
+  PickLocalSaveDirectoryRequest,
+  PickLocalSaveDirectoryResponse,
   PrepareRoundRequest,
   SavedGameRecord,
   SaveBundle,
@@ -18,6 +21,7 @@ import type {
   SessionSnapshot,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
+  UpdateLocalSaveSettingsRequest,
   UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
 
@@ -387,6 +391,50 @@ export async function fetchSavedGames(): Promise<SavedGameRecord[]> {
   try {
     const response = await fetch("/api/saves");
     return parseJson<SavedGameRecord[]>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchLocalSaveSettings(): Promise<LocalSaveSettings> {
+  try {
+    const response = await fetch("/api/local-settings");
+    return parseJson<LocalSaveSettings>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function updateLocalSaveSettings(
+  payload: UpdateLocalSaveSettingsRequest
+): Promise<LocalSaveSettings> {
+  try {
+    const response = await fetch("/api/local-settings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    return parseJson<LocalSaveSettings>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function pickLocalSaveDirectory(
+  payload: PickLocalSaveDirectoryRequest
+): Promise<string | null> {
+  try {
+    const response = await fetch("/api/local-settings/pick-directory", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await parseJson<PickLocalSaveDirectoryResponse>(response);
+    return data.selectedPath ?? null;
   } catch (error) {
     throw normalizeNetworkError(error);
   }

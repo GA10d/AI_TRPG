@@ -155,6 +155,10 @@
     }
   },
   app: {
+    saveDirectoryPrompt: {
+      title: "请选择本地存档目录。",
+      hint: "保存地址可以在设置修改。"
+    },
     status: {
       submitTurnPending: "正在提交本轮行动...",
       preparingRoundDrafts: "正在准备本轮队伍草稿...",
@@ -190,6 +194,7 @@
       noActiveSessionToSave: "当前没有可保存的活动会话。",
       creatingLocalSave: "正在创建本地存档...",
       localSaveCreated: "本地存档已创建。",
+      localSaveDirectorySelectionCancelled: "已取消本次存档目录选择，本次保存没有继续。",
       loadingSelectedSave: "正在载入所选存档...",
       noRecentSave: "当前没有最近存档。",
       noRecentSnapshot: "本地还没有最近快照。",
@@ -487,6 +492,13 @@
     debugOptions: "调试选项",
     enableDebug: "默认开启调试信息",
     showAiMetadata: "显示 AI 耗时、Token 与费用",
+    localSaveDirectory: "本地存档目录",
+    localSaveDirectoryPlaceholder: "留空则回退到默认目录",
+    localSaveDirectoryBrowse: "浏览文件夹",
+    localSaveDirectoryBrowsing: "正在打开...",
+    localSaveDirectoryHint: "这里填写服务端写入本地存档的目录路径。",
+    localSaveDirectoryEffective: (value: string) => `当前实际保存位置：${value}`,
+    localSaveDirectoryUsingDefault: "当前使用默认目录。清空后保存也会回到这里。",
     textModelEyebrow: "文本模型",
     textModelTitle: "文本模型配置",
     imageModelEyebrow: "图片模型",

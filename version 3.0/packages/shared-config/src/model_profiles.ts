@@ -96,7 +96,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
     features: {
-      mini_version: { supported: true, model: "gpt-5-nano", url: null },
+      mini_version: { supported: true, model: "gpt-5.4-mini", url: null },
       deep_think: {
         supported: true,
         model: "gpt-5.4",
@@ -162,7 +162,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     description: "使用 Gemini 的 OpenAI-compatible 接口模式。",
     urlRequirements: false,
     baseUrl: "https://generativelanguage.googleapis.com",
-    baseModel: "gemini-2.5-pro",
+    baseModel: "gemini-3-pro-preview",
     chargeUrl: "https://aistudio.google.com/app/billing",
     docsUrl: "https://ai.google.dev/docs",
     envKeyCandidates: [
@@ -176,17 +176,17 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
     features: {
-      mini_version: { supported: true, model: "gemini-2.5-flash", url: null },
+      mini_version: { supported: true, model: "gemini-3-flash-preview", url: null },
       deep_think: {
         supported: true,
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         url: "https://ai.google.dev/gemini-api/docs/thinking"
       },
-      json_output: { supported: true, model: "gemini-2.5-pro", url: null },
-      tool_calls: { supported: true, model: "gemini-2.5-pro", url: null },
+      json_output: { supported: true, model: "gemini-3-pro-preview", url: null },
+      tool_calls: { supported: true, model: "gemini-3-pro-preview", url: null },
       file_upload: {
         supported: true,
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         url: "https://ai.google.dev/gemini-api/docs/files"
       }
     }
@@ -202,7 +202,7 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     description: "使用火山引擎方舟（Doubao / Ark）的 OpenAI-compatible 接口。",
     urlRequirements: true,
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    baseModel: "doubao-seed-1-6-251015",
+    baseModel: "doubao-seed-2-0-pro-260215",
     chargeUrl: "https://console.volcengine.com/ark",
     docsUrl: "https://www.volcengine.com/docs/82379/1099522",
     envKeyCandidates: [
@@ -217,14 +217,26 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
     features: {
-      mini_version: { supported: false, model: null, url: null },
+      mini_version: {
+        supported: true,
+        model: "doubao-seed-2-0-mini-260215",
+        url: "https://www.volcengine.com/docs/6492/2250683"
+      },
       deep_think: {
         supported: true,
-        model: "doubao-seed-1-6-251015",
-        url: "https://www.volcengine.com/docs/6492/2192012"
+        model: "doubao-seed-2-0-pro-260215",
+        url: "https://www.volcengine.com/docs/6492/2250683"
       },
-      json_output: { supported: true, model: null, url: null },
-      tool_calls: { supported: true, model: null, url: null },
+      json_output: {
+        supported: true,
+        model: "doubao-seed-2-0-pro-260215",
+        url: "https://www.volcengine.com/docs/6492/2250683"
+      },
+      tool_calls: {
+        supported: true,
+        model: "doubao-seed-2-0-pro-260215",
+        url: "https://www.volcengine.com/docs/6492/2250683"
+      },
       file_upload: { supported: false, model: null, url: null }
     }
   },

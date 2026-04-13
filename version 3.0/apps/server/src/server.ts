@@ -18,6 +18,8 @@ import type {
   GenerateOpeningPreviewResponse,
   ImageGenerationRequest,
   LoadSaveRequest,
+  PickLocalSaveDirectoryRequest,
+  UpdateLocalSaveSettingsRequest,
   PrepareRoundRequest,
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
@@ -56,6 +58,11 @@ import {
   getServerProxyStatus,
   listModelProfileSummaries
 } from "./model_gateway/config.ts";
+import {
+  getLocalSaveSettings,
+  pickLocalDirectoryWithNativeDialog,
+  updateLocalSaveSettings
+} from "./local_settings.ts";
 import { resolveStoryOpening } from "./opening/service.ts";
 import {
   clearSavedGamesFromDisk,
@@ -70,7 +77,8 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
 const contentRoot = join(projectRoot, "content");
 const webDistRoot = join(projectRoot, "apps", "web", "dist");
-const localSaveRoot = join(projectRoot, "local_data", "saves");
+const defaultLocalSaveRoot = join(projectRoot, "local_data", "saves");
+const localSettingsPath = join(projectRoot, "local_data", "settings.json");
 const store = new InMemorySessionStore();
 const port = Number(process.env.PORT ?? 4316);
 
@@ -464,14 +472,46 @@ async function handleApiRequest(
     return true;
   }
 
+  if (url.pathname === "/api/local-settings" && request.method === "GET") {
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    sendJson(response, 200, localSettings);
+    return true;
+  }
+
+  if (url.pathname === "/api/local-settings" && request.method === "POST") {
+    const payload = await readJsonBody<UpdateLocalSaveSettingsRequest>(request);
+    const localSettings = await updateLocalSaveSettings(
+      localSettingsPath,
+      defaultLocalSaveRoot,
+      payload
+    );
+    sendJson(response, 200, localSettings);
+    return true;
+  }
+
+  if (url.pathname === "/api/local-settings/pick-directory" && request.method === "POST") {
+    const payload = await readJsonBody<PickLocalSaveDirectoryRequest>(request);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const selectedPath = await pickLocalDirectoryWithNativeDialog({
+      initialDirectory: payload.initialDirectory ?? localSettings.effectiveSaveDirectory,
+      title: payload.title
+    });
+    sendJson(response, 200, {
+      selectedPath
+    });
+    return true;
+  }
+
   if (url.pathname === "/api/saves" && request.method === "GET") {
-    const saves = await listSavedGamesFromDisk(localSaveRoot);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const saves = await listSavedGamesFromDisk(localSettings.effectiveSaveDirectory);
     sendJson(response, 200, saves);
     return true;
   }
 
   if (url.pathname === "/api/saves" && request.method === "DELETE") {
-    await clearSavedGamesFromDisk(localSaveRoot);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    await clearSavedGamesFromDisk(localSettings.effectiveSaveDirectory);
     sendJson(response, 200, {
       ok: true
     });
@@ -484,7 +524,8 @@ async function handleApiRequest(
     request.method === "POST"
   ) {
     const saveId = decodeURIComponent(url.pathname.replace("/api/saves/", "").replace("/load", ""));
-    const saveBundle = await loadSaveBundleFromDisk(localSaveRoot, saveId);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const saveBundle = await loadSaveBundleFromDisk(localSettings.effectiveSaveDirectory, saveId);
     const snapshot = loadSessionFromSaveBundle(saveBundle, store);
     sendJson(response, 200, snapshot);
     return true;
@@ -492,7 +533,8 @@ async function handleApiRequest(
 
   if (url.pathname.startsWith("/api/saves/") && request.method === "DELETE") {
     const saveId = decodeURIComponent(url.pathname.replace("/api/saves/", ""));
-    const deleted = await deleteSavedGameFromDisk(localSaveRoot, saveId);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const deleted = await deleteSavedGameFromDisk(localSettings.effectiveSaveDirectory, saveId);
     sendJson(response, deleted ? 200 : 404, deleted ? { ok: true } : {
       error: "SAVE_NOT_FOUND",
       message: `Local save not found: ${saveId}`
@@ -634,7 +676,8 @@ async function handleApiRequest(
       return true;
     }
 
-    const saveRecord = await saveBundleToDisk(localSaveRoot, result.saveBundle);
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const saveRecord = await saveBundleToDisk(localSettings.effectiveSaveDirectory, result.saveBundle);
     sendJson(response, 200, {
       ...result,
       saveRecord

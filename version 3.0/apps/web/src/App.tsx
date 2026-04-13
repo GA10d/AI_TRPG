@@ -6,6 +6,7 @@ import type {
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
+  LocalSaveSettings,
   Message,
   ReplayEvent,
   SaveBundle,
@@ -19,16 +20,19 @@ import {
   assistCharacterConcept,
   commitPreparedRound,
   createSave,
+  fetchLocalSaveSettings,
   fetchSession,
   generateOpeningPreview,
   loadSavedGame,
   loadSaveBundle,
+  pickLocalSaveDirectory,
   prepareRound,
   sendPrivateChat,
   submitManualNarration,
   streamCreateSession,
   streamOpeningPreview,
   submitTurn,
+  updateLocalSaveSettings,
   updateStoryControlMode
 } from "./lib/trpgApiClient.ts";
 import { useBootstrapState } from "./hooks/useBootstrapState.ts";
@@ -285,6 +289,9 @@ export function App() {
   const [isUpdatingStoryControl, setIsUpdatingStoryControl] = useState(false);
   const [storyControlModeOverride, setStoryControlModeOverride] = useState<StoryControlMode | null>(null);
   const [autoCommitCountdown, setAutoCommitCountdown] = useState<number | null>(null);
+  const [localSaveSettings, setLocalSaveSettings] = useState<LocalSaveSettings | null>(null);
+  const [localSaveDirectoryInput, setLocalSaveDirectoryInput] = useState("");
+  const [isPickingLocalSaveDirectory, setIsPickingLocalSaveDirectory] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -362,6 +369,7 @@ export function App() {
     commitSnapshot: persistStoredSnapshot,
     commitSaveRecord,
     clearRecent,
+    refreshSavedGamesList,
     clearSavedGamesList,
     removeSavedGameById
   } = useStoredProgress();
@@ -386,26 +394,55 @@ export function App() {
   );
   const roundPreparationRequired = sessionNeedsPreparedRound(snapshot);
   const snapshotStoryControlMode = getStoryControlMode(snapshot);
-  const storyControlMode = storyControlModeOverride ?? snapshotStoryControlMode;
+  const storyControlMode =
+    snapshotStoryControlMode === null
+      ? null
+      : storyControlModeOverride ?? snapshotStoryControlMode;
 
   useEffect(() => {
     setStoryControlModeOverride(null);
   }, [snapshot?.session.id]);
 
+  function applyLocalSaveSettings(nextSettings: LocalSaveSettings): void {
+    setLocalSaveSettings(nextSettings);
+    setLocalSaveDirectoryInput(nextSettings.saveDirectory ?? "");
+  }
+
   useEffect(() => {
-    if (storyControlModeOverride === null) {
+    let cancelled = false;
+
+    void fetchLocalSaveSettings()
+      .then((nextSettings) => {
+        if (!cancelled) {
+          applyLocalSaveSettings(nextSettings);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setStatus({
+            message: error instanceof Error ? error.message : String(error),
+            tone: "error"
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!localSaveSettings?.effectiveSaveDirectory) {
       return;
     }
 
-    if (snapshotStoryControlMode === null) {
-      setStoryControlModeOverride(null);
-      return;
-    }
-
-    if (snapshotStoryControlMode === storyControlModeOverride) {
-      setStoryControlModeOverride(null);
-    }
-  }, [snapshotStoryControlMode, storyControlModeOverride]);
+    void refreshSavedGamesList().catch((error) => {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    });
+  }, [localSaveSettings?.effectiveSaveDirectory]);
 
   useEffect(() => {
     if (!snapshot || view === "game_bootstrap" || isBootstrappingSession) {
@@ -1311,7 +1348,6 @@ export function App() {
         mode
       });
       commitSnapshot(nextSnapshot);
-      setStoryControlModeOverride(null);
       setStatus({
         message:
           mode === "auto"
@@ -1320,6 +1356,7 @@ export function App() {
         tone: "neutral"
       });
     } catch (error) {
+      setStoryControlModeOverride(snapshotStoryControlMode);
       setStatus({
         message: error instanceof Error ? error.message : String(error),
         tone: "error"
@@ -1620,6 +1657,59 @@ export function App() {
       return;
     }
 
+    const ensureSettings =
+      localSaveSettings ?? (await fetchLocalSaveSettings().catch((error) => {
+        setStatus({
+          message: error instanceof Error ? error.message : String(error),
+          tone: "error"
+        });
+        return null;
+      }));
+
+    if (!ensureSettings) {
+      return;
+    }
+
+    if (!localSaveSettings) {
+      applyLocalSaveSettings(ensureSettings);
+    }
+
+    if (!ensureSettings.hasSelectedSaveDirectory) {
+      window.alert(`${uiText.app.saveDirectoryPrompt.title}\n${uiText.app.saveDirectoryPrompt.hint}`);
+
+      const selectedDirectory = await pickLocalSaveDirectory({
+        initialDirectory: ensureSettings.effectiveSaveDirectory,
+        title: uiText.settingsScreen.localSaveDirectory
+      }).catch((error) => {
+        setStatus({
+          message: error instanceof Error ? error.message : String(error),
+          tone: "error"
+        });
+        return null;
+      });
+
+      if (!selectedDirectory) {
+        setStatus({
+          message: uiText.app.status.localSaveDirectorySelectionCancelled,
+          tone: "neutral"
+        });
+        return;
+      }
+
+      try {
+        const nextSettings = await updateLocalSaveSettings({
+          saveDirectory: selectedDirectory
+        });
+        applyLocalSaveSettings(nextSettings);
+      } catch (error) {
+        setStatus({
+          message: error instanceof Error ? error.message : String(error),
+          tone: "error"
+        });
+        return;
+      }
+    }
+
     setIsSaving(true);
     setStatus({
       message: uiText.app.status.creatingLocalSave,
@@ -1828,14 +1918,53 @@ export function App() {
     }
   }
 
-  function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): void {
+  async function handleSaveSettings(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    saveDefaults();
-    setView("menu");
-    setStatus({
-      message: uiText.app.status.defaultSettingsSaved,
-      tone: "neutral"
-    });
+
+    try {
+      const nextSettings = await updateLocalSaveSettings({
+        saveDirectory: localSaveDirectoryInput.trim() || null
+      });
+      applyLocalSaveSettings(nextSettings);
+      saveDefaults();
+      setView("menu");
+      setStatus({
+        message: uiText.app.status.defaultSettingsSaved,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    }
+  }
+
+  async function handleBrowseLocalSaveDirectory(): Promise<void> {
+    setIsPickingLocalSaveDirectory(true);
+
+    try {
+      const selectedDirectory = await pickLocalSaveDirectory({
+        initialDirectory:
+          localSaveDirectoryInput.trim() ||
+          localSaveSettings?.effectiveSaveDirectory ||
+          null,
+        title: uiText.settingsScreen.localSaveDirectory
+      });
+
+      if (!selectedDirectory) {
+        return;
+      }
+
+      setLocalSaveDirectoryInput(selectedDirectory);
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsPickingLocalSaveDirectory(false);
+    }
   }
 
   function handleResetSettings(): void {
@@ -1858,6 +1987,7 @@ export function App() {
     setShowAiMetadata(true);
     setMarkdownFontSize("large");
     setMenuFontSize("standard");
+    setLocalSaveDirectoryInput("");
     setStatus({
       message: uiText.app.status.defaultsRestored,
       tone: "neutral"
@@ -2127,6 +2257,10 @@ export function App() {
           logViewMode={logViewMode}
           showAiMetadata={showAiMetadata}
           menuFontSize={menuFontSize}
+          localSaveDirectory={localSaveDirectoryInput}
+          effectiveLocalSaveDirectory={localSaveSettings?.effectiveSaveDirectory ?? ""}
+          localSaveDirectoryUsesDefault={localSaveSettings?.usesDefaultSaveDirectory ?? true}
+          isPickingLocalSaveDirectory={isPickingLocalSaveDirectory}
           onBack={() => setView("menu")}
           onSubmit={handleSaveSettings}
           onReset={handleResetSettings}
@@ -2143,6 +2277,8 @@ export function App() {
           onShowAiMetadataChange={setShowAiMetadata}
           onMenuFontSizeChange={setMenuFontSize}
           onLogViewModeChange={setLogViewMode}
+          onLocalSaveDirectoryChange={setLocalSaveDirectoryInput}
+          onBrowseLocalSaveDirectory={handleBrowseLocalSaveDirectory}
         />
       );
       break;

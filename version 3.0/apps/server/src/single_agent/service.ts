@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildLanguageSystemPrompt } from "../../../../packages/shared-config/src/index.ts";
+import {
+  buildLanguageSystemPrompt,
+  fromLocaleCode
+} from "../../../../packages/shared-config/src/index.ts";
 import type {
   EndingJudgeDecision,
   EndingAdjudication,
@@ -62,23 +65,49 @@ export async function loadEndingJudgeOutputSchema(): Promise<Record<string, unkn
   return cachedEndingJudgeOutputSchema;
 }
 
-export async function buildNarratorSystemPrompt(locale: LocaleCode): Promise<string> {
+function buildAdditionalLanguageInstruction(
+  locale: LocaleCode,
+  options?: {
+    profileId?: string;
+  }
+): string | null {
+  if (options?.profileId !== "doubao") {
+    return null;
+  }
+
+  const language = fromLocaleCode(locale);
+  return `请严格用以下语言回答：${language.nativeName}（${language.code}）`;
+}
+
+export async function buildNarratorSystemPrompt(
+  locale: LocaleCode,
+  options?: {
+    profileId?: string;
+  }
+): Promise<string> {
   const basePrompt = await loadNarratorPrompt();
   return [
     basePrompt,
     "",
     buildLanguageSystemPrompt(locale),
+    buildAdditionalLanguageInstruction(locale, options),
     "Return only player-facing narration unless the supplied prompt explicitly asks for something else."
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
-export async function buildEndingJudgeSystemPrompt(locale: LocaleCode): Promise<string> {
+export async function buildEndingJudgeSystemPrompt(
+  locale: LocaleCode,
+  options?: {
+    profileId?: string;
+  }
+): Promise<string> {
   const basePrompt = await loadEndingJudgePrompt();
   return [
     basePrompt,
     "",
-    buildLanguageSystemPrompt(locale)
-  ].join("\n");
+    buildLanguageSystemPrompt(locale),
+    buildAdditionalLanguageInstruction(locale, options)
+  ].filter(Boolean).join("\n");
 }
 
 function normalizePlayerInfo(playerInfo: string): string {

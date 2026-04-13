@@ -157,6 +157,10 @@ export const enUs = {
     }
   },
   app: {
+    saveDirectoryPrompt: {
+      title: "Enter the local save directory.",
+      hint: "You can change the save path later in Settings."
+    },
     status: {
       submitTurnPending: "Submitting this turn...",
       preparingRoundDrafts: "Preparing this round's party drafts...",
@@ -195,6 +199,8 @@ export const enUs = {
       noActiveSessionToSave: "There is no active session to save.",
       creatingLocalSave: "Creating a local save...",
       localSaveCreated: "Local save created.",
+      localSaveDirectorySelectionCancelled:
+        "Save directory selection was cancelled, so this save did not continue.",
       loadingSelectedSave: "Loading the selected save...",
       noRecentSave: "There is no recent save yet.",
       noRecentSnapshot: "There is no recent local snapshot yet.",
@@ -511,6 +517,14 @@ export const enUs = {
     debugOptions: "Debug options",
     enableDebug: "Enable debug information by default",
     showAiMetadata: "Show AI timing, tokens, and cost",
+    localSaveDirectory: "Local save directory",
+    localSaveDirectoryPlaceholder: "Leave blank to fall back to the default directory",
+    localSaveDirectoryBrowse: "Browse folders",
+    localSaveDirectoryBrowsing: "Opening...",
+    localSaveDirectoryHint: "This is the directory path where the local server writes save files.",
+    localSaveDirectoryEffective: (value: string) => `Current effective save path: ${value}`,
+    localSaveDirectoryUsingDefault:
+      "The default directory is active right now. Clearing this field and saving will return here.",
     textModelEyebrow: "Text Model",
     textModelTitle: "Text Model Configuration",
     imageModelEyebrow: "Image Model",

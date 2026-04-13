@@ -123,6 +123,26 @@ export type LoadSaveRequest = {
   saveBundle: SaveBundle;
 };
 
+export type LocalSaveSettings = {
+  saveDirectory: string | null;
+  effectiveSaveDirectory: string;
+  usesDefaultSaveDirectory: boolean;
+  hasSelectedSaveDirectory: boolean;
+};
+
+export type UpdateLocalSaveSettingsRequest = {
+  saveDirectory: string | null;
+};
+
+export type PickLocalSaveDirectoryRequest = {
+  initialDirectory?: string | null;
+  title?: string | null;
+};
+
+export type PickLocalSaveDirectoryResponse = {
+  selectedPath: string | null;
+};
+
 export type SessionSnapshot = {
   session: Session;
   messages: Message[];

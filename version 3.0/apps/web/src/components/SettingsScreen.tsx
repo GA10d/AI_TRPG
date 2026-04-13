@@ -31,8 +31,12 @@ type SettingsScreenProps = {
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   showAiMetadata: boolean;
   menuFontSize: import("../ui.ts").MenuFontSizePreset;
+  localSaveDirectory: string;
+  effectiveLocalSaveDirectory: string;
+  localSaveDirectoryUsesDefault: boolean;
+  isPickingLocalSaveDirectory: boolean;
   onBack: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
   onReset: () => void;
   onLocaleChange: (value: CreateSessionRequest["locale"]) => void;
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
@@ -52,6 +56,8 @@ type SettingsScreenProps = {
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
   ) => void;
+  onLocalSaveDirectoryChange: (value: string) => void;
+  onBrowseLocalSaveDirectory: () => Promise<void>;
 };
 
 const EMPTY_RUNTIME_MODEL_CONFIG: RuntimeModelConfigInput = {
@@ -118,6 +124,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
     logViewMode,
     showAiMetadata,
     menuFontSize,
+    localSaveDirectory,
+    effectiveLocalSaveDirectory,
+    localSaveDirectoryUsesDefault,
+    isPickingLocalSaveDirectory,
     onBack,
     onSubmit,
     onReset,
@@ -133,7 +143,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onDebugEnabledChange,
     onShowAiMetadataChange,
     onMenuFontSizeChange,
-    onLogViewModeChange
+    onLogViewModeChange,
+    onLocalSaveDirectoryChange,
+    onBrowseLocalSaveDirectory
   } = props;
 
   const selectedTextProfile =
@@ -339,6 +351,40 @@ export function SettingsScreen(props: SettingsScreenProps) {
               </div>
             </div>
           </div>
+
+          <label className="field">
+            <span>{settingsText.localSaveDirectory}</span>
+            <input
+              className="text-input"
+              placeholder={
+                localSaveDirectoryUsesDefault
+                  ? effectiveLocalSaveDirectory || settingsText.localSaveDirectoryPlaceholder
+                  : settingsText.localSaveDirectoryPlaceholder
+              }
+              type="text"
+              value={localSaveDirectory}
+              onChange={(event) => onLocalSaveDirectoryChange(event.target.value)}
+            />
+            <div className="button-row">
+              <button
+                className="ghost-button"
+                disabled={isPickingLocalSaveDirectory}
+                onClick={() => void onBrowseLocalSaveDirectory()}
+                type="button"
+              >
+                {isPickingLocalSaveDirectory
+                  ? settingsText.localSaveDirectoryBrowsing
+                  : settingsText.localSaveDirectoryBrowse}
+              </button>
+            </div>
+            <span className="field-hint">{settingsText.localSaveDirectoryHint}</span>
+            <span className="summary-text">
+              {settingsText.localSaveDirectoryEffective(effectiveLocalSaveDirectory)}
+            </span>
+            {localSaveDirectoryUsesDefault ? (
+              <span className="summary-text">{settingsText.localSaveDirectoryUsingDefault}</span>
+            ) : null}
+          </label>
         </section>
 
         <section className="summary-card">
