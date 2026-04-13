@@ -1,6 +1,7 @@
 import type { ModelAccessMode } from "../../../../packages/shared-types/src/index.ts";
 import {
   buildMockEndingJudgeFromNarration,
+  buildMockEndingJudgeDecisionFromNarration,
   buildMockInitialNarration,
   buildMockOpeningText,
   buildMockTurnOutcome
@@ -178,6 +179,7 @@ class MockModelGateway implements ModelGateway {
 
   async judgeEnding(input: EndingJudgeInput): Promise<EndingJudgeOutput> {
     const adjudication = buildMockEndingJudgeFromNarration(input.narrationText);
+    const judgeDecision = buildMockEndingJudgeDecisionFromNarration(input.narrationText);
 
     return {
       adjudication:
@@ -190,7 +192,8 @@ class MockModelGateway implements ModelGateway {
                 confirmedAtRound: input.round
               }
             },
-      rawText: JSON.stringify(adjudication, null, 2),
+      judgeDecision,
+      rawText: JSON.stringify(judgeDecision, null, 2),
       provider: "mock-local",
       mode: "mock",
       meta: {

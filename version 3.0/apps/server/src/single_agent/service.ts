@@ -4,22 +4,28 @@ import { fileURLToPath } from "node:url";
 
 import { buildLanguageSystemPrompt } from "../../../../packages/shared-config/src/index.ts";
 import type {
+  EndingJudgeDecision,
   EndingAdjudication,
+  EndingType,
   LocaleCode
 } from "../../../../packages/shared-types/src/index.ts";
 
-type PromptKind = "narrator" | "ending_judge";
+type PromptKind = "narrator";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../..");
-const promptDir = join(projectRoot, "apps", "prompt", "single_agent");
+const singleAgentPromptDir = join(projectRoot, "apps", "prompt", "single_agent");
+const endingJudgePromptDir = join(projectRoot, "apps", "prompt", "ending_judge");
+const endingJudgeSystemPromptPath = join(endingJudgePromptDir, "system_prompt.txt");
+const endingJudgeOutputSchemaPath = join(endingJudgePromptDir, "output_schema.json");
 
 const promptFileMap: Record<PromptKind, string> = {
-  narrator: "narrator_prompt.txt",
-  ending_judge: "ending_judge_prompt.txt"
+  narrator: "narrator_prompt.txt"
 };
 
 const promptCache = new Map<PromptKind, string>();
+let cachedEndingJudgeSystemPrompt: string | null = null;
+let cachedEndingJudgeOutputSchema: Record<string, unknown> | null = null;
 
 async function loadPrompt(kind: PromptKind): Promise<string> {
   const cachedPrompt = promptCache.get(kind);
@@ -27,9 +33,7 @@ async function loadPrompt(kind: PromptKind): Promise<string> {
     return cachedPrompt;
   }
 
-  const prompt = (
-    await readFile(join(promptDir, promptFileMap[kind]), "utf8")
-  ).trim();
+  const prompt = (await readFile(join(singleAgentPromptDir, promptFileMap[kind]), "utf8")).trim();
   promptCache.set(kind, prompt);
   return prompt;
 }
@@ -39,7 +43,23 @@ export async function loadNarratorPrompt(): Promise<string> {
 }
 
 export async function loadEndingJudgePrompt(): Promise<string> {
-  return loadPrompt("ending_judge");
+  if (cachedEndingJudgeSystemPrompt !== null) {
+    return cachedEndingJudgeSystemPrompt;
+  }
+
+  cachedEndingJudgeSystemPrompt = (await readFile(endingJudgeSystemPromptPath, "utf8")).trim();
+  return cachedEndingJudgeSystemPrompt;
+}
+
+export async function loadEndingJudgeOutputSchema(): Promise<Record<string, unknown>> {
+  if (cachedEndingJudgeOutputSchema !== null) {
+    return cachedEndingJudgeOutputSchema;
+  }
+
+  cachedEndingJudgeOutputSchema = JSON.parse(
+    await readFile(endingJudgeOutputSchemaPath, "utf8")
+  ) as Record<string, unknown>;
+  return cachedEndingJudgeOutputSchema;
 }
 
 export async function buildNarratorSystemPrompt(locale: LocaleCode): Promise<string> {
@@ -134,7 +154,9 @@ export function buildEndingJudgeUserPrompt(input: {
     "Narrator reply to inspect:",
     input.narrationText.trim(),
     "",
-    "Decide whether this reply means the session has entered an ending."
+    "Decide whether this reply means the game is already over.",
+    "Entering a finale, epilogue, cleanup, or wrap-up is not enough by itself.",
+    "Only mark GameOver as true if this exact narrator reply clearly indicates that active play has already ended."
   ].join("\n");
 }
 
@@ -158,12 +180,37 @@ function extractJsonPayload(rawText: string): string {
   throw new Error("Ending judge did not return a JSON object.");
 }
 
+function normalizeTrimmedString(rawValue: unknown): string {
+  return typeof rawValue === "string" ? rawValue.trim() : "";
+}
+
 function normalizeEndingType(rawValue: unknown): "preset" | "hidden" | "emergent" {
   return rawValue === "preset" || rawValue === "hidden" ? rawValue : "emergent";
 }
 
-export function parseEndingJudgeResult(rawText: string): EndingAdjudication {
+function normalizeDecisionEndingType(rawValue: unknown): "" | EndingType {
+  return rawValue === "preset" || rawValue === "hidden" || rawValue === "emergent" ? rawValue : "";
+}
+
+function buildDefaultEndingJudgeDecision(): EndingJudgeDecision {
+  return {
+    GameOver: false,
+    Reason: "The latest narrator reply does not clearly confirm that the game has already ended.",
+    EndingId: "",
+    EndingType: "",
+    EndingTitle: "",
+    EndingSummary: ""
+  };
+}
+
+export function parseEndingJudgeDecision(rawText: string): EndingJudgeDecision {
   const payload = JSON.parse(extractJsonPayload(rawText)) as {
+    GameOver?: unknown;
+    Reason?: unknown;
+    EndingId?: unknown;
+    EndingType?: unknown;
+    EndingTitle?: unknown;
+    EndingSummary?: unknown;
     isGameOver?: unknown;
     adjudicationSource?: unknown;
     endingState?: {
@@ -175,51 +222,85 @@ export function parseEndingJudgeResult(rawText: string): EndingAdjudication {
     } | null;
   };
 
-  const isGameOver = payload.isGameOver === true;
-  if (!isGameOver) {
-    return {
-      isGameOver: false,
-      endingState: null,
-      adjudicationSource: "single_agent"
+  if ("GameOver" in payload) {
+    const gameOver = payload.GameOver === true;
+    const reason = normalizeTrimmedString(payload.Reason);
+    const decision: EndingJudgeDecision = {
+      GameOver: gameOver,
+      Reason:
+        reason ||
+        (gameOver
+          ? "The latest narrator reply clearly indicates that the game is already over."
+          : buildDefaultEndingJudgeDecision().Reason),
+      EndingId: gameOver ? normalizeTrimmedString(payload.EndingId) || "single_agent_ending" : "",
+      EndingType: gameOver
+        ? normalizeDecisionEndingType(payload.EndingType) || "emergent"
+        : "",
+      EndingTitle:
+        gameOver ? normalizeTrimmedString(payload.EndingTitle) || "Ending Reached" : "",
+      EndingSummary:
+        gameOver
+          ? normalizeTrimmedString(payload.EndingSummary) ||
+            normalizeTrimmedString(payload.Reason) ||
+            "The narrator reply indicates that the session has ended."
+          : ""
     };
+
+    return decision;
   }
 
+  const isGameOver = payload.isGameOver === true;
   const endingState = payload.endingState;
-  if (!endingState) {
-    return {
-      isGameOver: false,
-      endingState: null,
-      adjudicationSource: "single_agent"
-    };
+  if (!isGameOver || !endingState) {
+    return buildDefaultEndingJudgeDecision();
   }
 
   const endingId =
-    typeof endingState.endingId === "string" && endingState.endingId.trim().length > 0
-      ? endingState.endingId.trim()
-      : "single_agent_ending";
+    normalizeTrimmedString(endingState.endingId) || "single_agent_ending";
   const title =
-    typeof endingState.title === "string" && endingState.title.trim().length > 0
-      ? endingState.title.trim()
-      : "Ending Reached";
+    normalizeTrimmedString(endingState.title) || "Ending Reached";
   const summary =
-    typeof endingState.summary === "string" && endingState.summary.trim().length > 0
-      ? endingState.summary.trim()
-      : "The current narration indicates that the session has reached an ending.";
-  const confirmedAtRound =
-    typeof endingState.confirmedAtRound === "number" && Number.isFinite(endingState.confirmedAtRound)
-      ? endingState.confirmedAtRound
-      : 0;
+    normalizeTrimmedString(endingState.summary) ||
+    "The current narration indicates that the session has reached an ending.";
+
+  return {
+    GameOver: true,
+    Reason: summary,
+    EndingId: endingId,
+    EndingType: normalizeDecisionEndingType(endingState.endingType) || "emergent",
+    EndingTitle: title,
+    EndingSummary: summary
+  };
+}
+
+export function buildEndingAdjudicationFromDecision(
+  decision: EndingJudgeDecision,
+  round: number
+): EndingAdjudication {
+  if (!decision.GameOver) {
+    return {
+      isGameOver: false,
+      endingState: null,
+      adjudicationSource: "single_agent"
+    };
+  }
 
   return {
     isGameOver: true,
-    adjudicationSource:
-      payload.adjudicationSource === "single_agent" ? "single_agent" : "single_agent",
+    adjudicationSource: "single_agent",
     endingState: {
-      endingId,
-      endingType: normalizeEndingType(endingState.endingType),
-      title,
-      summary,
-      confirmedAtRound
+      endingId: decision.EndingId.trim() || "single_agent_ending",
+      endingType: normalizeEndingType(decision.EndingType),
+      title: decision.EndingTitle.trim() || "Ending Reached",
+      summary:
+        decision.EndingSummary.trim() ||
+        decision.Reason.trim() ||
+        "The current narration indicates that the session has ended.",
+      confirmedAtRound: round
     }
   };
+}
+
+export function parseEndingJudgeResult(rawText: string, round: number = 0): EndingAdjudication {
+  return buildEndingAdjudicationFromDecision(parseEndingJudgeDecision(rawText), round);
 }

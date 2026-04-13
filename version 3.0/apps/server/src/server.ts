@@ -21,6 +21,7 @@ import type {
   PrepareRoundRequest,
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
+  SubmitManualNarrationRequest,
   SubmitTurnRequest,
   UpdateStoryControlModeRequest
 } from "../../../packages/shared-types/src/index.ts";
@@ -46,6 +47,7 @@ import {
   loadSessionFromSaveBundle,
   prepareRound,
   sendPrivateChat,
+  submitManualNarration,
   submitTurn,
   updateStoryControlMode
 } from "./session/index.ts";
@@ -488,6 +490,27 @@ async function handleApiRequest(
       sendJson(response, 404, {
         error: "SESSION_NOT_FOUND",
         message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/manual-narration") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/manual-narration", "");
+    const payload = await readJsonBody<SubmitManualNarrationRequest>(request);
+    const snapshot = await submitManualNarration(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `session not found: ${sessionId}`
       });
       return true;
     }

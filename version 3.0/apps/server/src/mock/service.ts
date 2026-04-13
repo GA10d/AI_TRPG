@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type {
   EndingAdjudication,
+  EndingJudgeDecision,
   Message
 } from "../../../../packages/shared-types/src/index.ts";
 
@@ -282,6 +283,32 @@ export function buildMockEndingJudgeFromNarration(
     isGameOver: false,
     adjudicationSource: "mock",
     endingState: null
+  };
+}
+
+export function buildMockEndingJudgeDecisionFromNarration(
+  narrationText: string
+): EndingJudgeDecision {
+  const adjudication = buildMockEndingJudgeFromNarration(narrationText);
+
+  if (!adjudication.isGameOver || !adjudication.endingState) {
+    return {
+      GameOver: false,
+      Reason: "The latest narrator reply does not clearly indicate that the game has already ended.",
+      EndingId: "",
+      EndingType: "",
+      EndingTitle: "",
+      EndingSummary: ""
+    };
+  }
+
+  return {
+    GameOver: true,
+    Reason: adjudication.endingState.summary,
+    EndingId: adjudication.endingState.endingId,
+    EndingType: adjudication.endingState.endingType,
+    EndingTitle: adjudication.endingState.title,
+    EndingSummary: adjudication.endingState.summary
   };
 }
 

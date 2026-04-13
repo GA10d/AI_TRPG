@@ -24,6 +24,7 @@ import type {
   SessionSnapshot,
   StoryControlMode,
   SubmitTurnRequest,
+  SubmitManualNarrationRequest,
   UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
 import {
@@ -231,6 +232,14 @@ function getCompanionTagMap(session: Session): Map<string, AiPersonalityTag[]> {
       companion.personalityTags
     ])
   );
+}
+
+function buildStoryRecipientIds(session: Session): string[] {
+  return [
+    session.localHumanParticipantId ?? session.playerParticipantId,
+    session.playerParticipantId,
+    ...(session.companionParticipantIds ?? [])
+  ].filter((participantId, index, items) => items.indexOf(participantId) === index);
 }
 
 function buildSaveReplayEvent(sessionId: string, savedAt: string): ReplayEvent {
@@ -481,6 +490,7 @@ async function createSessionSnapshotInternal(
       phase: "playing",
       endingState: null,
       lastEndingJudgeResult: null,
+      lastEndingJudgeDecision: null,
       roundInputState: null,
       storyControlMode: primaryPlayerMode === "ai" ? "intervene" : null
     }
@@ -940,6 +950,7 @@ export async function commitPreparedRound(
             ? "ended"
             : "playing",
         lastEndingJudgeResult: endingAdjudication,
+        lastEndingJudgeDecision: endingJudge.judgeDecision,
         endingState:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? endingAdjudication.endingState
@@ -986,6 +997,144 @@ export async function updateStoryControlMode(
         storyControlMode: nextMode
       }
     }
+  }));
+}
+
+export async function submitManualNarration(
+  sessionId: string,
+  request: SubmitManualNarrationRequest,
+  store: InMemorySessionStore
+): Promise<SessionSnapshot | null> {
+  const narrationText = request.narrationText.trim();
+  if (!narrationText) {
+    throw new Error("Manual narrator text cannot be empty.");
+  }
+
+  const current = store.get(sessionId);
+  if (!current) {
+    return null;
+  }
+
+  if (current.session.status === "ended") {
+    throw new Error("The current session has already ended. Resume from a previous node or start a new run before testing again.");
+  }
+
+  const timestamp = nowIso();
+  const gmParticipant = findGmParticipant(current.session);
+  const runtimeConfig = store.getRuntimeConfig(sessionId);
+  const targetRound = current.session.currentRound;
+  const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const endingJudge = await modelGateway.judgeEnding({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId:
+      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
+    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    locale: current.session.locale,
+    round: targetRound,
+    narrationText
+  });
+
+  const gmMessage: Message = {
+    id: `msg_${randomUUID()}`,
+    round: targetRound,
+    createdAt: timestamp,
+    senderId: gmParticipant.id,
+    recipientIds: buildStoryRecipientIds(current.session),
+    visibility: "public",
+    kind: "gm_narration",
+    channel: "public_story",
+    content: narrationText,
+    tags: [
+      "manual_narration_test",
+      "turn_response",
+      "provider:manual_override"
+    ]
+  };
+
+  const endingAdjudication = endingJudge.adjudication ?? null;
+  const replayEntries: ReplayEvent[] = [
+    {
+      id: `evt_${randomUUID()}`,
+      round: targetRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "message_created",
+      displayLevel: "detail",
+      summary: "Manual narrator reply injected",
+      payload: {
+        messageId: gmMessage.id,
+        manual: true
+      }
+    },
+    {
+      id: `evt_${randomUUID()}`,
+      round: targetRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "gm_response_received",
+      displayLevel: "core",
+      summary: "Manual narrator reply tested against ending judge",
+      payload: {
+        messageId: gmMessage.id,
+        provider: "manual_override",
+        mode: "manual_override",
+        endingJudgeProvider: endingJudge.provider,
+        endingJudgeRawText: endingJudge.rawText,
+        manual: true
+      }
+    }
+  ];
+
+  if (endingAdjudication?.isGameOver && endingAdjudication.endingState) {
+    replayEntries.push({
+      id: `evt_${randomUUID()}`,
+      round: targetRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "ending_confirmed",
+      displayLevel: "core",
+      summary: `Ending confirmed: ${endingAdjudication.endingState.title}`,
+      payload: {
+        endingId: endingAdjudication.endingState.endingId,
+        endingType: endingAdjudication.endingState.endingType,
+        adjudicationSource: endingAdjudication.adjudicationSource,
+        manual: true
+      }
+    });
+  }
+
+  return store.update(sessionId, () => ({
+    ...current,
+    session: {
+      ...current.session,
+      status:
+        endingAdjudication?.isGameOver && endingAdjudication.endingState
+          ? "ended"
+          : current.session.status,
+      updatedAt: timestamp,
+      gameState: {
+        ...current.session.gameState,
+        phase:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? "ended"
+            : "playing",
+        lastEndingJudgeResult: endingAdjudication,
+        lastEndingJudgeDecision: endingJudge.judgeDecision,
+        endingState:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? endingAdjudication.endingState
+            : current.session.gameState.endingState ?? null,
+        roundInputState: null
+      }
+    },
+    messages: [
+      ...current.messages,
+      gmMessage
+    ],
+    replay: [
+      ...current.replay,
+      ...replayEntries
+    ]
   }));
 }
 
@@ -1293,6 +1442,7 @@ export async function submitTurn(
             ? "ended"
             : "playing",
         lastEndingJudgeResult: endingAdjudication,
+        lastEndingJudgeDecision: endingJudge.judgeDecision,
         endingState:
           endingAdjudication?.isGameOver && endingAdjudication.endingState
             ? endingAdjudication.endingState

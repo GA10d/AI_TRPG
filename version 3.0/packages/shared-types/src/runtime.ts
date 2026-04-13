@@ -71,6 +71,15 @@ export type EndingAdjudication = {
   adjudicationSource: "mock" | "single_agent" | "multi_agent" | "unknown";
 };
 
+export type EndingJudgeDecision = {
+  GameOver: boolean;
+  Reason: string;
+  EndingId: string;
+  EndingType: "" | EndingType;
+  EndingTitle: string;
+  EndingSummary: string;
+};
+
 export type PlaythroughNodeKind =
   | "opening"
   | "turn"
@@ -153,6 +162,7 @@ export type GameState = {
   phase?: "setup" | "playing" | "ending" | "ended";
   endingState?: EndingState | null;
   lastEndingJudgeResult?: EndingAdjudication | null;
+  lastEndingJudgeDecision?: EndingJudgeDecision | null;
   roundInputState?: RoundInputState | null;
   storyControlMode?: StoryControlMode | null;
 };

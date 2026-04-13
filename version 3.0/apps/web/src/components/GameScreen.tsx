@@ -53,6 +53,7 @@ type GameScreenProps = {
   sessionBootstrapState: SessionBootstrapPanelState | null;
   isPreparingRound: boolean;
   isSubmittingTurn: boolean;
+  isInjectingManualNarration: boolean;
   isSendingPrivateChat: boolean;
   isUpdatingStoryControl: boolean;
   autoCommitCountdown: number | null;
@@ -70,6 +71,7 @@ type GameScreenProps = {
   onContinueFromNode: (nodeId: string) => Promise<void>;
   onLoadSavedGame: (record: SavedGameRecord) => Promise<void>;
   onQuickEndingTest: () => Promise<void>;
+  onSubmitManualNarration: (narrationText: string) => Promise<boolean>;
   onSaveGame: () => Promise<void>;
   onSendPrivateChat: (targetParticipantId: string, content: string) => Promise<boolean>;
   onStoryControlModeChange: (mode: StoryControlMode) => Promise<void>;
@@ -118,6 +120,7 @@ export function GameScreen(props: GameScreenProps) {
     sessionBootstrapState,
     isPreparingRound,
     isSubmittingTurn,
+    isInjectingManualNarration,
     isSendingPrivateChat,
     isUpdatingStoryControl,
     autoCommitCountdown,
@@ -135,6 +138,7 @@ export function GameScreen(props: GameScreenProps) {
     onContinueFromNode,
     onLoadSavedGame,
     onQuickEndingTest,
+    onSubmitManualNarration,
     onSaveGame,
     onSendPrivateChat,
     onStoryControlModeChange,
@@ -156,6 +160,7 @@ export function GameScreen(props: GameScreenProps) {
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   const [selectedPrivateChatTargetId, setSelectedPrivateChatTargetId] = useState<string | null>(null);
   const [privateChatDrafts, setPrivateChatDrafts] = useState<Record<string, string>>({});
+  const [manualNarrationDraft, setManualNarrationDraft] = useState("");
   const [generatedPortraits, setGeneratedPortraits] = useState<
     Record<string, ImageGenerationResponse>
   >({});
@@ -212,9 +217,18 @@ export function GameScreen(props: GameScreenProps) {
     isSubmittingTurn ||
     isUpdatingStoryControl ||
     storyAutoMode;
-  const endingJudgeJson = snapshot?.session.gameState.lastEndingJudgeResult
-    ? JSON.stringify(snapshot.session.gameState.lastEndingJudgeResult, null, 2)
-    : text.gameScreen.noEndingJudge;
+  const endingJudgeDecision = snapshot?.session.gameState.lastEndingJudgeDecision ?? null;
+  const endingJudgeJson = endingJudgeDecision
+    ? JSON.stringify(endingJudgeDecision, null, 2)
+    : snapshot?.session.gameState.lastEndingJudgeResult
+      ? JSON.stringify(snapshot.session.gameState.lastEndingJudgeResult, null, 2)
+      : text.gameScreen.noEndingJudge;
+  const endingJudgeStatusLabel = endingJudgeDecision
+    ? endingJudgeDecision.GameOver
+      ? text.gameScreen.endingJudgeGameOverTrue
+      : text.gameScreen.endingJudgeGameOverFalse
+    : text.gameScreen.endingJudgePending;
+  const endingJudgeStatusCopy = endingJudgeDecision?.Reason || text.gameScreen.noEndingJudge;
   const selectedNpc =
     npcRoster.find((npc) => npc.id === selectedNpcId) ?? npcRoster[0] ?? null;
   const canUseQuickEndingTest =
@@ -238,6 +252,12 @@ export function GameScreen(props: GameScreenProps) {
     isSendingPrivateChat ||
     isUpdatingStoryControl ||
     storyAutoMode;
+  const manualNarrationLocked =
+    actionLocked ||
+    isSessionEnded ||
+    isPreparingRound ||
+    isSubmittingTurn ||
+    isInjectingManualNarration;
   const bootstrapProgressPercent = Math.max(
     8,
     Math.min(100, Math.round((sessionBootstrapState?.progress ?? 0.08) * 100))
@@ -317,6 +337,7 @@ export function GameScreen(props: GameScreenProps) {
     setSelectedNpcId(null);
     setSelectedPrivateChatTargetId(null);
     setPrivateChatDrafts({});
+    setManualNarrationDraft("");
     setSidePanelMode("history");
     setSidePanelWidth(420);
     setComposerHeight(240);
@@ -532,6 +553,15 @@ export function GameScreen(props: GameScreenProps) {
     }));
   }
 
+  async function handleManualNarrationSubmit(): Promise<void> {
+    const didSubmit = await onSubmitManualNarration(manualNarrationDraft);
+    if (!didSubmit) {
+      return;
+    }
+
+    setManualNarrationDraft("");
+  }
+
   if (!snapshot) {
     return (
       <section className="panel page-panel">
@@ -718,6 +748,23 @@ export function GameScreen(props: GameScreenProps) {
               >
                 {text.gameScreen.roundRepliesTab}
               </button>
+            </div>
+
+            <div className="game-side-judge-card">
+              <div className="game-side-judge-head">
+                <span className="meta-label">{text.gameScreen.endingJudgeSideLabel}</span>
+                <span
+                  className={`flag-chip ${
+                    endingJudgeDecision?.GameOver ? "flag-chip-warning" : ""
+                  }`}
+                >
+                  {endingJudgeStatusLabel}
+                </span>
+              </div>
+              <div className="summary-text">{endingJudgeStatusCopy}</div>
+              {endingJudgeDecision?.GameOver && endingJudgeDecision.EndingTitle ? (
+                <div className="ai-meta-line">{endingJudgeDecision.EndingTitle}</div>
+              ) : null}
             </div>
 
             <div className="game-side-scroll">
@@ -1192,7 +1239,7 @@ export function GameScreen(props: GameScreenProps) {
                     <div className="button-row">
                       <button
                         className="ghost-button"
-                        disabled={!canUseQuickEndingTest || isSubmittingTurn}
+                        disabled={!canUseQuickEndingTest || isSubmittingTurn || isInjectingManualNarration}
                         onClick={() => void onQuickEndingTest()}
                         type="button"
                       >
@@ -1203,7 +1250,51 @@ export function GameScreen(props: GameScreenProps) {
                 </div>
 
                 <div className="summary-card">
+                  <div className="meta-label">{text.gameScreen.manualNarrationTest}</div>
+                  <div className="summary-text">
+                    {text.gameScreen.manualNarrationTestDescription}
+                  </div>
+                  <label className="field">
+                    <span>{text.gameScreen.manualNarrationInputLabel}</span>
+                    <textarea
+                      disabled={manualNarrationLocked}
+                      onChange={(event) => setManualNarrationDraft(event.target.value)}
+                      placeholder={text.gameScreen.manualNarrationInputPlaceholder}
+                      value={manualNarrationDraft}
+                    />
+                  </label>
+                  <div className="button-row">
+                    <button
+                      className="ghost-button"
+                      disabled={manualNarrationLocked || manualNarrationDraft.trim().length === 0}
+                      onClick={() => void handleManualNarrationSubmit()}
+                      type="button"
+                    >
+                      {isInjectingManualNarration
+                        ? text.gameScreen.manualNarrationSubmitting
+                        : text.gameScreen.manualNarrationSubmit}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="summary-card">
                   <div className="meta-label">{text.gameScreen.endingJudge}</div>
+                  {endingJudgeDecision ? (
+                    <>
+                      <div className="summary-title">
+                        {endingJudgeDecision.GameOver
+                          ? text.gameScreen.endingJudgeGameOverTrue
+                          : text.gameScreen.endingJudgeGameOverFalse}
+                      </div>
+                      <div className="summary-text">{endingJudgeDecision.Reason}</div>
+                      {endingJudgeDecision.GameOver && endingJudgeDecision.EndingTitle ? (
+                        <div className="ai-meta-line">
+                          {endingJudgeDecision.EndingTitle}
+                        </div>
+                      ) : null}
+                      <div className="meta-label">{text.gameScreen.endingJudgeStructuredJson}</div>
+                    </>
+                  ) : null}
                   <pre>{endingJudgeJson}</pre>
                 </div>
 

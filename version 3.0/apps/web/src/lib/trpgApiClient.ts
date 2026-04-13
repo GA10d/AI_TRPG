@@ -15,6 +15,7 @@ import type {
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
   SessionSnapshot,
+  SubmitManualNarrationRequest,
   SubmitTurnRequest,
   UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
@@ -461,6 +462,25 @@ export async function sendPrivateChat(
 ): Promise<SessionSnapshot> {
   try {
     const response = await fetch(`/api/sessions/${sessionId}/private-chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function submitManualNarration(
+  sessionId: string,
+  payload: SubmitManualNarrationRequest
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/manual-narration`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

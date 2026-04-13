@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "GameOver",
+    "Reason",
+    "EndingId",
+    "EndingType",
+    "EndingTitle",
+    "EndingSummary"
+  ],
+  "properties": {
+    "GameOver": {
+      "type": "boolean",
+      "description": "True only if the game has already ended, not if it is merely entering a finale, epilogue, or wrap-up."
+    },
+    "Reason": {
+      "type": "string",
+      "description": "A short explanation in the target language."
+    },
+    "EndingId": {
+      "type": "string",
+      "description": "Use short snake_case when GameOver is true. Use an empty string when GameOver is false."
+    },
+    "EndingType": {
+      "type": "string",
+      "enum": [
+        "",
+        "preset",
+        "hidden",
+        "emergent"
+      ],
+      "description": "Use an empty string when GameOver is false."
+    },
+    "EndingTitle": {
+      "type": "string",
+      "description": "A concise UI-facing ending title in the target language. Use an empty string when GameOver is false."
+    },
+    "EndingSummary": {
+      "type": "string",
+      "description": "A concise UI-facing ending summary in the target language. Use an empty string when GameOver is false."
+    }
+  }
+}

@@ -1794,6 +1794,11 @@ pre {
   color: var(--accent-strong);
 }
 
+.flag-chip-warning {
+  background: rgba(180, 78, 44, 0.16);
+  color: #7a1f17;
+}
+
 .opening-block {
   padding: 16px;
   border-radius: 18px;
@@ -2437,7 +2442,7 @@ pre {
 
 .game-side-panel {
   min-height: 0;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(122, 50, 32, 0.05), transparent 34%),
@@ -2556,6 +2561,22 @@ pre {
   border-color: rgba(122, 50, 32, 0.36);
   background: rgba(122, 50, 32, 0.12);
   color: var(--accent-strong);
+}
+
+.game-side-judge-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 251, 246, 0.9);
+}
+
+.game-side-judge-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .game-composer-actions {

@@ -24,6 +24,7 @@ import {
   loadSaveBundle,
   prepareRound,
   sendPrivateChat,
+  submitManualNarration,
   streamCreateSession,
   streamOpeningPreview,
   submitTurn,
@@ -269,6 +270,7 @@ export function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [isPreparingRound, setIsPreparingRound] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
+  const [isInjectingManualNarration, setIsInjectingManualNarration] = useState(false);
   const [isSendingPrivateChat, setIsSendingPrivateChat] = useState(false);
   const [isUpdatingStoryControl, setIsUpdatingStoryControl] = useState(false);
   const [autoCommitCountdown, setAutoCommitCountdown] = useState<number | null>(null);
@@ -905,6 +907,7 @@ export function App() {
           phase: "playing",
           endingState: null,
           lastEndingJudgeResult: null,
+          lastEndingJudgeDecision: null,
           storyControlMode: playMode === "story_mode" ? "intervene" : null
         }
       },
@@ -1487,6 +1490,58 @@ export function App() {
     });
   }
 
+  async function handleSubmitManualNarration(narrationText: string): Promise<boolean> {
+    if (!snapshot) {
+      setStatus({
+        message: uiText.app.status.startGameFirst,
+        tone: "error"
+      });
+      return false;
+    }
+
+    const trimmedNarration = narrationText.trim();
+    if (!trimmedNarration) {
+      setStatus({
+        message: uiText.app.status.enterManualNarration,
+        tone: "error"
+      });
+      return false;
+    }
+
+    setIsInjectingManualNarration(true);
+    setStatus({
+      message: uiText.app.status.manualNarrationPending,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await submitManualNarration(snapshot.session.id, {
+        narrationText: trimmedNarration
+      });
+      commitSnapshot(nextSnapshot);
+      relinkSnapshot(
+        nextSnapshot,
+        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+      );
+      setStatus({
+        message:
+          nextSnapshot.session.status === "ended"
+            ? uiText.app.status.manualNarrationEnded
+            : uiText.app.status.manualNarrationSuccess,
+        tone: "neutral"
+      });
+      return true;
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+      return false;
+    } finally {
+      setIsInjectingManualNarration(false);
+    }
+  }
+
   async function handleSaveGame(): Promise<void> {
     if (!snapshot) {
       setStatus({
@@ -1969,6 +2024,7 @@ export function App() {
           sessionBootstrapState={sessionBootstrapState}
           isPreparingRound={isPreparingRound}
           isSubmittingTurn={isSubmittingTurn}
+          isInjectingManualNarration={isInjectingManualNarration}
           isSendingPrivateChat={isSendingPrivateChat}
           isUpdatingStoryControl={isUpdatingStoryControl}
           autoCommitCountdown={autoCommitCountdown}
@@ -1988,6 +2044,7 @@ export function App() {
           onContinueFromNode={handleContinueFromNode}
           onLoadSavedGame={handleLoadSavedGame}
           onQuickEndingTest={handleQuickEndingTest}
+          onSubmitManualNarration={handleSubmitManualNarration}
           onSaveGame={handleSaveGame}
           onSendPrivateChat={handleSendPrivateChat}
           onStoryControlModeChange={handleStoryControlModeChange}

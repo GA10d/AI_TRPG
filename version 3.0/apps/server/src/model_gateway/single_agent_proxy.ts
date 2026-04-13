@@ -3,12 +3,14 @@ import { Buffer } from "node:buffer";
 import { estimateModelUsageCost } from "../../../../packages/shared-config/src/index.ts";
 import type { AiGenerationUsage } from "../../../../packages/shared-types/src/index.ts";
 import {
+  buildEndingAdjudicationFromDecision,
   buildEndingJudgeSystemPrompt,
   buildEndingJudgeUserPrompt,
   buildNarratorSystemPrompt,
   buildSessionOpeningTaskText,
   buildTurnTaskText,
-  parseEndingJudgeResult
+  loadEndingJudgeOutputSchema,
+  parseEndingJudgeDecision
 } from "../single_agent/service.ts";
 import { getServerProxyConfig, type ServerProxyConfig } from "./config.ts";
 import type {
@@ -123,6 +125,17 @@ type TextCompletionResult = {
   usage: AiGenerationUsage;
 };
 
+type ChatCompletionResponseFormat =
+  | {
+      type: "json_object";
+    }
+  | {
+      type: "json_schema";
+      name: string;
+      schema: Record<string, unknown>;
+      strict?: boolean;
+    };
+
 function normalizeContent(rawContent: unknown): string {
   if (typeof rawContent === "string") {
     return rawContent.trim();
@@ -225,6 +238,7 @@ async function callChatCompletion(
   messages: ChatMessage[],
   options?: {
     temperature?: number;
+    responseFormat?: ChatCompletionResponseFormat;
   }
 ): Promise<TextCompletionResult> {
   const controller = new AbortController();
@@ -240,6 +254,22 @@ async function callChatCompletion(
 
     if (config.maxTokens !== null) {
       payload.max_tokens = config.maxTokens;
+    }
+
+    if (options?.responseFormat) {
+      payload.response_format =
+        options.responseFormat.type === "json_object"
+          ? {
+              type: "json_object"
+            }
+          : {
+              type: "json_schema",
+              json_schema: {
+                name: options.responseFormat.name,
+                strict: options.responseFormat.strict ?? true,
+                schema: options.responseFormat.schema
+              }
+            };
     }
 
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -272,6 +302,21 @@ async function callChatCompletion(
   } finally {
     clearTimeout(timeoutHandle);
   }
+}
+
+function buildDefaultEndingJudgeDecision() {
+  return {
+    GameOver: false,
+    Reason: "The latest narrator reply does not clearly confirm that the game has already ended.",
+    EndingId: "",
+    EndingType: "",
+    EndingTitle: "",
+    EndingSummary: ""
+  } as const;
+}
+
+function shouldAttemptStrictEndingJudgeSchema(config: ServerProxyConfig): boolean {
+  return config.profileId !== "deepseek" && config.profileId !== "custom-openai-compatible";
 }
 
 function buildInlineOpenAiFileData(content: string, mimeType: string = "text/plain"): string {
@@ -837,50 +882,63 @@ export async function judgeEndingViaServerProxy(
     runtimeModelConfig: input.runtimeModelConfig
   });
   const systemPrompt = await buildEndingJudgeSystemPrompt(input.locale);
-  const completion = await callChatCompletion(
-    config,
-    [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: buildEndingJudgeUserPrompt({
-          locale: input.locale,
-          round: input.round,
-          narrationText: input.narrationText
-        })
-      }
-    ],
+  const messages: ChatMessage[] = [
     {
-      temperature: 0
+      role: "system",
+      content: systemPrompt
+    },
+    {
+      role: "user",
+      content: buildEndingJudgeUserPrompt({
+        locale: input.locale,
+        round: input.round,
+        narrationText: input.narrationText
+      })
     }
-  );
+  ];
 
-  let adjudication;
-  try {
-    adjudication = parseEndingJudgeResult(completion.text);
-  } catch {
-    adjudication = {
-      isGameOver: false,
-      endingState: null,
-      adjudicationSource: "single_agent" as const
-    };
+  let completion: TextCompletionResult | null = null;
+  let judgeDecision = null;
+
+  if (shouldAttemptStrictEndingJudgeSchema(config)) {
+    try {
+      const outputSchema = await loadEndingJudgeOutputSchema();
+      completion = await callChatCompletion(config, messages, {
+        temperature: 0,
+        responseFormat: {
+          type: "json_schema",
+          name: "ending_judge_decision",
+          schema: outputSchema,
+          strict: true
+        }
+      });
+      judgeDecision = parseEndingJudgeDecision(completion.text);
+    } catch {
+      completion = null;
+      judgeDecision = null;
+    }
   }
 
-  if (adjudication.endingState) {
-    adjudication = {
-      ...adjudication,
-      endingState: {
-        ...adjudication.endingState,
-        confirmedAtRound: input.round
+  if (!completion || !judgeDecision) {
+    completion = await callChatCompletion(config, messages, {
+      temperature: 0,
+      responseFormat: {
+        type: "json_object"
       }
-    };
+    });
   }
+
+  try {
+    judgeDecision ??= parseEndingJudgeDecision(completion.text);
+  } catch {
+    judgeDecision = buildDefaultEndingJudgeDecision();
+  }
+
+  const adjudication = buildEndingAdjudicationFromDecision(judgeDecision, input.round);
 
   return {
     adjudication,
+    judgeDecision,
     rawText: completion.text,
     provider: `${config.providerLabel}:${config.model}`,
     mode: "server_proxy",

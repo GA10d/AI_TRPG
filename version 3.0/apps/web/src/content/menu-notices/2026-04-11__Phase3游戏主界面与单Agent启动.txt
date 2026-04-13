@@ -1,16 +1,16 @@
 本轮更新聚焦“进入游戏后的核心游玩体验”。
 
 1. 游戏主界面改成了以叙事阅读和行动输入为中心的布局。
-保存、读档、NPC 和详情都保留在主界面一级入口，不再把所有参数和调试信息直接堆在主视图里。
+保存、读档、NPC 和详情都保留在主界面的一线入口，不再把所有参数和调试信息直接堆在主视图里。
 
-2. 运行时切换为 Narrator + Ending Judge 的 MVP 双 Agent 结构。
-Narrator 负责输出玩家可见的叙事文本，Ending Judge 每轮只读取 Narrator 的本轮回答，判断是否进入结局。
+2. 运行时切换为 Narrator + Ending Judge 的 MVP 单 Agent 结构。
+Narrator 负责输出玩家可见的叙事文本，Ending Judge 每轮只读取 Narrator 的本轮回复，判断当前是否已经真正结束。
 
-3. 单 Agent Prompt 目录补齐。
-Narrator 现在使用 single_agent/narrator_prompt.txt，结局判定使用新增的 single_agent/ending_judge_prompt.txt。
+3. 单 Agent Prompt 目录继续拆分。
+Narrator 使用 `single_agent/narrator_prompt.txt`，结局判定改为使用 `ending_judge/system_prompt.txt` 和 `ending_judge/output_schema.json`。
 
-4. 正式开局链路更新。
-进入游戏时会把 rule.txt、story.txt 和玩家在 beginning/角色创建阶段填写的文本一起交给 Narrator，生成真正的首条可游玩叙事。
+4. 正式开局链路已经接上。
+进入游戏时会把 `rule.txt`、`story.txt` 和玩家在 beginning / 角色创建阶段填写的文本一起交给 Narrator，生成真正的首条可游玩叙事。
 
 5. NPC 档案入口和文生图接口底座已经搭起。
-NPC 页面现在会读取剧本目录中的 npc_prompt 文档，图片生成 pipeline 也已经接入基础 provider 配置和 prompt 模板配置，为后续立绘与场景图扩展做准备。
+NPC 页面现在会读取剧本目录中的 `npc_prompt` 文档，图片生成 pipeline 也已经接入基础 provider 配置和 prompt 模板配置，为后续立绘与场景图扩展做准备。

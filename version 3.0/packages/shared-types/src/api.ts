@@ -114,6 +114,10 @@ export type UpdateStoryControlModeRequest = {
   mode: StoryControlMode;
 };
 
+export type SubmitManualNarrationRequest = {
+  narrationText: string;
+};
+
 export type LoadSaveRequest = {
   saveBundle: SaveBundle;
 };

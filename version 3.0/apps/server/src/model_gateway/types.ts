@@ -1,6 +1,7 @@
 import type {
   AiGenerationMetadata,
   EndingAdjudication,
+  EndingJudgeDecision,
   LocaleCode,
   ModelAccessMode,
   RuntimeModelConfigInput
@@ -70,6 +71,7 @@ export type EndingJudgeInput = {
 
 export type EndingJudgeOutput = {
   adjudication: EndingAdjudication;
+  judgeDecision: EndingJudgeDecision;
   provider: string;
   mode: ModelAccessMode;
   meta: AiGenerationMetadata;
