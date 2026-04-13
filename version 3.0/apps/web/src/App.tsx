@@ -80,6 +80,7 @@ const SESSION_BOOTSTRAP_STAGE_ORDER: SessionBootstrapVisualStage[] = [
   "waiting_first_reply",
   "finalizing_session"
 ];
+const AUTO_COMMIT_COUNTDOWN_SECONDS = 3;
 
 function buildSessionBootstrapPanelState(text: UiText, input: {
   coverAssetUrl: string | null;
@@ -270,6 +271,7 @@ export function App() {
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
   const [isSendingPrivateChat, setIsSendingPrivateChat] = useState(false);
   const [isUpdatingStoryControl, setIsUpdatingStoryControl] = useState(false);
+  const [autoCommitCountdown, setAutoCommitCountdown] = useState<number | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -375,6 +377,7 @@ export function App() {
   useEffect(() => {
     autoPreparedRoundKeyRef.current = null;
     autoCommittedRoundKeyRef.current = null;
+    setAutoCommitCountdown(null);
   }, [snapshot?.session.id]);
 
   useEffect(() => {
@@ -568,22 +571,28 @@ export function App() {
 
   useEffect(() => {
     if (!snapshot || view !== "game") {
+      setAutoCommitCountdown(null);
       return;
     }
 
     if (snapshot.session.partySetup?.primaryPlayerMode !== "ai") {
+      setAutoCommitCountdown(null);
       return;
     }
 
     if ((snapshot.session.gameState.storyControlMode ?? "intervene") !== "auto") {
+      autoCommittedRoundKeyRef.current = null;
+      setAutoCommitCountdown(null);
       return;
     }
 
     if (snapshot.session.status === "ended") {
+      setAutoCommitCountdown(null);
       return;
     }
 
     if (snapshot.session.gameState.roundInputState?.phase !== "ready_to_commit") {
+      setAutoCommitCountdown(null);
       return;
     }
 
@@ -596,6 +605,7 @@ export function App() {
       isSendingPrivateChat ||
       isUpdatingStoryControl
     ) {
+      setAutoCommitCountdown(null);
       return;
     }
 
@@ -604,7 +614,25 @@ export function App() {
       return;
     }
 
+    if (autoCommitCountdown === null) {
+      setAutoCommitCountdown(AUTO_COMMIT_COUNTDOWN_SECONDS);
+      return;
+    }
+
+    if (autoCommitCountdown > 0) {
+      const countdownHandle = window.setTimeout(() => {
+        setAutoCommitCountdown((current) =>
+          current === null ? null : Math.max(current - 1, 0)
+        );
+      }, 1000);
+
+      return () => {
+        window.clearTimeout(countdownHandle);
+      };
+    }
+
     autoCommittedRoundKeyRef.current = autoCommitKey;
+    setAutoCommitCountdown(null);
 
     void commitPreparedRoundDrafts(snapshot, {
       pendingMessage: uiText.app.status.autoRoundSubmitting,
@@ -614,10 +642,11 @@ export function App() {
         turnInput.trim() || getPreparedPrimaryDraft(snapshot)?.content || undefined
     }).then((didCommit) => {
       if (!didCommit && autoCommittedRoundKeyRef.current === autoCommitKey) {
-        autoCommittedRoundKeyRef.current = null;
+        autoCommittedRoundKeyRef.current = autoCommitKey;
       }
     });
   }, [
+    autoCommitCountdown,
     isBootstrappingSession,
     isCreating,
     isOpeningRevealInProgress,
@@ -1942,6 +1971,7 @@ export function App() {
           isSubmittingTurn={isSubmittingTurn}
           isSendingPrivateChat={isSendingPrivateChat}
           isUpdatingStoryControl={isUpdatingStoryControl}
+          autoCommitCountdown={autoCommitCountdown}
           isSaving={isSaving}
           savedGames={savedGames}
           isRestoring={isRestoring}

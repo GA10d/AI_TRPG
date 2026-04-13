@@ -381,6 +381,8 @@ export const enUs = {
       `Prepared ${count} party drafts. Commit them together when ready.`,
     storyAutoHint:
       "Auto play is active. The AI protagonist and teammates will commit this round automatically once their drafts are ready.",
+    storyAutoCountdownHint: (seconds: number) =>
+      `Auto play will commit in ${seconds}s. You can still switch back to Player Intervene before it fires.`,
     storyInterveneHint:
       "The AI protagonist drafts after the narration settles, and you can revise that main draft before committing.",
     aiDraftHint:
@@ -390,6 +392,7 @@ export const enUs = {
     submitTurnHint: "Submit this turn.",
     autoSubmittingRound: "Auto committing...",
     autoRunning: "Auto Running",
+    autoCommitCountdown: (seconds: number) => `Auto commit in ${seconds}s`,
     initPlaceholder: "Session is initializing. You can act once the formal opening finishes.",
     draftingPlaceholder: "AI teammates are drafting their public replies for this round...",
     aiDraftPlaceholder: "The AI protagonist will draft the next move here after the narration settles.",

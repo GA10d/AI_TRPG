@@ -55,6 +55,7 @@ type GameScreenProps = {
   isSubmittingTurn: boolean;
   isSendingPrivateChat: boolean;
   isUpdatingStoryControl: boolean;
+  autoCommitCountdown: number | null;
   isSaving: boolean;
   isRestoring: boolean;
   isResumingBranch: boolean;
@@ -119,6 +120,7 @@ export function GameScreen(props: GameScreenProps) {
     isSubmittingTurn,
     isSendingPrivateChat,
     isUpdatingStoryControl,
+    autoCommitCountdown,
     isSaving,
     isRestoring,
     isResumingBranch,
@@ -249,7 +251,9 @@ export function GameScreen(props: GameScreenProps) {
     ? isPreparingRound
       ? text.gameScreen.preparingRoundHint
       : storyAutoMode
-        ? isSubmittingTurn
+        ? autoCommitCountdown !== null
+          ? text.gameScreen.storyAutoCountdownHint(autoCommitCountdown)
+          : isSubmittingTurn
           ? text.gameScreen.autoSubmittingRound
           : text.gameScreen.storyAutoHint
         : roundInputState
@@ -261,7 +265,9 @@ export function GameScreen(props: GameScreenProps) {
       ? text.gameScreen.inputLocked
       : text.gameScreen.submitTurnHint;
   const submitButtonLabel = storyAutoMode
-    ? isPreparingRound
+    ? autoCommitCountdown !== null
+      ? text.gameScreen.autoCommitCountdown(autoCommitCountdown)
+      : isPreparingRound
       ? text.gameScreen.preparingRound
       : isSubmittingTurn
         ? text.gameScreen.autoSubmittingRound
