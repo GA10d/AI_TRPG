@@ -165,6 +165,13 @@ export const enUs = {
       enterPrivateChat: "Enter a private message first.",
       sendingPrivateChat: "Sending the private chat...",
       privateChatSent: "Private chat delivered.",
+      storyControlSwitching: "Switching the story-mode control flow...",
+      storyControlAutoEnabled: "Story mode is now set to auto play. Upcoming rounds will prepare and commit automatically.",
+      storyControlInterveneEnabled: "Story mode is now set to player intervene. You can edit the AI protagonist draft again.",
+      autoRoundSubmitting: "Auto play is committing this round now...",
+      autoModeSubmitLocked: "Auto play is active, so manual submission is disabled.",
+      privateChatAutoModeUnavailable:
+        "Private chat is unavailable during auto play. Switch back to player intervene first.",
       turnComplete: "This turn has been completed.",
       turnCompleteEnded: "This turn has been completed and the session has entered an ending.",
       createSessionPending: "Entering the game and creating the session...",
@@ -365,19 +372,30 @@ export const enUs = {
     editableDraftBadge: "Editable",
     yourAction: "Your Action",
     actionTitle: "Enter the next action or line of dialogue",
+    storyControlLabel: "Story Control",
+    storyControlAuto: "Auto Play",
+    storyControlIntervene: "Player Intervene",
     inputLocked: "Input is locked until the scene is ready.",
     preparingRoundHint: "AI teammates are drafting the round right now.",
     commitRoundHint: (count: number) =>
       `Prepared ${count} party drafts. Commit them together when ready.`,
+    storyAutoHint:
+      "Auto play is active. The AI protagonist and teammates will commit this round automatically once their drafts are ready.",
+    storyInterveneHint:
+      "The AI protagonist drafts after the narration settles, and you can revise that main draft before committing.",
     aiDraftHint:
       "The AI protagonist drafts automatically after the narration settles. You can revise the main draft here before committing.",
     prepareRoundHint:
       "Prepare the round first so AI teammates can react before everything is submitted together.",
     submitTurnHint: "Submit this turn.",
+    autoSubmittingRound: "Auto committing...",
+    autoRunning: "Auto Running",
     initPlaceholder: "Session is initializing. You can act once the formal opening finishes.",
     draftingPlaceholder: "AI teammates are drafting their public replies for this round...",
     aiDraftPlaceholder: "The AI protagonist will draft the next move here after the narration settles.",
     aiDraftWaiting: "Waiting for the AI protagonist and teammates to finish drafting this round.",
+    autoModeLockedInput:
+      "Auto play uses the prepared AI draft directly. Switch to Player Intervene if you want to edit it.",
     actionPlaceholder:
       "For example: I examine the marks behind the door first, then ask why this happened at this exact time.",
     prepareRound: "Prepare Round",

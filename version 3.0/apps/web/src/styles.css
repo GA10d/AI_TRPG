@@ -2558,6 +2558,19 @@ pre {
   color: var(--accent-strong);
 }
 
+.game-composer-actions {
+  align-items: flex-end;
+}
+
+.game-story-control {
+  display: grid;
+  gap: 8px;
+}
+
+.game-story-control .meta-label {
+  margin-bottom: 0;
+}
+
 .game-resizer {
   position: relative;
   z-index: 2;

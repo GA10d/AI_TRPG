@@ -22,7 +22,9 @@ import type {
   SessionAiCompanion,
   SessionContentSummary,
   SessionSnapshot,
-  SubmitTurnRequest
+  StoryControlMode,
+  SubmitTurnRequest,
+  UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
 import {
   generateAiPrivateChatReply,
@@ -146,6 +148,25 @@ function buildPrivateThreadContext(
       return `${sender}: ${message.content}`;
     })
     .join("\n");
+}
+
+function buildRelevantPrivateContextForParticipant(
+  session: Session,
+  messages: Message[],
+  participantId: string
+): string {
+  if (!(session.companionParticipantIds ?? []).includes(participantId)) {
+    return "No relevant private chat history for this character.";
+  }
+
+  const localHumanParticipant = findLocalHumanParticipant(session);
+  const threadId = buildPrivateChatThreadId(localHumanParticipant.id, participantId);
+  const threadContext = buildPrivateThreadContext(session, messages, threadId);
+
+  return [
+    `Private chat with ${localHumanParticipant.displayName}:`,
+    threadContext
+  ].join("\n");
 }
 
 function findPrimaryPlayerParticipant(session: Session): Participant {
@@ -462,7 +483,8 @@ async function createSessionSnapshotInternal(
       phase: "playing",
       endingState: null,
       lastEndingJudgeResult: null,
-      roundInputState: null
+      roundInputState: null,
+      storyControlMode: primaryPlayerMode === "ai" ? "intervene" : null
     }
   };
 
@@ -670,6 +692,11 @@ export async function prepareRound(
       personalityTags: [],
       participants: current.session.participants,
       messages: current.messages,
+      privateContext: buildRelevantPrivateContextForParticipant(
+        current.session,
+        current.messages,
+        primaryParticipant.id
+      ),
       preparedInputs: []
     });
 
@@ -694,6 +721,11 @@ export async function prepareRound(
         personalityTags: companionTagMap.get(participant.id) ?? [],
         participants: current.session.participants,
         messages: current.messages,
+        privateContext: buildRelevantPrivateContextForParticipant(
+          current.session,
+          current.messages,
+          participant.id
+        ),
         preparedInputs: preparedDrafts
       })
     )
@@ -929,6 +961,36 @@ export async function commitPreparedRound(
   }));
 }
 
+export async function updateStoryControlMode(
+  sessionId: string,
+  request: UpdateStoryControlModeRequest,
+  store: InMemorySessionStore
+): Promise<SessionSnapshot | null> {
+  const current = store.get(sessionId);
+  if (!current) {
+    return null;
+  }
+
+  if (current.session.partySetup?.primaryPlayerMode !== "ai") {
+    throw new Error("Story control mode is only available when the primary player is AI-controlled.");
+  }
+
+  const nextMode: StoryControlMode = request.mode === "auto" ? "auto" : "intervene";
+  const timestamp = nowIso();
+
+  return store.update(sessionId, () => ({
+    ...current,
+    session: {
+      ...current.session,
+      updatedAt: timestamp,
+      gameState: {
+        ...current.session.gameState,
+        storyControlMode: nextMode
+      }
+    }
+  }));
+}
+
 export async function sendPrivateChat(
   sessionId: string,
   request: SendPrivateChatRequest,
@@ -946,6 +1008,13 @@ export async function sendPrivateChat(
 
   if (current.session.status === "ended") {
     throw new Error("The current session has already reached an ending and cannot send private chat.");
+  }
+
+  if (
+    current.session.partySetup?.primaryPlayerMode === "ai" &&
+    current.session.gameState.storyControlMode === "auto"
+  ) {
+    throw new Error("Private chat is disabled while story mode is set to automatic play.");
   }
 
   const localHumanParticipant = findLocalHumanParticipant(current.session);

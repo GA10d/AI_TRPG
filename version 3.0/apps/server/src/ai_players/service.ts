@@ -16,16 +16,42 @@ function buildSpeakerLabel(
   senderId: string,
   kind: Message["kind"]
 ): string {
-  const participant = participants.find((item) => item.id === senderId);
-  if (participant) {
-    return participant.displayName;
-  }
-
   if (kind === "gm_narration" || kind === "gm_dialogue") {
     return "Narrator";
   }
 
+  const participant = participants.find((item) => item.id === senderId);
+  if (participant) {
+    if (participant.role === "human_player") {
+      return participant.isLocalUser
+        ? `Human Player - ${participant.displayName}`
+        : participant.displayName;
+    }
+
+    if (participant.role === "ai_player") {
+      return `AI Character - ${participant.displayName}`;
+    }
+
+    return participant.displayName;
+  }
+
   return "Unknown";
+}
+
+function inferMessageChannel(message: Message): Message["channel"] {
+  if (message.channel) {
+    return message.channel;
+  }
+
+  if (message.visibility === "system" || message.kind === "system") {
+    return "system";
+  }
+
+  if (message.visibility === "private" || message.kind === "private_chat") {
+    return "private_chat";
+  }
+
+  return "public_story";
 }
 
 function buildPublicStoryContext(
@@ -34,7 +60,7 @@ function buildPublicStoryContext(
   maxMessages = 12
 ): string {
   const visibleMessages = messages
-    .filter((message) => message.visibility === "public")
+    .filter((message) => inferMessageChannel(message) === "public_story")
     .slice(-maxMessages);
 
   if (!visibleMessages.length) {
@@ -55,7 +81,14 @@ function buildPreparedInputSummary(drafts: RoundDraft[]): string {
   }
 
   return drafts
-    .map((draft) => `${draft.displayName}: ${draft.content}`)
+    .map((draft) => {
+      const label = draft.isPrimary
+        ? draft.source === "ai"
+          ? `AI Protagonist - ${draft.displayName}`
+          : `Primary Player - ${draft.displayName}`
+        : `AI Teammate - ${draft.displayName}`;
+      return `${label}: ${draft.content}`;
+    })
     .join("\n");
 }
 
@@ -74,6 +107,7 @@ function buildAiRoundUserPrompt(input: {
   participant: Participant;
   isPrimary: boolean;
   publicStoryContext: string;
+  privateContext: string;
   preparedInputs: RoundDraft[];
   personalityTags: AiPersonalityTag[];
 }): string {
@@ -95,6 +129,9 @@ function buildAiRoundUserPrompt(input: {
     "",
     "Public story context:",
     input.publicStoryContext,
+    "",
+    "Relevant private chat context for this character:",
+    input.privateContext,
     "",
     "Already prepared party actions for this round:",
     buildPreparedInputSummary(input.preparedInputs),
@@ -151,6 +188,7 @@ export async function generateAiRoundDraft(input: {
   personalityTags: AiPersonalityTag[];
   participants: Participant[];
   messages: Message[];
+  privateContext?: string;
   preparedInputs: RoundDraft[];
 }): Promise<RoundDraft> {
   const modelGateway = getModelGateway(input.accessMode);
@@ -159,6 +197,7 @@ export async function generateAiRoundDraft(input: {
     personalityTags: input.personalityTags
   });
   const publicStoryContext = buildPublicStoryContext(input.messages, input.participants);
+  const privateContext = input.privateContext?.trim() || "No relevant private chat history.";
   const result = await modelGateway.generatePromptedText({
     accessMode: input.accessMode,
     modelProfileId: input.modelProfileId,
@@ -172,6 +211,7 @@ export async function generateAiRoundDraft(input: {
       participant: input.participant,
       isPrimary: input.isPrimary,
       publicStoryContext,
+      privateContext,
       preparedInputs: input.preparedInputs,
       personalityTags: input.personalityTags
     })

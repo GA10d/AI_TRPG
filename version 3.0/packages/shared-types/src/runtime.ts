@@ -48,6 +48,10 @@ export type MessageChannel =
   | "private_chat"
   | "system";
 
+export type StoryControlMode =
+  | "auto"
+  | "intervene";
+
 export type EndingType =
   | "preset"
   | "hidden"
@@ -150,6 +154,7 @@ export type GameState = {
   endingState?: EndingState | null;
   lastEndingJudgeResult?: EndingAdjudication | null;
   roundInputState?: RoundInputState | null;
+  storyControlMode?: StoryControlMode | null;
 };
 
 export type Session = {

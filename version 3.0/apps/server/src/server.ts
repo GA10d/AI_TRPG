@@ -21,7 +21,8 @@ import type {
   PrepareRoundRequest,
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
-  SubmitTurnRequest
+  SubmitTurnRequest,
+  UpdateStoryControlModeRequest
 } from "../../../packages/shared-types/src/index.ts";
 import {
   loadContentCatalog,
@@ -45,7 +46,8 @@ import {
   loadSessionFromSaveBundle,
   prepareRound,
   sendPrivateChat,
-  submitTurn
+  submitTurn,
+  updateStoryControlMode
 } from "./session/index.ts";
 import { InMemorySessionStore } from "./session/store.ts";
 import {
@@ -502,6 +504,27 @@ async function handleApiRequest(
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/private-chat", "");
     const payload = await readJsonBody<SendPrivateChatRequest>(request);
     const snapshot = await sendPrivateChat(sessionId, payload, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/story-control") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/story-control", "");
+    const payload = await readJsonBody<UpdateStoryControlModeRequest>(request);
+    const snapshot = await updateStoryControlMode(sessionId, payload, store);
 
     if (!snapshot) {
       sendJson(response, 404, {

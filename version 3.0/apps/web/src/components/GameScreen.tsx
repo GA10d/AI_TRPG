@@ -14,7 +14,8 @@ import type {
   NpcRosterEntry,
   PlaythroughGraphBundle,
   RuntimeImageModelConfigInput,
-  SessionSnapshot
+  SessionSnapshot,
+  StoryControlMode
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchNpcRoster, generateSceneImage } from "../lib/trpgApiClient.ts";
 import { useUiText } from "../locales/index.tsx";
@@ -53,12 +54,14 @@ type GameScreenProps = {
   isPreparingRound: boolean;
   isSubmittingTurn: boolean;
   isSendingPrivateChat: boolean;
+  isUpdatingStoryControl: boolean;
   isSaving: boolean;
   isRestoring: boolean;
   isResumingBranch: boolean;
   savedGames: SavedGameRecord[];
   showAiMetadata: boolean;
   markdownFontSize: MarkdownFontSizePreset;
+  storyControlMode: StoryControlMode | null;
   imageProfileId: string;
   runtimeImageModelConfig: RuntimeImageModelConfigInput;
   imagePromptTemplateConfig: ImagePromptTemplateConfig | null;
@@ -68,6 +71,7 @@ type GameScreenProps = {
   onQuickEndingTest: () => Promise<void>;
   onSaveGame: () => Promise<void>;
   onSendPrivateChat: (targetParticipantId: string, content: string) => Promise<boolean>;
+  onStoryControlModeChange: (mode: StoryControlMode) => Promise<void>;
   onTurnInputChange: (value: string) => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -114,12 +118,14 @@ export function GameScreen(props: GameScreenProps) {
     isPreparingRound,
     isSubmittingTurn,
     isSendingPrivateChat,
+    isUpdatingStoryControl,
     isSaving,
     isRestoring,
     isResumingBranch,
     savedGames,
     showAiMetadata,
     markdownFontSize,
+    storyControlMode,
     imageProfileId,
     runtimeImageModelConfig,
     imagePromptTemplateConfig,
@@ -129,6 +135,7 @@ export function GameScreen(props: GameScreenProps) {
     onQuickEndingTest,
     onSaveGame,
     onSendPrivateChat,
+    onStoryControlModeChange,
     onTurnInputChange,
     onSubmitTurn
   } = props;
@@ -188,12 +195,21 @@ export function GameScreen(props: GameScreenProps) {
     : publicStoryMessages.slice(-8);
   const isSessionEnded = snapshot?.session.status === "ended";
   const primaryPlayerMode = snapshot?.session.partySetup?.primaryPlayerMode ?? "human";
+  const resolvedStoryControlMode =
+    primaryPlayerMode === "ai" ? storyControlMode ?? "intervene" : null;
+  const storyAutoMode = resolvedStoryControlMode === "auto";
   const roundPreparationRequired =
     primaryPlayerMode === "ai" || (snapshot?.session.companionParticipantIds?.length ?? 0) > 0;
   const roundInputState = snapshot?.session.gameState.roundInputState ?? null;
   const roundDrafts = roundInputState?.drafts ?? [];
   const primaryDraft = roundDrafts.find((draft) => draft.isPrimary) ?? null;
-  const composerDisabled = isSessionEnded || actionLocked || isPreparingRound || isSubmittingTurn;
+  const composerDisabled =
+    isSessionEnded ||
+    actionLocked ||
+    isPreparingRound ||
+    isSubmittingTurn ||
+    isUpdatingStoryControl ||
+    storyAutoMode;
   const endingJudgeJson = snapshot?.session.gameState.lastEndingJudgeResult
     ? JSON.stringify(snapshot.session.gameState.lastEndingJudgeResult, null, 2)
     : text.gameScreen.noEndingJudge;
@@ -205,8 +221,21 @@ export function GameScreen(props: GameScreenProps) {
     !roundPreparationRequired &&
     !isPreparingRound &&
     !actionLocked;
+  const storyControlLocked =
+    actionLocked ||
+    isSessionEnded ||
+    isPreparingRound ||
+    isSubmittingTurn ||
+    isSendingPrivateChat ||
+    isUpdatingStoryControl;
   const privateChatLocked =
-    actionLocked || isSessionEnded || isPreparingRound || isSubmittingTurn || isSendingPrivateChat;
+    actionLocked ||
+    isSessionEnded ||
+    isPreparingRound ||
+    isSubmittingTurn ||
+    isSendingPrivateChat ||
+    isUpdatingStoryControl ||
+    storyAutoMode;
   const bootstrapProgressPercent = Math.max(
     8,
     Math.min(100, Math.round((sessionBootstrapState?.progress ?? 0.08) * 100))
@@ -219,15 +248,25 @@ export function GameScreen(props: GameScreenProps) {
   const composerHint = roundPreparationRequired
     ? isPreparingRound
       ? text.gameScreen.preparingRoundHint
-      : roundInputState
+      : storyAutoMode
+        ? isSubmittingTurn
+          ? text.gameScreen.autoSubmittingRound
+          : text.gameScreen.storyAutoHint
+        : roundInputState
         ? text.gameScreen.commitRoundHint(roundDrafts.length)
         : primaryPlayerMode === "ai"
-          ? text.gameScreen.aiDraftHint
+          ? text.gameScreen.storyInterveneHint
           : text.gameScreen.prepareRoundHint
     : composerDisabled
       ? text.gameScreen.inputLocked
       : text.gameScreen.submitTurnHint;
-  const submitButtonLabel = roundPreparationRequired
+  const submitButtonLabel = storyAutoMode
+    ? isPreparingRound
+      ? text.gameScreen.preparingRound
+      : isSubmittingTurn
+        ? text.gameScreen.autoSubmittingRound
+        : text.gameScreen.autoRunning
+    : roundPreparationRequired
     ? isPreparingRound
       ? text.gameScreen.preparingRound
       : isSubmittingTurn
@@ -242,6 +281,8 @@ export function GameScreen(props: GameScreenProps) {
     ? text.gameScreen.initPlaceholder
     : isPreparingRound
       ? text.gameScreen.draftingPlaceholder
+      : storyAutoMode
+        ? text.gameScreen.autoModeLockedInput
       : primaryPlayerMode === "ai" && !primaryDraft
         ? text.gameScreen.aiDraftPlaceholder
         : text.gameScreen.actionPlaceholder;
@@ -306,6 +347,11 @@ export function GameScreen(props: GameScreenProps) {
       return;
     }
 
+    if (storyAutoMode) {
+      setActiveDrawer("none");
+      return;
+    }
+
     if (!companionParticipants.length) {
       setSelectedPrivateChatTargetId(null);
       return;
@@ -316,7 +362,7 @@ export function GameScreen(props: GameScreenProps) {
         ? current
         : companionParticipants[0]?.id ?? null
     );
-  }, [activeDrawer, companionParticipants]);
+  }, [activeDrawer, companionParticipants, storyAutoMode]);
 
   useEffect(() => {
     if (activeDrawer !== "npcs" || !snapshot || actionLocked) {
@@ -541,7 +587,7 @@ export function GameScreen(props: GameScreenProps) {
           {companionParticipants.length ? (
             <button
               className="ghost-button"
-              disabled={actionLocked}
+              disabled={actionLocked || storyAutoMode}
               onClick={() => setActiveDrawer("private_chat")}
               type="button"
             >
@@ -777,7 +823,34 @@ export function GameScreen(props: GameScreenProps) {
             onChange={(event) => onTurnInputChange(event.target.value)}
           />
 
-          <div className="button-row">
+          <div className="button-row game-composer-actions">
+            {primaryPlayerMode === "ai" ? (
+              <div className="game-story-control">
+                <div className="meta-label">{text.gameScreen.storyControlLabel}</div>
+                <div className="game-panel-toggle-row">
+                  <button
+                    className={`game-panel-toggle ${
+                      resolvedStoryControlMode === "auto" ? "game-panel-toggle-active" : ""
+                    }`}
+                    disabled={storyControlLocked}
+                    onClick={() => void onStoryControlModeChange("auto")}
+                    type="button"
+                  >
+                    {text.gameScreen.storyControlAuto}
+                  </button>
+                  <button
+                    className={`game-panel-toggle ${
+                      resolvedStoryControlMode === "intervene" ? "game-panel-toggle-active" : ""
+                    }`}
+                    disabled={storyControlLocked}
+                    onClick={() => void onStoryControlModeChange("intervene")}
+                    type="button"
+                  >
+                    {text.gameScreen.storyControlIntervene}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <button
               className="primary-button"
               disabled={isSubmittingTurn || composerDisabled}

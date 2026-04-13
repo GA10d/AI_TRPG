@@ -15,7 +15,8 @@ import type {
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
   SessionSnapshot,
-  SubmitTurnRequest
+  SubmitTurnRequest,
+  UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
 
 type OpeningPreviewStreamEvent =
@@ -460,6 +461,25 @@ export async function sendPrivateChat(
 ): Promise<SessionSnapshot> {
   try {
     const response = await fetch(`/api/sessions/${sessionId}/private-chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function updateStoryControlMode(
+  sessionId: string,
+  payload: UpdateStoryControlModeRequest
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/story-control`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

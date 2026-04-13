@@ -14,6 +14,7 @@ import type {
   Session,
   SessionContentSummary
 } from "./runtime.ts";
+import type { StoryControlMode } from "./runtime.ts";
 
 export type RuntimeModelConfigInput = {
   apiKey?: string;
@@ -107,6 +108,10 @@ export type CommitRoundRequest = {
 export type SendPrivateChatRequest = {
   targetParticipantId: string;
   content: string;
+};
+
+export type UpdateStoryControlModeRequest = {
+  mode: StoryControlMode;
 };
 
 export type LoadSaveRequest = {
