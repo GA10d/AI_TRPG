@@ -10,9 +10,13 @@ import {
   toLanguageOptionPayload
 } from "../../../packages/shared-config/src/index.ts";
 import type {
+  AppendPersistedComicPageRequest,
   BootstrapResponse,
   CharacterConceptAssistRequest,
   CommitRoundRequest,
+  ComicMetadataGenerationRequest,
+  ComicPageGenerationRequest,
+  CreatePersistedComicRequest,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
   GenerateOpeningPreviewResponse,
@@ -40,6 +44,17 @@ import {
   generateImage,
   loadImagePromptTemplateConfig
 } from "./image_generation/service.ts";
+import {
+  appendPersistedComicPage,
+  createPersistedComicProject,
+  deletePersistedComicProject,
+  generateComicMetadata,
+  generateComicPage,
+  listPersistedComicProjects,
+  loadPersistedComicProject,
+  listComicPromptPresets
+} from "./comic_generation/index.ts";
+import { resolveComicAssetAbsolutePath } from "./comic_generation/storage.ts";
 import {
   buildDefaultCreateSessionRequest,
   commitPreparedRound,
@@ -78,6 +93,7 @@ const projectRoot = resolve(currentDir, "../../..");
 const contentRoot = join(projectRoot, "content");
 const webDistRoot = join(projectRoot, "apps", "web", "dist");
 const defaultLocalSaveRoot = join(projectRoot, "local_data", "saves");
+const defaultComicRoot = join(projectRoot, "local_data", "comics");
 const localSettingsPath = join(projectRoot, "local_data", "settings.json");
 const store = new InMemorySessionStore();
 const port = Number(process.env.PORT ?? 4316);
@@ -461,6 +477,95 @@ async function handleApiRequest(
   if (url.pathname === "/api/images/generate" && request.method === "POST") {
     const payload = await readJsonBody<ImageGenerationRequest>(request);
     const result = await generateImage(payload);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/comic-assets/") && request.method === "GET") {
+    const relativeSegments = url.pathname
+      .replace("/api/comic-assets/", "")
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+
+    if (relativeSegments.length < 2) {
+      sendJson(response, 400, {
+        error: "INVALID_COMIC_ASSET_REQUEST",
+        message: "comicId and asset path are required."
+      });
+      return true;
+    }
+
+    const [comicId, ...assetSegments] = relativeSegments;
+    const absolutePath = resolveComicAssetAbsolutePath({
+      comicRoot: defaultComicRoot,
+      comicId,
+      relativePath: assetSegments.join("/")
+    });
+    await serveAbsoluteFile(response, absolutePath, join(defaultComicRoot, comicId));
+    return true;
+  }
+
+  if (url.pathname === "/api/comics/presets" && request.method === "GET") {
+    sendJson(response, 200, await listComicPromptPresets());
+    return true;
+  }
+
+  if (url.pathname === "/api/comics/projects" && request.method === "GET") {
+    sendJson(response, 200, await listPersistedComicProjects(defaultComicRoot));
+    return true;
+  }
+
+  if (url.pathname === "/api/comics/projects" && request.method === "POST") {
+    const payload = await readJsonBody<CreatePersistedComicRequest>(request);
+    const result = await createPersistedComicProject(defaultComicRoot, payload);
+    sendJson(response, 201, result);
+    return true;
+  }
+
+  const comicProjectPagesMatch = url.pathname.match(/^\/api\/comics\/projects\/([^/]+)\/pages$/u);
+  if (comicProjectPagesMatch && request.method === "POST") {
+    const comicId = decodeURIComponent(comicProjectPagesMatch[1]);
+    const payload = await readJsonBody<AppendPersistedComicPageRequest>(request);
+    const result = await appendPersistedComicPage(defaultComicRoot, comicId, payload);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  const comicProjectMatch = url.pathname.match(/^\/api\/comics\/projects\/([^/]+)$/u);
+  if (comicProjectMatch && request.method === "GET") {
+    const comicId = decodeURIComponent(comicProjectMatch[1]);
+    const result = await loadPersistedComicProject(defaultComicRoot, comicId);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (comicProjectMatch && request.method === "DELETE") {
+    const comicId = decodeURIComponent(comicProjectMatch[1]);
+    const deleted = await deletePersistedComicProject(defaultComicRoot, comicId);
+    sendJson(
+      response,
+      deleted ? 200 : 404,
+      deleted
+        ? { ok: true }
+        : {
+            error: "COMIC_NOT_FOUND",
+            message: `Local comic not found: ${comicId}`
+          }
+    );
+    return true;
+  }
+
+  if (url.pathname === "/api/comics/generate-page" && request.method === "POST") {
+    const payload = await readJsonBody<ComicPageGenerationRequest>(request);
+    const result = await generateComicPage(payload);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/comics/generate-metadata" && request.method === "POST") {
+    const payload = await readJsonBody<ComicMetadataGenerationRequest>(request);
+    const result = await generateComicMetadata(payload);
     sendJson(response, 200, result);
     return true;
   }

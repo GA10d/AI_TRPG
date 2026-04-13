@@ -103,6 +103,87 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
         url: "https://ai.google.dev/gemini-api/docs/image-generation"
       }
     }
+  },
+  {
+    id: "chatgpt-image",
+    order: 20,
+    name: "ChatGPT Image",
+    code: "chatgpt_image",
+    providerFamily: "openai-native",
+    dependence: "OpenAI",
+    description: "Use OpenAI GPT Image for native text-to-image generation.",
+    urlRequirements: false,
+    baseUrl: "https://api.openai.com/v1",
+    baseModel: "gpt-image-1.5",
+    chargeUrl: "https://openai.com/api/pricing/",
+    docsUrl: "https://platform.openai.com/docs/guides/image-generation",
+    envKeyCandidates: [
+      "TRPG_CHATGPT_IMAGE_API_KEY",
+      "OPENAI_API_KEY"
+    ],
+    modelEnvKeyCandidates: [
+      "TRPG_CHATGPT_IMAGE_MODEL"
+    ],
+    baseUrlEnvKeyCandidates: [
+      "TRPG_CHATGPT_IMAGE_BASE_URL"
+    ],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      text_to_image: {
+        supported: true,
+        model: "gpt-image-1.5",
+        url: "https://platform.openai.com/docs/guides/image-generation"
+      },
+      reference_image: {
+        supported: false,
+        model: null,
+        url: null
+      }
+    }
+  },
+  {
+    id: "doubao-image",
+    order: 30,
+    name: "Doubao Image",
+    code: "doubao_image",
+    providerFamily: "byteplus-openai-compatible",
+    dependence: "OpenAI",
+    description: "Use BytePlus ModelArk Seedream image generation through the OpenAI-compatible image API.",
+    urlRequirements: false,
+    baseUrl: "https://ark.ap-southeast.bytepluses.com/api/v3",
+    baseModel: "seedream-5-0-260128",
+    chargeUrl: "https://www.byteplus.com/en/product/ModelArk",
+    docsUrl: "https://docs.byteplus.com/en/docs/ModelArk/1824690",
+    envKeyCandidates: [
+      "TRPG_DOUBAO_IMAGE_API_KEY",
+      "DOUBAO_API_KEY",
+      "TRPG_DOUBAO_API_KEY",
+      "ARK_API_KEY"
+    ],
+    modelEnvKeyCandidates: [
+      "TRPG_DOUBAO_IMAGE_MODEL"
+    ],
+    baseUrlEnvKeyCandidates: [
+      "TRPG_DOUBAO_IMAGE_BASE_URL",
+      "TRPG_DOUBAO_BASE_URL"
+    ],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      text_to_image: {
+        supported: true,
+        model: "seedream-5-0-260128",
+        url: "https://docs.byteplus.com/en/docs/ModelArk/1824690"
+      },
+      reference_image: {
+        supported: false,
+        model: null,
+        url: null
+      }
+    }
   }
 ];
 

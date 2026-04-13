@@ -7,7 +7,9 @@ import type {
   ImageCharacterReference,
   ImageGenerationRequest,
   ImageGenerationResponse,
-  ImagePromptTemplateConfig
+  ImageReferenceInput,
+  ImagePromptTemplateConfig,
+  RuntimeImageModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import { getImageProviderConfig } from "./config.ts";
 
@@ -149,13 +151,18 @@ function buildFinalPrompt(
     promptTemplateConfig.triggerTemplates[request.trigger] ??
     promptTemplateConfig.fallbackTriggerTemplate;
   const castClause = buildCastClause(request.characters, promptTemplateConfig);
+  const negativePrompt = request.negativePrompt?.trim() ?? "";
 
-  return triggerTemplate
+  const finalPrompt = triggerTemplate
     .replaceAll("{basePrompt}", request.prompt.trim())
     .replaceAll("{castClause}", castClause)
     .replaceAll("{themeStyle}", themeStyle)
     .replace(/\s+/gu, " ")
     .trim();
+
+  return negativePrompt
+    ? `${finalPrompt}\nAvoid the following: ${negativePrompt}`
+    : finalPrompt;
 }
 
 function buildMockSvg(prompt: string, theme: string): string {
@@ -197,18 +204,25 @@ function buildMockSvg(prompt: string, theme: string): string {
 }
 
 function buildCacheKey(request: ImageGenerationRequest, finalPrompt: string, model: string | null): string {
-  return createHash("sha1")
-    .update(
-      JSON.stringify({
-        sceneId: request.sceneId,
-        trigger: request.trigger,
-        theme: request.theme,
-        prompt: finalPrompt,
-        model,
-        characters: request.characters ?? []
-      })
-    )
-    .digest("hex");
+  const hash = createHash("sha1");
+  hash.update(
+    JSON.stringify({
+      sceneId: request.sceneId,
+      trigger: request.trigger,
+      theme: request.theme,
+      prompt: finalPrompt,
+      model,
+      characters: request.characters ?? []
+    })
+  );
+
+  for (const reference of request.referenceImages ?? []) {
+    hash.update(reference.imageUrl);
+    hash.update(reference.role ?? "");
+    hash.update(reference.label ?? "");
+  }
+
+  return hash.digest("hex");
 }
 
 function extractGeminiImage(data: unknown): { bytes: Buffer; mimeType: string } | null {
@@ -249,7 +263,31 @@ async function generateGeminiImage(args: {
   apiKey: string;
   model: string;
   prompt: string;
+  referenceImages?: ImageReferenceInput[];
+  imageSize?: string;
+  aspectRatio?: string;
 }): Promise<{ imageUrl: string; mimeType: string }> {
+  const parts = await buildGeminiParts(args.prompt, args.referenceImages);
+  const generationConfig: {
+    responseModalities: string[];
+    imageConfig?: {
+      imageSize?: string;
+      aspectRatio?: string;
+    };
+  } = {
+    responseModalities: ["TEXT", "IMAGE"]
+  };
+
+  if (args.imageSize || args.aspectRatio) {
+    generationConfig.imageConfig = {};
+    if (args.imageSize) {
+      generationConfig.imageConfig.imageSize = args.imageSize;
+    }
+    if (args.aspectRatio) {
+      generationConfig.imageConfig.aspectRatio = args.aspectRatio;
+    }
+  }
+
   const response = await fetch(
     `${args.baseUrl.replace(/\/+$/u, "")}/models/${args.model}:generateContent?key=${encodeURIComponent(args.apiKey)}`,
     {
@@ -260,16 +298,10 @@ async function generateGeminiImage(args: {
       body: JSON.stringify({
         contents: [
           {
-            parts: [
-              {
-                text: args.prompt
-              }
-            ]
+            parts
           }
         ],
-        generationConfig: {
-          responseModalities: ["TEXT", "IMAGE"]
-        }
+        generationConfig
       })
     }
   );
@@ -292,6 +324,338 @@ async function generateGeminiImage(args: {
     imageUrl: `data:${image.mimeType};base64,${image.bytes.toString("base64")}`,
     mimeType: image.mimeType
   };
+}
+
+type ResolvedReferenceImage = {
+  mimeType: string;
+  base64Data: string;
+};
+
+type GeneratedImagePayload = {
+  imageUrl: string;
+  mimeType: string;
+  revisedPrompt?: string | null;
+};
+
+function parseDataUrl(url: string): ResolvedReferenceImage | null {
+  const match = url.match(/^data:([^;,]+);base64,(.+)$/u);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    mimeType: match[1],
+    base64Data: match[2]
+  };
+}
+
+async function resolveReferenceImage(imageUrl: string): Promise<ResolvedReferenceImage> {
+  const inlineData = parseDataUrl(imageUrl);
+  if (inlineData) {
+    return inlineData;
+  }
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to load reference image: HTTP ${response.status}`);
+  }
+
+  const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim() || "image/png";
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return {
+    mimeType,
+    base64Data: buffer.toString("base64")
+  };
+}
+
+function toDataUrl(mimeType: string, base64Data: string): string {
+  return `data:${mimeType};base64,${base64Data}`;
+}
+
+function inferMimeTypeFromOutputFormat(outputFormat: string | undefined): string {
+  switch (outputFormat?.trim().toLowerCase()) {
+    case "jpeg":
+    case "jpg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    case "png":
+    default:
+      return "image/png";
+  }
+}
+
+function pickRuntimeImageString(
+  runtimeImageModelConfig: RuntimeImageModelConfigInput | undefined,
+  key: keyof RuntimeImageModelConfigInput
+): string | undefined {
+  const rawValue = runtimeImageModelConfig?.[key];
+  return typeof rawValue === "string" && rawValue.trim().length > 0
+    ? rawValue.trim()
+    : undefined;
+}
+
+function pickRuntimeImageNumber(
+  runtimeImageModelConfig: RuntimeImageModelConfigInput | undefined,
+  key: keyof RuntimeImageModelConfigInput
+): number | undefined {
+  const rawValue = runtimeImageModelConfig?.[key];
+  return typeof rawValue === "number" && Number.isFinite(rawValue)
+    ? rawValue
+    : undefined;
+}
+
+function pickRuntimeImageBoolean(
+  runtimeImageModelConfig: RuntimeImageModelConfigInput | undefined,
+  key: keyof RuntimeImageModelConfigInput
+): boolean | undefined {
+  const rawValue = runtimeImageModelConfig?.[key];
+  return typeof rawValue === "boolean"
+    ? rawValue
+    : undefined;
+}
+
+async function readResponseData(response: Response): Promise<unknown> {
+  const rawText = await response.text();
+  if (!rawText.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch {
+    return {
+      rawText
+    };
+  }
+}
+
+function extractErrorMessage(data: unknown, fallbackMessage: string): string {
+  if (typeof data === "object" && data !== null) {
+    const payload = data as {
+      error?: {
+        message?: string;
+      } | string;
+      message?: string;
+    };
+
+    if (typeof payload.error === "string" && payload.error.trim().length > 0) {
+      return payload.error.trim();
+    }
+
+    if (typeof payload.error?.message === "string" && payload.error.message.trim().length > 0) {
+      return payload.error.message.trim();
+    }
+
+    if (typeof payload.message === "string" && payload.message.trim().length > 0) {
+      return payload.message.trim();
+    }
+  }
+
+  return fallbackMessage;
+}
+
+type OpenAiCompatibleImageResponse = {
+  data?: Array<{
+    b64_json?: string;
+    url?: string;
+    revised_prompt?: string;
+  }>;
+};
+
+async function extractOpenAiCompatibleImage(
+  data: unknown,
+  fallbackOutputFormat: string | undefined
+): Promise<GeneratedImagePayload | null> {
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+
+  const payload = data as OpenAiCompatibleImageResponse;
+  const firstImage = payload.data?.[0];
+
+  if (!firstImage) {
+    return null;
+  }
+
+  if (typeof firstImage.b64_json === "string" && firstImage.b64_json.length > 0) {
+    const mimeType = inferMimeTypeFromOutputFormat(fallbackOutputFormat);
+    return {
+      imageUrl: toDataUrl(mimeType, firstImage.b64_json),
+      mimeType,
+      revisedPrompt: firstImage.revised_prompt ?? null
+    };
+  }
+
+  if (typeof firstImage.url === "string" && firstImage.url.length > 0) {
+    const resolved = await resolveReferenceImage(firstImage.url);
+    return {
+      imageUrl: toDataUrl(resolved.mimeType, resolved.base64Data),
+      mimeType: resolved.mimeType,
+      revisedPrompt: firstImage.revised_prompt ?? null
+    };
+  }
+
+  return null;
+}
+
+async function generateOpenAiImage(args: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+  imageSize?: string;
+  quality?: string;
+  background?: string;
+  outputFormat?: string;
+  outputCompression?: number;
+}): Promise<GeneratedImagePayload> {
+  const requestBody: Record<string, unknown> = {
+    model: args.model,
+    prompt: args.prompt
+  };
+
+  if (args.imageSize) {
+    requestBody.size = args.imageSize;
+  }
+  if (args.quality) {
+    requestBody.quality = args.quality;
+  }
+  if (args.background) {
+    requestBody.background = args.background;
+  }
+  if (args.outputFormat) {
+    requestBody.output_format = args.outputFormat;
+  }
+  if (typeof args.outputCompression === "number") {
+    requestBody.output_compression = args.outputCompression;
+  }
+
+  const endpointBase = args.baseUrl.replace(/\/+$/u, "");
+  const endpointCandidates = [
+    `${endpointBase}/images/generations`,
+    `${endpointBase}/images`
+  ];
+
+  let lastResponse: Response | null = null;
+  let lastData: unknown = null;
+
+  for (const endpoint of endpointCandidates) {
+    const response = await fetch(
+      endpoint,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${args.apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    const data = await readResponseData(response);
+    if (response.ok) {
+      const image = await extractOpenAiCompatibleImage(data, args.outputFormat);
+      if (!image) {
+        throw new Error("OpenAI image request returned no image data.");
+      }
+
+      return image;
+    }
+
+    lastResponse = response;
+    lastData = data;
+
+    if (response.status !== 404 && response.status !== 405) {
+      break;
+    }
+  }
+
+  throw new Error(
+    extractErrorMessage(
+      lastData,
+      `OpenAI image request failed with HTTP ${lastResponse?.status ?? 500}.`
+    )
+  );
+}
+
+async function generateDoubaoImage(args: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+  imageSize?: string;
+  watermark?: boolean;
+}): Promise<GeneratedImagePayload> {
+  const requestBody: Record<string, unknown> = {
+    model: args.model,
+    prompt: args.prompt,
+    response_format: "url"
+  };
+
+  if (args.imageSize) {
+    requestBody.size = args.imageSize;
+  }
+
+  requestBody.watermark = args.watermark ?? false;
+
+  const response = await fetch(
+    `${args.baseUrl.replace(/\/+$/u, "")}/images/generations`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${args.apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    }
+  );
+
+  const data = await readResponseData(response);
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(data, `Doubao image request failed with HTTP ${response.status}.`)
+    );
+  }
+
+  const image = await extractOpenAiCompatibleImage(data, "png");
+  if (!image) {
+    throw new Error("Doubao image request returned no image data.");
+  }
+
+  return image;
+}
+
+async function buildGeminiParts(
+  prompt: string,
+  referenceImages: ImageReferenceInput[] | undefined
+): Promise<Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>> {
+  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
+    {
+      text: prompt
+    }
+  ];
+
+  const normalizedReferences = (referenceImages ?? [])
+    .map((item) => ({
+      imageUrl: item.imageUrl.trim(),
+      role: item.role ?? "character"
+    }))
+    .filter((item) => item.imageUrl.length > 0)
+    .slice(0, 4);
+
+  for (const reference of normalizedReferences) {
+    const resolved = await resolveReferenceImage(reference.imageUrl);
+    parts.push({
+      inlineData: {
+        mimeType: resolved.mimeType,
+        data: resolved.base64Data
+      }
+    });
+  }
+
+  return parts;
 }
 
 export async function generateImage(
@@ -319,16 +683,61 @@ export async function generateImage(
       providerConfig.apiKey &&
       providerConfig.model
     ) {
+      const supportsReferenceImages = providerConfig.features.reference_image.supported;
       const generated = await generateGeminiImage({
         baseUrl: providerConfig.baseUrl,
         apiKey: providerConfig.apiKey,
         model: providerConfig.model,
-        prompt: finalPrompt
+        prompt: finalPrompt,
+        referenceImages: supportsReferenceImages ? request.referenceImages : undefined,
+        imageSize: pickRuntimeImageString(request.runtimeImageModelConfig, "imageSize"),
+        aspectRatio: pickRuntimeImageString(request.runtimeImageModelConfig, "aspectRatio")
       });
 
       return {
         imageUrl: generated.imageUrl,
-        revisedPrompt: finalPrompt,
+        revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
+        provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
+        cached: false,
+        mimeType: generated.mimeType,
+        outputPath: null
+      };
+    }
+
+    if (
+      providerConfig.dependence === "OpenAI" &&
+      providerConfig.baseUrl &&
+      providerConfig.apiKey &&
+      providerConfig.model
+    ) {
+      const generated =
+        providerConfig.profileId === "doubao-image"
+          ? await generateDoubaoImage({
+              baseUrl: providerConfig.baseUrl,
+              apiKey: providerConfig.apiKey,
+              model: providerConfig.model,
+              prompt: finalPrompt,
+              imageSize: pickRuntimeImageString(request.runtimeImageModelConfig, "imageSize"),
+              watermark: pickRuntimeImageBoolean(request.runtimeImageModelConfig, "watermark")
+            })
+          : await generateOpenAiImage({
+              baseUrl: providerConfig.baseUrl,
+              apiKey: providerConfig.apiKey,
+              model: providerConfig.model,
+              prompt: finalPrompt,
+              imageSize: pickRuntimeImageString(request.runtimeImageModelConfig, "imageSize"),
+              quality: pickRuntimeImageString(request.runtimeImageModelConfig, "quality"),
+              background: pickRuntimeImageString(request.runtimeImageModelConfig, "background"),
+              outputFormat: pickRuntimeImageString(request.runtimeImageModelConfig, "outputFormat"),
+              outputCompression: pickRuntimeImageNumber(
+                request.runtimeImageModelConfig,
+                "outputCompression"
+              )
+            });
+
+      return {
+        imageUrl: generated.imageUrl,
+        revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
         provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
         cached: false,
         mimeType: generated.mimeType,
