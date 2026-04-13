@@ -113,12 +113,10 @@ function formatParticipantActionLabel(
 
 function buildConversationContext(
   session: Session,
-  messages: Message[],
-  maxMessages = 8
+  messages: Message[]
 ): string {
   return messages
     .filter((message) => inferMessageChannel(message) === "public_story")
-    .slice(-maxMessages)
     .map((message) => `[${formatPublicMessageSpeaker(session, message)}][R${message.round}] ${message.content}`)
     .join("\n\n");
 }

@@ -56,12 +56,10 @@ function inferMessageChannel(message: Message): Message["channel"] {
 
 function buildPublicStoryContext(
   messages: Message[],
-  participants: Participant[],
-  maxMessages = 12
+  participants: Participant[]
 ): string {
   const visibleMessages = messages
-    .filter((message) => inferMessageChannel(message) === "public_story")
-    .slice(-maxMessages);
+    .filter((message) => inferMessageChannel(message) === "public_story");
 
   if (!visibleMessages.length) {
     return "No public story context has been recorded yet.";
