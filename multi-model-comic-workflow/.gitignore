@@ -1,8 +1,0 @@
-.env
-.env.local
-artifacts/*
-!artifacts/.gitkeep
-local_data/*
-!local_data/.gitkeep
-node_modules/
-__pycache__/
