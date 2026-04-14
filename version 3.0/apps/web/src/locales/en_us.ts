@@ -816,7 +816,7 @@ export const enUs = {
       eyebrow: "Companions",
       title: "Companion Settings",
       description:
-        "Manage AI teammate slots, names, and personality tags here, with room for later private-chat expansion.",
+        "Manage AI teammate slots, names, personality tags, and visual look presets here, with room for later private-chat expansion.",
       entryTitle: "AI Companion Entry",
       entryDescription:
         "In standard play, the human player acts alongside these AI teammates. Build the party here before the run starts.",
@@ -825,10 +825,10 @@ export const enUs = {
       count: (value: number) => `AI teammates: ${value}`,
       emptyTitle: "No AI teammate yet",
       emptyDescription:
-        "Add an AI teammate first, then set its name and personality tags for this run.",
+        "Add an AI teammate first, then set its name, personality, and visual look for this run.",
       addTitle: "Add Companion",
       addDescription:
-        "Up to 3 AI teammates are supported in this MVP. Each one can have a custom name and multiple personality tags.",
+        "Up to 3 AI teammates are supported in this MVP. Each one can have a custom name plus multiple personality and appearance tags.",
       addButton: "+ Add Companion",
       loadPresetButton: "Load Preset",
       savedPresetCount: (value: number) => `Saved local presets: ${value}`,
@@ -837,12 +837,22 @@ export const enUs = {
       nameLabel: "Name",
       namePlaceholder: (value: number) => `Example: AI Teammate ${value}`,
       selectedCount: (value: number) => `Selected personality tags: ${value}`,
+      selectionSummary: (personalityCount: number, appearanceCount: number) =>
+        `Personality ${personalityCount} / Appearance ${appearanceCount}`,
+      personalitySelectionLabel: (value: number) => `Personality tags: ${value}`,
+      appearanceSelectionLabel: (value: number) => `Appearance tags: ${value}`,
       selectedPreviewEmpty: "No personality tags selected yet.",
+      appearancePreviewEmpty: "No appearance tags selected yet.",
       savePresetButton: "Save Preset",
       configureButton: "Set Personality",
       configureDescription:
         "Open a dedicated personality panel to choose or adjust this teammate's tags.",
+      configureAppearanceButton: "Set Appearance",
+      configureAppearanceDescription:
+        "Open a dedicated appearance panel to choose this teammate's look and outfit cues.",
       tagHint: "Click the personality tags below to multi-select them. Hover to read the description.",
+      appearanceTagHint:
+        "Click the appearance tags below to multi-select them. They are grouped into looks and outfits.",
       loadPresetTitle: "Load AI Companion Preset",
       loadPresetDescription:
         "These presets are stored in the local browser. Loading one adds that AI teammate to the current party immediately.",
@@ -852,10 +862,13 @@ export const enUs = {
       noSavedPresets: "No AI companion presets have been saved locally yet.",
       removeButton: "Remove",
       noTags: "Personality tags are still loading.",
+      noAppearanceTags: "Appearance tags are still loading.",
       basicPositiveLabel: "Basic Positive",
       basicNegativeLabel: "Basic Negative",
       advancedPositiveLabel: "Advanced Positive",
       advancedNegativeLabel: "Advanced Negative",
+      appearanceLabel: "Appearance",
+      outfitLabel: "Outfit",
       warningsTitle: "Content Warnings"
     },
     layout: {

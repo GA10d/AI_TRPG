@@ -34,6 +34,7 @@ import type {
 import {
   generateAiPrivateChatReply,
   generateAiRoundDraft,
+  resolveAiAppearanceTagsByIds,
   resolveAiPersonalityTagsByIds
 } from "../ai_players/index.ts";
 import { buildSystemCreatedMessage } from "../mock/index.ts";
@@ -367,14 +368,16 @@ async function resolveSessionAiCompanions(
   return Promise.all(
     normalizedCompanions.map(async (companion, index) => {
       const displayName = companion.displayName.trim() || `AI Companion ${index + 1}`;
-      const personalityTags = await resolveAiPersonalityTagsByIds(
-        companion.personalityTagIds ?? []
-      );
+      const [personalityTags, appearanceTags] = await Promise.all([
+        resolveAiPersonalityTagsByIds(companion.personalityTagIds ?? []),
+        resolveAiAppearanceTagsByIds(companion.appearanceTagIds ?? [])
+      ]);
 
       return {
         participantId: `companion_${randomUUID()}`,
         displayName,
-        personalityTags
+        personalityTags,
+        appearanceTags
       };
     })
   );

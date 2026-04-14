@@ -8,6 +8,7 @@
 
 import type {
   AdvancedTextModelConfigInput,
+  AiAppearanceTag,
   AiGenerationMetadata,
   AiPersonalityTag,
   BootstrapResponse,
@@ -106,6 +107,7 @@ type GameSetupScreenProps = {
   onRemoveAiCompanion: (index: number) => void;
   onUpdateAiCompanionName: (index: number, value: string) => void;
   onToggleAiCompanionPersonalityTag: (index: number, personalityTagId: string) => void;
+  onToggleAiCompanionAppearanceTag: (index: number, appearanceTagId: string) => void;
 };
 
 type DragTarget = "left" | "right" | null;
@@ -407,7 +409,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onAddAiCompanionFromPreset,
     onRemoveAiCompanion,
     onUpdateAiCompanionName,
-    onToggleAiCompanionPersonalityTag
+    onToggleAiCompanionPersonalityTag,
+    onToggleAiCompanionAppearanceTag
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -417,6 +420,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const [isSettingsDetailOpen, setIsSettingsDetailOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<SetupDetailTab>("game");
   const [personalityEditorIndex, setPersonalityEditorIndex] = useState<number | null>(null);
+  const [appearanceEditorIndex, setAppearanceEditorIndex] = useState<number | null>(null);
   const [savedCompanionPresets, setSavedCompanionPresets] = useState<StoredAiCompanionPreset[]>(
     () => loadAiCompanionPresets()
   );
@@ -527,6 +531,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     setPersonalityEditorIndex(aiCompanions.length ? aiCompanions.length - 1 : null);
   }, [aiCompanions.length, personalityEditorIndex]);
 
+  useEffect(() => {
+    if (appearanceEditorIndex === null) {
+      return;
+    }
+
+    if (appearanceEditorIndex < aiCompanions.length) {
+      return;
+    }
+
+    setAppearanceEditorIndex(aiCompanions.length ? aiCompanions.length - 1 : null);
+  }, [aiCompanions.length, appearanceEditorIndex]);
+
   function handleSplitterPointerDown(
     target: DragTarget,
     event: ReactPointerEvent<HTMLButtonElement>
@@ -559,11 +575,21 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function handleOpenPersonalityEditor(index: number): void {
+    setAppearanceEditorIndex(null);
     setPersonalityEditorIndex(index);
   }
 
   function handleClosePersonalityEditor(): void {
     setPersonalityEditorIndex(null);
+  }
+
+  function handleOpenAppearanceEditor(index: number): void {
+    setPersonalityEditorIndex(null);
+    setAppearanceEditorIndex(index);
+  }
+
+  function handleCloseAppearanceEditor(): void {
+    setAppearanceEditorIndex(null);
   }
 
   function handleOpenCompanionPresetPicker(): void {
@@ -585,7 +611,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
     onAddAiCompanionFromPreset({
       displayName: preset.displayName,
-      personalityTagIds: preset.personalityTagIds
+      personalityTagIds: preset.personalityTagIds,
+      appearanceTagIds: preset.appearanceTagIds
     });
     setIsCompanionPresetPickerOpen(false);
   }
@@ -662,6 +689,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     ? characterAssistBusyLabel
     : characterAssistButtonLabel;
   const personalityTags = bootstrap?.personalityTags ?? [];
+  const appearanceTags = bootstrap?.appearanceTags ?? [];
   const isStoryMode = playMode === "story_mode";
   const normalizedAdvancedTextModelConfig = advancedTextModelEnabled
     ? {
@@ -684,6 +712,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     personalityEditorIndex !== null ? aiCompanions[personalityEditorIndex] ?? null : null;
   const editingCompanionSelectedTags = editingCompanion
     ? personalityTags.filter((tag) => editingCompanion.personalityTagIds.includes(tag.id))
+    : [];
+  const editingAppearanceCompanion =
+    appearanceEditorIndex !== null ? aiCompanions[appearanceEditorIndex] ?? null : null;
+  const editingCompanionSelectedAppearanceTags = editingAppearanceCompanion
+    ? appearanceTags.filter((tag) =>
+        (editingAppearanceCompanion.appearanceTagIds ?? []).includes(tag.id)
+      )
     : [];
   const personalityTagSections: Array<{
     key: string;
@@ -717,6 +752,22 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       tags: personalityTags.filter(
         (tag) => tag.group === "advanced" && tag.polarity === "negative"
       )
+    }
+  ].filter((section) => section.tags.length > 0);
+  const appearanceTagSections: Array<{
+    key: string;
+    title: string;
+    tags: AiAppearanceTag[];
+  }> = [
+    {
+      key: "appearance",
+      title: setupText.companions.appearanceLabel,
+      tags: appearanceTags.filter((tag) => tag.category === "appearance")
+    },
+    {
+      key: "outfit",
+      title: setupText.companions.outfitLabel,
+      tags: appearanceTags.filter((tag) => tag.category === "outfit")
     }
   ].filter((section) => section.tags.length > 0);
 
@@ -1364,19 +1415,62 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     );
   }
 
+  function renderAppearanceTagSection(
+    companionIndex: number,
+    section: {
+      key: string;
+      title: string;
+      tags: AiAppearanceTag[];
+    }
+  ): React.ReactNode {
+    const selectedTagIds = aiCompanions[companionIndex]?.appearanceTagIds ?? [];
+
+    return (
+      <div className="companion-tag-section" key={section.key}>
+        <div className="companion-tag-section-title">{section.title}</div>
+        <div className="companion-tag-list">
+          {section.tags.map((tag) => {
+            const isSelected = selectedTagIds.includes(tag.id);
+
+            return (
+              <button
+                className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
+                key={tag.id}
+                onClick={() => onToggleAiCompanionAppearanceTag(companionIndex, tag.id)}
+                title={tag.description}
+                type="button"
+              >
+                <span>{tag.keyword}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderCompanionEditor(
     companion: CreateSessionAiCompanionInput,
     index: number
   ): React.ReactNode {
-    const selectedTags = personalityTags.filter((tag) =>
+    const selectedPersonalityTags = personalityTags.filter((tag) =>
       companion.personalityTagIds.includes(tag.id)
+    );
+    const selectedAppearanceTags = appearanceTags.filter((tag) =>
+      (companion.appearanceTagIds ?? []).includes(tag.id)
     );
     const companionDisplayName =
       companion.displayName.trim() || setupText.companions.namePlaceholder(index + 1);
-    const previewTags = selectedTags.slice(0, 6);
-    const hiddenTagCount = selectedTags.length - previewTags.length;
+    const previewPersonalityTags = selectedPersonalityTags.slice(0, 6);
+    const hiddenPersonalityTagCount =
+      selectedPersonalityTags.length - previewPersonalityTags.length;
+    const previewAppearanceTags = selectedAppearanceTags.slice(0, 6);
+    const hiddenAppearanceTagCount =
+      selectedAppearanceTags.length - previewAppearanceTags.length;
     const canSavePreset =
-      companion.displayName.trim().length > 0 || companion.personalityTagIds.length > 0;
+      companion.displayName.trim().length > 0 ||
+      companion.personalityTagIds.length > 0 ||
+      (companion.appearanceTagIds?.length ?? 0) > 0;
 
     return (
       <div className="companion-card companion-editor-card" key={`companion-${index}`}>
@@ -1386,7 +1480,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               {setupText.companions.memberTitle(index + 1)}
             </div>
             <div className="summary-text">
-              {setupText.companions.selectedCount(selectedTags.length)}
+              {setupText.companions.selectionSummary(
+                selectedPersonalityTags.length,
+                selectedAppearanceTags.length
+              )}
             </div>
           </div>
           <button
@@ -1410,20 +1507,48 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
         <div className="companion-editor-selection">
           <div className="summary-text">{companionDisplayName}</div>
-          {selectedTags.length ? (
-            <div className="companion-selected-tags">
-              {previewTags.map((tag) => (
-                <span className="badge" key={tag.id}>
-                  {tag.keyword}
-                </span>
-              ))}
-              {hiddenTagCount > 0 ? <span className="badge">+{hiddenTagCount}</span> : null}
+          <div className="companion-selection-group">
+            <div className="companion-selection-label">
+              {setupText.companions.personalitySelectionLabel(selectedPersonalityTags.length)}
             </div>
-          ) : (
-            <div className="companion-selected-placeholder">
-              {setupText.companions.selectedPreviewEmpty}
+            {selectedPersonalityTags.length ? (
+              <div className="companion-selected-tags">
+                {previewPersonalityTags.map((tag) => (
+                  <span className="badge" key={tag.id}>
+                    {tag.keyword}
+                  </span>
+                ))}
+                {hiddenPersonalityTagCount > 0 ? (
+                  <span className="badge">+{hiddenPersonalityTagCount}</span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="companion-selected-placeholder">
+                {setupText.companions.selectedPreviewEmpty}
+              </div>
+            )}
+          </div>
+          <div className="companion-selection-group">
+            <div className="companion-selection-label">
+              {setupText.companions.appearanceSelectionLabel(selectedAppearanceTags.length)}
             </div>
-          )}
+            {selectedAppearanceTags.length ? (
+              <div className="companion-selected-tags">
+                {previewAppearanceTags.map((tag) => (
+                  <span className="badge" key={tag.id}>
+                    {tag.keyword}
+                  </span>
+                ))}
+                {hiddenAppearanceTagCount > 0 ? (
+                  <span className="badge">+{hiddenAppearanceTagCount}</span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="companion-selected-placeholder">
+                {setupText.companions.appearancePreviewEmpty}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="companion-editor-actions">
@@ -1441,6 +1566,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             type="button"
           >
             {setupText.companions.configureButton}
+          </button>
+          <button
+            className="ghost-button"
+            onClick={() => handleOpenAppearanceEditor(index)}
+            type="button"
+          >
+            {setupText.companions.configureAppearanceButton}
           </button>
         </div>
       </div>
@@ -1561,11 +1693,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             {hasSavedCompanionPresets ? (
               <div className="companion-preset-list">
                 {savedCompanionPresets.map((preset) => {
-                  const selectedTags = personalityTags.filter((tag) =>
+                  const selectedPersonalityTags = personalityTags.filter((tag) =>
                     preset.personalityTagIds.includes(tag.id)
                   );
-                  const previewTags = selectedTags.slice(0, 6);
-                  const hiddenTagCount = selectedTags.length - previewTags.length;
+                  const selectedAppearanceTags = appearanceTags.filter((tag) =>
+                    (preset.appearanceTagIds ?? []).includes(tag.id)
+                  );
+                  const previewPersonalityTags = selectedPersonalityTags.slice(0, 6);
+                  const hiddenPersonalityTagCount =
+                    selectedPersonalityTags.length - previewPersonalityTags.length;
+                  const previewAppearanceTags = selectedAppearanceTags.slice(0, 6);
+                  const hiddenAppearanceTagCount =
+                    selectedAppearanceTags.length - previewAppearanceTags.length;
                   const presetDisplayName =
                     preset.displayName.trim() || setupText.companions.presetNameFallback;
 
@@ -1575,7 +1714,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                         <div className="companion-preset-meta">
                           <div className="selection-card-title">{presetDisplayName}</div>
                           <div className="summary-text">
-                            {setupText.companions.selectedCount(preset.personalityTagIds.length)}
+                            {setupText.companions.selectionSummary(
+                              preset.personalityTagIds.length,
+                              preset.appearanceTagIds.length
+                            )}
                           </div>
                           <div className="summary-text">
                             {setupText.companions.presetSavedAt(
@@ -1603,22 +1745,52 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                         </div>
                       </div>
 
-                      {selectedTags.length ? (
-                        <div className="companion-selected-tags">
-                          {previewTags.map((tag) => (
-                            <span className="badge" key={tag.id}>
-                              {tag.keyword}
-                            </span>
-                          ))}
-                          {hiddenTagCount > 0 ? (
-                            <span className="badge">+{hiddenTagCount}</span>
-                          ) : null}
+                      <div className="companion-selection-group">
+                        <div className="companion-selection-label">
+                          {setupText.companions.personalitySelectionLabel(
+                            selectedPersonalityTags.length
+                          )}
                         </div>
-                      ) : (
-                        <div className="companion-selected-placeholder">
-                          {setupText.companions.selectedPreviewEmpty}
+                        {selectedPersonalityTags.length ? (
+                          <div className="companion-selected-tags">
+                            {previewPersonalityTags.map((tag) => (
+                              <span className="badge" key={tag.id}>
+                                {tag.keyword}
+                              </span>
+                            ))}
+                            {hiddenPersonalityTagCount > 0 ? (
+                              <span className="badge">+{hiddenPersonalityTagCount}</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="companion-selected-placeholder">
+                            {setupText.companions.selectedPreviewEmpty}
+                          </div>
+                        )}
+                      </div>
+                      <div className="companion-selection-group">
+                        <div className="companion-selection-label">
+                          {setupText.companions.appearanceSelectionLabel(
+                            selectedAppearanceTags.length
+                          )}
                         </div>
-                      )}
+                        {selectedAppearanceTags.length ? (
+                          <div className="companion-selected-tags">
+                            {previewAppearanceTags.map((tag) => (
+                              <span className="badge" key={tag.id}>
+                                {tag.keyword}
+                              </span>
+                            ))}
+                            {hiddenAppearanceTagCount > 0 ? (
+                              <span className="badge">+{hiddenAppearanceTagCount}</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="companion-selected-placeholder">
+                            {setupText.companions.appearancePreviewEmpty}
+                          </div>
+                        )}
+                      </div>
                     </article>
                   );
                 })}
@@ -1626,6 +1798,85 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             ) : (
               <div className="empty-state companion-preset-modal-empty">
                 {setupText.companions.noSavedPresets}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderAppearanceEditorModal(): React.ReactNode {
+    if (editingAppearanceCompanion === null || appearanceEditorIndex === null) {
+      return null;
+    }
+
+    const companionDisplayName =
+      editingAppearanceCompanion.displayName.trim() ||
+      setupText.companions.namePlaceholder(appearanceEditorIndex + 1);
+
+    return (
+      <div
+        aria-label={setupText.companions.configureAppearanceButton}
+        className="companion-personality-modal-backdrop"
+        onClick={handleCloseAppearanceEditor}
+        role="dialog"
+      >
+        <div
+          className="companion-personality-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="companion-personality-modal-header">
+            <div>
+              <div className="eyebrow">{setupText.companions.eyebrow}</div>
+              <h2>{companionDisplayName}</h2>
+              <div className="summary-text">
+                {setupText.companions.configureAppearanceDescription}
+              </div>
+            </div>
+            <button
+              className="ghost-button ghost-button-small"
+              onClick={handleCloseAppearanceEditor}
+              type="button"
+            >
+              {setupText.modal.close}
+            </button>
+          </div>
+
+          <div className="companion-personality-modal-summary">
+            <div className="companion-personality-modal-selection">
+              <div className="companion-personality-modal-selection-head">
+                <div className="companion-personality-modal-selection-title">
+                  {setupText.companions.appearanceSelectionLabel(
+                    editingCompanionSelectedAppearanceTags.length
+                  )}
+                </div>
+                <div className="summary-text">{setupText.companions.appearanceTagHint}</div>
+              </div>
+              {editingCompanionSelectedAppearanceTags.length ? (
+                <div className="companion-selected-tags">
+                  {editingCompanionSelectedAppearanceTags.map((tag) => (
+                    <span className="badge" key={tag.id}>
+                      {tag.keyword}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="companion-selected-placeholder">
+                  {setupText.companions.appearancePreviewEmpty}
+                </div>
+              )}
+            </div>
+
+            {appearanceTagSections.length ? (
+              <div className="companion-tag-sections">
+                {appearanceTagSections.map((section) =>
+                  renderAppearanceTagSection(appearanceEditorIndex, section)
+                )}
+              </div>
+            ) : (
+              <div className="empty-state companion-personality-modal-empty">
+                {setupText.companions.noAppearanceTags}
               </div>
             )}
           </div>
@@ -2442,6 +2693,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       ) : null}
 
       {renderPersonalityEditorModal()}
+      {renderAppearanceEditorModal()}
       {renderCompanionPresetPickerModal()}
 
       {coverAsset && isCoverExpanded ? (

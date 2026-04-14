@@ -5,6 +5,7 @@ import type {
   PlayMode
 } from "./content.ts";
 import type {
+  AiAppearanceTag,
   AiPersonalityTag,
   AiGenerationMetadata,
   SessionMemory,
@@ -75,6 +76,7 @@ export type ImagePromptTemplateConfig = {
 export type CreateSessionAiCompanionInput = {
   displayName: string;
   personalityTagIds: string[];
+  appearanceTagIds: string[];
 };
 
 export type CreateSessionRequest = {
@@ -257,6 +259,7 @@ export type UpsertWorldlineComicPageRequest = {
   pageIndex: number;
   storyPrompt: string;
   storyMemorySummary?: string;
+  characterReferences?: ComicCharacterReferenceInput[];
   imageProfileId?: string;
   runtimeImageModelConfig?: RuntimeImageModelConfigInput;
 };
@@ -385,6 +388,11 @@ export type ComicReferenceImageInput = {
   appearance?: string;
 };
 
+export type ComicCharacterReferenceInput = {
+  name?: string;
+  appearance: string;
+};
+
 export type ComicPreviousPageInput = {
   pageNumber: number;
   prompt: string;
@@ -400,6 +408,7 @@ export type ComicPageGenerationRequest = {
   storyMemorySummary?: string;
   previousPages?: ComicPreviousPageInput[];
   referenceImages?: ComicReferenceImageInput[];
+  characterReferences?: ComicCharacterReferenceInput[];
   negativePrompt?: string;
   allowFallback?: boolean;
   imageProfileId?: string;
@@ -541,6 +550,7 @@ export type BootstrapResponse = {
     logViewMode: "all" | "compact" | "hidden";
   };
   personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
   languages: Array<{
     id: number;
     code: LocaleCode;

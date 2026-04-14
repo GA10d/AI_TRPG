@@ -42,7 +42,7 @@ import {
   loadPlayableContentBundle,
   loadStoryNpcRoster
 } from "./content/index.ts";
-import { loadAiPersonalityTags } from "./ai_players/index.ts";
+import { loadAiAppearanceTags, loadAiPersonalityTags } from "./ai_players/index.ts";
 import {
   listImageProfileSummaries
 } from "./image_generation/config.ts";
@@ -241,7 +241,10 @@ async function buildBootstrapResponse(
 ): Promise<BootstrapResponse> {
   const serverProxyStatus = getServerProxyStatus();
   const imagePromptTemplateConfig = await loadImagePromptTemplateConfig();
-  const personalityTags = await loadAiPersonalityTags();
+  const [personalityTags, appearanceTags] = await Promise.all([
+    loadAiPersonalityTags(),
+    loadAiAppearanceTags()
+  ]);
 
   return {
     defaults: {
@@ -254,6 +257,7 @@ async function buildBootstrapResponse(
       logViewMode: PHASE1_DEFAULTS.logViewMode
     },
     personalityTags,
+    appearanceTags,
     languages: listEnabledLanguages().map((item) => toLanguageOptionPayload(item.code)),
     modelAccessModes: PHASE1_MODEL_ACCESS_MODE_OPTIONS.map((item) => ({
       code: item.code,

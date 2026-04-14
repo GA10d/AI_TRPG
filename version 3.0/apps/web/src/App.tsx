@@ -4,6 +4,7 @@ import type {
   AdvancedTextModelConfigInput,
   AiGenerationMetadata,
   CharacterConceptAssistMode,
+  ComicCharacterReferenceInput,
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
@@ -17,6 +18,7 @@ import type {
   RoundDraft,
   RoleTextModelConfigInput,
   SessionSnapshot,
+  SessionAiCompanion,
   StoryControlMode
 } from "../../../packages/shared-types/src/index.ts";
 import {
@@ -292,7 +294,8 @@ function isAbortError(error: unknown): boolean {
 function buildEmptyAiCompanion(): CreateSessionAiCompanionInput {
   return {
     displayName: "",
-    personalityTagIds: []
+    personalityTagIds: [],
+    appearanceTagIds: []
   };
 }
 
@@ -407,6 +410,51 @@ function buildWorldlineComicMemorySummary(snapshot: SessionSnapshot): string | u
 
   const summary = sections.join("\n\n").trim();
   return summary || undefined;
+}
+
+function buildCompanionAppearanceSummary(companion: SessionAiCompanion): string | undefined {
+  const appearanceTags = companion.appearanceTags ?? [];
+  const appearanceDetails = appearanceTags
+    .filter((tag) => tag.category === "appearance")
+    .map((tag) => tag.description.trim())
+    .filter(Boolean);
+  const outfitDetails = appearanceTags
+    .filter((tag) => tag.category === "outfit")
+    .map((tag) => tag.description.trim())
+    .filter(Boolean);
+  const sections: string[] = [];
+
+  if (appearanceDetails.length > 0) {
+    sections.push(`appearance: ${appearanceDetails.join("; ")}`);
+  }
+
+  if (outfitDetails.length > 0) {
+    sections.push(`outfit: ${outfitDetails.join("; ")}`);
+  }
+
+  return sections.length > 0 ? sections.join("; ") : undefined;
+}
+
+function buildWorldlineComicCharacterReferences(
+  snapshot: SessionSnapshot
+): ComicCharacterReferenceInput[] | undefined {
+  const references = (snapshot.session.partySetup?.aiCompanions ?? [])
+    .map((companion) => {
+      const appearance = buildCompanionAppearanceSummary(companion);
+      if (!appearance) {
+        return null;
+      }
+
+      const name = companion.displayName.trim();
+      return {
+        name: name || undefined,
+        appearance
+      };
+    })
+    .filter((item): item is ComicCharacterReferenceInput => item !== null)
+    .slice(0, 3);
+
+  return references.length > 0 ? references : undefined;
 }
 
 function buildWorldlineComicStoryPrompt(
@@ -1404,6 +1452,7 @@ export function App() {
         pageIndex: plan.pageIndex,
         storyPrompt: plan.storyPrompt,
         storyMemorySummary: plan.storyMemorySummary,
+        characterReferences: buildWorldlineComicCharacterReferences(nextSnapshot),
         imageProfileId,
         runtimeImageModelConfig
       });
@@ -1539,6 +1588,9 @@ export function App() {
               displayName: companion.displayName,
               personalityTagIds: Array.from(
                 new Set(companion.personalityTagIds.filter((tagId) => tagId.trim().length > 0))
+              ),
+              appearanceTagIds: Array.from(
+                new Set((companion.appearanceTagIds ?? []).filter((tagId) => tagId.trim().length > 0))
               )
             }
           ]
@@ -1578,6 +1630,28 @@ export function App() {
           personalityTagIds: hasTag
             ? companion.personalityTagIds.filter((tagId) => tagId !== personalityTagId)
             : [...companion.personalityTagIds, personalityTagId]
+        };
+      })
+    );
+  }
+
+  function handleToggleAiCompanionAppearanceTag(
+    index: number,
+    appearanceTagId: string
+  ): void {
+    setAiCompanions((current) =>
+      current.map((companion, itemIndex) => {
+        if (itemIndex !== index) {
+          return companion;
+        }
+
+        const currentAppearanceTagIds = companion.appearanceTagIds ?? [];
+        const hasTag = currentAppearanceTagIds.includes(appearanceTagId);
+        return {
+          ...companion,
+          appearanceTagIds: hasTag
+            ? currentAppearanceTagIds.filter((tagId) => tagId !== appearanceTagId)
+            : [...currentAppearanceTagIds, appearanceTagId]
         };
       })
     );
@@ -2161,11 +2235,14 @@ export function App() {
     const normalizedAiCompanions = aiCompanions
       .map((companion) => ({
         displayName: companion.displayName.trim(),
-        personalityTagIds: companion.personalityTagIds
+        personalityTagIds: companion.personalityTagIds,
+        appearanceTagIds: companion.appearanceTagIds ?? []
       }))
       .filter(
         (companion) =>
-          companion.displayName.length > 0 || companion.personalityTagIds.length > 0
+          companion.displayName.length > 0 ||
+          companion.personalityTagIds.length > 0 ||
+          companion.appearanceTagIds.length > 0
       );
 
     setIsCreating(true);
@@ -3045,6 +3122,7 @@ export function App() {
           onRemoveAiCompanion={handleRemoveAiCompanion}
           onUpdateAiCompanionName={handleUpdateAiCompanionName}
           onToggleAiCompanionPersonalityTag={handleToggleAiCompanionPersonalityTag}
+          onToggleAiCompanionAppearanceTag={handleToggleAiCompanionAppearanceTag}
         />
       );
       break;

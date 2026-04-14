@@ -1424,6 +1424,18 @@ img {
   gap: 10px;
 }
 
+.companion-selection-group {
+  display: grid;
+  gap: 8px;
+}
+
+.companion-selection-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .companion-selected-tags {
   display: flex;
   flex-wrap: wrap;

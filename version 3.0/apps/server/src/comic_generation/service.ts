@@ -8,6 +8,7 @@ import {
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
   AppendPersistedComicPageRequest,
+  ComicCharacterReferenceInput,
   ComicProjectSummary,
   ComicMetadataGenerationRequest,
   ComicMetadataGenerationResponse,
@@ -63,6 +64,10 @@ function compactWhitespace(input: string): string {
   return input.replace(/\s+/gu, " ").trim();
 }
 
+function buildShortDigest(input: string): string {
+  return createHash("sha1").update(input).digest("hex").slice(0, 12);
+}
+
 function buildSceneId(request: ComicPageGenerationRequest, pageNumber: number): string {
   const requestedSceneId = compactWhitespace(request.sceneId ?? "");
   if (requestedSceneId.length > 0) {
@@ -73,10 +78,23 @@ function buildSceneId(request: ComicPageGenerationRequest, pageNumber: number): 
     storyPrompt: request.storyPrompt,
     styleId: request.styleId,
     pageNumber,
+    storyMemorySummary: request.storyMemorySummary,
+    negativePrompt: request.negativePrompt,
     previousPages: request.previousPages?.map((item) => ({
       pageNumber: item.pageNumber,
       prompt: item.prompt,
-      summary: item.summary
+      summary: item.summary,
+      imageDigest: item.imageUrl ? buildShortDigest(item.imageUrl) : null
+    })) ?? [],
+    referenceImages: request.referenceImages?.map((item) => ({
+      role: item.role,
+      name: item.name,
+      appearance: item.appearance,
+      imageDigest: buildShortDigest(item.imageUrl)
+    })) ?? [],
+    characterReferences: request.characterReferences?.map((item) => ({
+      name: item.name,
+      appearance: item.appearance
     })) ?? []
   });
 
@@ -133,6 +151,17 @@ function collectReferenceImages(request: ComicPageGenerationRequest): ImageRefer
   }
 
   return output;
+}
+
+function collectCharacterReferences(
+  request: ComicPageGenerationRequest
+): ComicCharacterReferenceInput[] {
+  return (request.characterReferences ?? [])
+    .map((item) => ({
+      name: compactWhitespace(item.name ?? "") || undefined,
+      appearance: compactWhitespace(item.appearance)
+    }))
+    .filter((item) => item.appearance.length > 0);
 }
 
 function buildFallbackTitle(storyPrompt: string): string {
@@ -481,9 +510,9 @@ export async function generateComicPage(
 ): Promise<ComicPageGenerationResponse> {
   const promptBundle = await buildComicPagePrompt(request);
   const referenceImages = collectReferenceImages(request);
-  const characterReferenceCount = referenceImages.filter(
-    (item) => (item.role ?? "character") === "character"
-  ).length;
+  const characterReferenceCount =
+    referenceImages.filter((item) => (item.role ?? "character") === "character").length +
+    collectCharacterReferences(request).length;
   const previousPageReferenceCount = referenceImages.filter(
     (item) => item.role === "previous_page"
   ).length;
@@ -852,6 +881,7 @@ export async function upsertWorldlineComicPage(
     previousPages: existingProject
       ? await buildPersistedPreviousPages(existingProject)
       : undefined,
+    characterReferences: collectCharacterReferences(request),
     imageProfileId: request.imageProfileId,
     runtimeImageModelConfig: request.runtimeImageModelConfig
   });

@@ -122,10 +122,18 @@ export type AiPersonalityTag = {
   description: string;
 };
 
+export type AiAppearanceTag = {
+  id: string;
+  category: string;
+  keyword: string;
+  description: string;
+};
+
 export type SessionAiCompanion = {
   participantId: string;
   displayName: string;
   personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
 };
 
 export type SessionPartySetup = {

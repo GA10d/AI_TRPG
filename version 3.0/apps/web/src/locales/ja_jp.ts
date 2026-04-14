@@ -829,7 +829,7 @@ export const jaJp = {
       eyebrow: "同行者",
       title: "同行者設定",
       description:
-        "AI 仲間の枠、名前、人格タグをここで管理し、後続の私聊拡張にも備えます。",
+        "AI 仲間の枠、名前、人格タグ、見た目設定をここで管理し、後続の私聊拡張にも備えます。",
       entryTitle: "AI 同伴入口",
       entryDescription:
         "通常モードでは、人間プレイヤーがここで設定した AI 仲間と一緒に行動します。",
@@ -838,10 +838,10 @@ export const jaJp = {
       count: (value: number) => `AI 仲間: ${value} 名`,
       emptyTitle: "AI 仲間はまだいません",
       emptyDescription:
-        "まず AI 仲間を追加し、その後で名前と人格タグを設定してください。",
+        "まず AI 仲間を追加し、その後で名前、性格、見た目を設定してください。",
       addTitle: "同行者を追加",
       addDescription:
-        "この MVP では最大 3 名までの AI 仲間を追加できます。各仲間に名前と複数の人格タグを設定できます。",
+        "この MVP では最大 3 名までの AI 仲間を追加できます。各仲間に名前、複数の人格タグ、複数の見た目タグを設定できます。",
       addButton: "+ 同行者を追加",
       loadPresetButton: "設定を読み込む",
       savedPresetCount: (value: number) => `ローカル保存済み設定: ${value} 件`,
@@ -850,12 +850,22 @@ export const jaJp = {
       nameLabel: "名前",
       namePlaceholder: (value: number) => `例: AI仲間${value}`,
       selectedCount: (value: number) => `選択中の人格タグ: ${value}`,
+      selectionSummary: (personalityCount: number, appearanceCount: number) =>
+        `性格 ${personalityCount} / 見た目 ${appearanceCount}`,
+      personalitySelectionLabel: (value: number) => `人格タグ: ${value}`,
+      appearanceSelectionLabel: (value: number) => `見た目タグ: ${value}`,
       selectedPreviewEmpty: "まだ人格タグは選択されていません。",
+      appearancePreviewEmpty: "まだ見た目タグは選択されていません。",
       savePresetButton: "設定を保存",
       configureButton: "性格を設定",
       configureDescription:
         "専用の性格画面を開いて、この AI 仲間の人格タグを選択または調整します。",
+      configureAppearanceButton: "見た目を設定",
+      configureAppearanceDescription:
+        "専用の見た目画面を開いて、この AI 仲間の外見と服装の手掛かりを選択または調整します。",
       tagHint: "下の人格タグをクリックして複数選択できます。ホバーで説明を確認できます。",
+      appearanceTagHint:
+        "下の形象タグをクリックして複数選択できます。外貌と服装に分かれています。",
       loadPresetTitle: "AI 仲間設定を読み込む",
       loadPresetDescription:
         "ここにはブラウザのローカルに保存された AI 仲間設定が並びます。読み込むと現在のパーティへすぐ追加されます。",
@@ -865,10 +875,13 @@ export const jaJp = {
       noSavedPresets: "ローカルに保存された AI 仲間設定はまだありません。",
       removeButton: "削除",
       noTags: "人格タグをまだ読み込めていません。",
+      noAppearanceTags: "見た目タグをまだ読み込めていません。",
       basicPositiveLabel: "基本・正向",
       basicNegativeLabel: "基本・負向",
       advancedPositiveLabel: "上級・正向",
       advancedNegativeLabel: "上級・負向",
+      appearanceLabel: "外見",
+      outfitLabel: "服装",
       warningsTitle: "コンテンツ警告"
     },
     layout: {

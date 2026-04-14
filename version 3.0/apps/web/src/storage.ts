@@ -54,6 +54,7 @@ export type StoredAiCompanionPreset = {
   id: string;
   displayName: string;
   personalityTagIds: string[];
+  appearanceTagIds: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -169,6 +170,13 @@ function normalizeAiCompanionPreset(
           .map((tagId) => tagId.trim())
           .filter((tagId) => tagId.length > 0)
       )
+    ),
+    appearanceTagIds: Array.from(
+      new Set(
+        (companion.appearanceTagIds ?? [])
+          .map((tagId) => tagId.trim())
+          .filter((tagId) => tagId.length > 0)
+      )
     )
   };
 }
@@ -180,8 +188,29 @@ function buildAiCompanionPresetId(companion: CreateSessionAiCompanionInput): str
     return `name:${normalizedName}`;
   }
 
-  const tagKey = [...normalized.personalityTagIds].sort().join("|");
+  const personalityKey = [...normalized.personalityTagIds].sort().join("|");
+  const appearanceKey = [...normalized.appearanceTagIds].sort().join("|");
+  const tagKey = [personalityKey, appearanceKey].filter((value) => value.length > 0).join("||");
   return tagKey.length > 0 ? `tags:${tagKey}` : "";
+}
+
+function normalizeStoredAiCompanionPreset(
+  preset: StoredAiCompanionPreset
+): StoredAiCompanionPreset {
+  const normalized = normalizeAiCompanionPreset({
+    displayName: preset.displayName,
+    personalityTagIds: preset.personalityTagIds ?? [],
+    appearanceTagIds: preset.appearanceTagIds ?? []
+  });
+
+  return {
+    id: preset.id,
+    displayName: normalized.displayName,
+    personalityTagIds: normalized.personalityTagIds,
+    appearanceTagIds: normalized.appearanceTagIds,
+    createdAt: preset.createdAt,
+    updatedAt: preset.updatedAt
+  };
 }
 
 export function loadRecentSessionSnapshot(): SessionSnapshot | null {
@@ -222,9 +251,9 @@ export function storeWebDefaults(defaults: StoredWebDefaults): void {
 }
 
 export function loadAiCompanionPresets(): StoredAiCompanionPreset[] {
-  return (readJson<StoredAiCompanionPreset[]>(AI_COMPANION_PRESETS_STORAGE_KEY) ?? []).sort(
-    (left, right) => right.updatedAt.localeCompare(left.updatedAt)
-  );
+  return (readJson<StoredAiCompanionPreset[]>(AI_COMPANION_PRESETS_STORAGE_KEY) ?? [])
+    .map(normalizeStoredAiCompanionPreset)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 export function storeAiCompanionPreset(
@@ -243,6 +272,7 @@ export function storeAiCompanionPreset(
     id: presetId,
     displayName: normalized.displayName,
     personalityTagIds: normalized.personalityTagIds,
+    appearanceTagIds: normalized.appearanceTagIds,
     createdAt: existingPreset?.createdAt ?? now,
     updatedAt: now
   };

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type {
+  ComicCharacterReferenceInput,
   ComicMetadataGenerationRequest,
   ComicPageGenerationRequest,
   ComicPreviousPageInput,
@@ -210,13 +211,17 @@ async function buildContinuationContext(
   }).trim();
 }
 
-function buildCharacterReferenceDescriptor(
+function buildCharacterReferenceLabel(name: string | undefined, index: number): string {
+  const cleanName = compactWhitespace(name ?? "");
+  return cleanName.length > 0 ? cleanName : `Character ${index + 1}`;
+}
+
+function buildImageCharacterReferenceDescriptor(
   reference: ComicReferenceImageInput,
   index: number
 ): string {
-  const name = compactWhitespace(reference.name ?? "");
   const appearance = compactWhitespace(reference.appearance ?? "");
-  const label = name.length > 0 ? `${name}` : `Character ${index + 1}`;
+  const label = buildCharacterReferenceLabel(reference.name, index);
 
   if (appearance.length > 0) {
     return `- ${label}: ${appearance}`;
@@ -225,42 +230,81 @@ function buildCharacterReferenceDescriptor(
   return `- ${label}: no extra appearance text supplied, so use the image itself as the primary identity reference.`;
 }
 
+function buildTextCharacterReferenceDescriptor(
+  reference: ComicCharacterReferenceInput,
+  index: number
+): string {
+  return `- ${buildCharacterReferenceLabel(reference.name, index)}: ${compactWhitespace(reference.appearance)}`;
+}
+
 async function buildCharacterReferenceRules(
-  referenceImages: ComicReferenceImageInput[] | undefined
+  referenceImages: ComicReferenceImageInput[] | undefined,
+  characterReferences: ComicCharacterReferenceInput[] | undefined
 ): Promise<string> {
-  const characterReferences = (referenceImages ?? [])
+  const imageCharacterReferences = (referenceImages ?? [])
     .filter((item) => (item.role ?? "character") === "character")
     .filter((item) => compactWhitespace(item.imageUrl).length > 0)
     .slice(0, 2);
+  const textCharacterReferences = (characterReferences ?? [])
+    .map((item) => ({
+      name: compactWhitespace(item.name ?? "") || undefined,
+      appearance: compactWhitespace(item.appearance)
+    }))
+    .filter((item) => item.appearance.length > 0)
+    .slice(0, 3);
 
-  if (characterReferences.length === 0) {
+  if (imageCharacterReferences.length === 0 && textCharacterReferences.length === 0) {
     return "";
   }
 
-  const baseRules = await loadPromptFile("character_reference_rules.txt");
-  const roleSpecificRules =
-    characterReferences.length === 1
-      ? [
-          "PROJECT-SPECIFIC ENFORCEMENT:",
-          "- Use the uploaded image as the protagonist identity reference.",
-          "- Keep this same face and visual identity stable across all 5 panels."
-        ]
-      : [
-          "PROJECT-SPECIFIC ENFORCEMENT:",
-          "- Treat the first uploaded image as Character 1's identity reference.",
-          "- Treat the second uploaded image as Character 2's identity reference.",
-          "- Keep both characters visually distinct and individually stable."
-        ];
-  const descriptorLines = characterReferences.map(buildCharacterReferenceDescriptor);
+  const sections: string[] = [];
 
-  return [
-    baseRules,
-    "",
-    "SELECTED REFERENCE CHARACTERS:",
-    ...descriptorLines,
-    "",
-    ...roleSpecificRules
-  ].join("\n");
+  if (imageCharacterReferences.length > 0) {
+    const baseRules = await loadPromptFile("character_reference_rules.txt");
+    const roleSpecificRules =
+      imageCharacterReferences.length === 1
+        ? [
+            "PROJECT-SPECIFIC ENFORCEMENT:",
+            "- Use the uploaded image as the protagonist identity reference.",
+            "- Keep this same face and visual identity stable across all 5 panels."
+          ]
+        : [
+            "PROJECT-SPECIFIC ENFORCEMENT:",
+            "- Treat the first uploaded image as Character 1's identity reference.",
+            "- Treat the second uploaded image as Character 2's identity reference.",
+            "- Keep both characters visually distinct and individually stable."
+          ];
+    const descriptorLines = imageCharacterReferences.map(buildImageCharacterReferenceDescriptor);
+
+    sections.push(
+      [
+        baseRules,
+        "",
+        "SELECTED IMAGE REFERENCE CHARACTERS:",
+        ...descriptorLines,
+        "",
+        ...roleSpecificRules
+      ].join("\n")
+    );
+  }
+
+  if (textCharacterReferences.length > 0) {
+    sections.push(
+      [
+        "TEXTUAL CHARACTER APPEARANCE REFERENCES:",
+        ...textCharacterReferences.map(buildTextCharacterReferenceDescriptor),
+        "",
+        "TEXTUAL CONSISTENCY RULES:",
+        "- Treat these notes as identity anchors for recurring characters.",
+        "- Keep each named character's face, silhouette, and outfit cues stable across panels unless the story explicitly changes them.",
+        textCharacterReferences.length > 1
+          ? "- Keep these characters visually distinct. Do not swap or blend their facial traits or clothing."
+          : "- Preserve the listed appearance cues whenever the character is on page."
+      ].join("\n")
+    );
+  }
+
+  return sections.join("\n\n").trim();
 }
 
 export async function buildComicPagePrompt(
@@ -281,7 +325,7 @@ export async function buildComicPagePrompt(
   const [pageTemplate, continuationContext, characterReferenceRules] = await Promise.all([
     loadPromptFile("page_generation_system_prompt.txt"),
     buildContinuationContext(request, pageNumber),
-    buildCharacterReferenceRules(request.referenceImages)
+    buildCharacterReferenceRules(request.referenceImages, request.characterReferences)
   ]);
 
   return {
