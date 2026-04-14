@@ -821,6 +821,22 @@ export function App() {
     );
   }
 
+  function handleAddAiCompanionFromPreset(companion: CreateSessionAiCompanionInput): void {
+    setAiCompanions((current) =>
+      current.length >= 3
+        ? current
+        : [
+            ...current,
+            {
+              displayName: companion.displayName,
+              personalityTagIds: Array.from(
+                new Set(companion.personalityTagIds.filter((tagId) => tagId.trim().length > 0))
+              )
+            }
+          ]
+    );
+  }
+
   function handleRemoveAiCompanion(index: number): void {
     setAiCompanions((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
@@ -2175,6 +2191,8 @@ export function App() {
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
           runtimeModelConfig={runtimeModelConfig}
+          imageProfileId={imageProfileId}
+          runtimeImageModelConfig={runtimeImageModelConfig}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           openingPreviewDeliveryMode={openingPreviewDeliveryMode}
@@ -2198,6 +2216,8 @@ export function App() {
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
+          onImageProfileIdChange={setImageProfileId}
+          onImageProfileRuntimeConfigChange={setImageProfileRuntimeConfig}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
           onRegenerateOpeningPreview={handleRegenerateOpeningPreview}
@@ -2206,6 +2226,7 @@ export function App() {
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}
           onAddAiCompanion={handleAddAiCompanion}
+          onAddAiCompanionFromPreset={handleAddAiCompanionFromPreset}
           onRemoveAiCompanion={handleRemoveAiCompanion}
           onUpdateAiCompanionName={handleUpdateAiCompanionName}
           onToggleAiCompanionPersonalityTag={handleToggleAiCompanionPersonalityTag}

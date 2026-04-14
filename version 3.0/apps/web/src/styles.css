@@ -1478,6 +1478,37 @@ img {
   min-height: 120px;
 }
 
+.companion-preset-list {
+  display: grid;
+  gap: 12px;
+}
+
+.companion-preset-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(95, 33, 18, 0.1);
+}
+
+.companion-preset-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.companion-preset-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.companion-preset-modal-empty {
+  min-height: 140px;
+}
+
 .character-setup-copy {
   display: grid;
   align-content: start;

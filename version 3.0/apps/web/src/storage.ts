@@ -1,4 +1,5 @@
 import type {
+  CreateSessionAiCompanionInput,
   CreateSessionRequest,
   ImagePromptTemplateConfig,
   RuntimeModelConfigInput,
@@ -14,6 +15,7 @@ const SESSION_RECORDS_STORAGE_KEY = "trpg3.sessionRecords";
 const WEB_DEFAULTS_STORAGE_KEY = "trpg3.webDefaults";
 const PLAYTHROUGH_GRAPHS_STORAGE_KEY = "trpg3.playthroughGraphs";
 const ACTIVE_PLAYTHROUGH_GRAPH_ID_STORAGE_KEY = "trpg3.activePlaythroughGraphId";
+const AI_COMPANION_PRESETS_STORAGE_KEY = "trpg3.aiCompanionPresets";
 const MAX_SESSION_RECORDS = 20;
 
 export type StoredWebDefaults = {
@@ -44,6 +46,14 @@ export type SessionRecord = {
   locale: string;
   status: string;
   round: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StoredAiCompanionPreset = {
+  id: string;
+  displayName: string;
+  personalityTagIds: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -148,6 +158,32 @@ function buildRecord(snapshot: SessionSnapshot): SessionRecord {
   };
 }
 
+function normalizeAiCompanionPreset(
+  companion: CreateSessionAiCompanionInput
+): CreateSessionAiCompanionInput {
+  return {
+    displayName: companion.displayName.trim(),
+    personalityTagIds: Array.from(
+      new Set(
+        companion.personalityTagIds
+          .map((tagId) => tagId.trim())
+          .filter((tagId) => tagId.length > 0)
+      )
+    )
+  };
+}
+
+function buildAiCompanionPresetId(companion: CreateSessionAiCompanionInput): string {
+  const normalized = normalizeAiCompanionPreset(companion);
+  const normalizedName = normalized.displayName.toLocaleLowerCase();
+  if (normalizedName.length > 0) {
+    return `name:${normalizedName}`;
+  }
+
+  const tagKey = [...normalized.personalityTagIds].sort().join("|");
+  return tagKey.length > 0 ? `tags:${tagKey}` : "";
+}
+
 export function loadRecentSessionSnapshot(): SessionSnapshot | null {
   return readJson<SessionSnapshot>(RECENT_SNAPSHOT_STORAGE_KEY);
 }
@@ -183,4 +219,38 @@ export function loadStoredWebDefaults(): StoredWebDefaults | null {
 
 export function storeWebDefaults(defaults: StoredWebDefaults): void {
   writeJson(WEB_DEFAULTS_STORAGE_KEY, defaults);
+}
+
+export function loadAiCompanionPresets(): StoredAiCompanionPreset[] {
+  return (readJson<StoredAiCompanionPreset[]>(AI_COMPANION_PRESETS_STORAGE_KEY) ?? []).sort(
+    (left, right) => right.updatedAt.localeCompare(left.updatedAt)
+  );
+}
+
+export function storeAiCompanionPreset(
+  companion: CreateSessionAiCompanionInput
+): StoredAiCompanionPreset[] {
+  const normalized = normalizeAiCompanionPreset(companion);
+  const presetId = buildAiCompanionPresetId(normalized);
+  if (!presetId) {
+    return loadAiCompanionPresets();
+  }
+
+  const currentPresets = loadAiCompanionPresets();
+  const existingPreset = currentPresets.find((item) => item.id === presetId);
+  const now = new Date().toISOString();
+  const nextPreset: StoredAiCompanionPreset = {
+    id: presetId,
+    displayName: normalized.displayName,
+    personalityTagIds: normalized.personalityTagIds,
+    createdAt: existingPreset?.createdAt ?? now,
+    updatedAt: now
+  };
+  const nextPresets = [
+    nextPreset,
+    ...currentPresets.filter((item) => item.id !== presetId)
+  ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+
+  writeJson(AI_COMPANION_PRESETS_STORAGE_KEY, nextPresets);
+  return nextPresets;
 }

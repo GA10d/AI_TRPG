@@ -13,6 +13,7 @@ import type {
   CharacterConceptAssistMode,
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
+  RuntimeImageModelConfigInput,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import {
@@ -31,6 +32,11 @@ import {
   type OpeningPreviewDeliveryMode
 } from "../openingPreviewPreferences.ts";
 import { useUiText } from "../locales/index.tsx";
+import {
+  loadAiCompanionPresets,
+  storeAiCompanionPreset,
+  type StoredAiCompanionPreset
+} from "../storage.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
@@ -44,6 +50,8 @@ type GameSetupScreenProps = {
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId: string;
   runtimeModelConfig: RuntimeModelConfigInput;
+  imageProfileId: string;
+  runtimeImageModelConfig: RuntimeImageModelConfigInput;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
@@ -69,6 +77,11 @@ type GameSetupScreenProps = {
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
   onModelProfileIdChange: (value: string) => void;
+  onImageProfileIdChange: (value: string) => void;
+  onImageProfileRuntimeConfigChange: (
+    profileId: string,
+    value: RuntimeImageModelConfigInput
+  ) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
@@ -77,6 +90,7 @@ type GameSetupScreenProps = {
   onMarkdownFontSizeChange: (value: MarkdownFontSizePreset) => void;
   onCharacterConceptChange: (value: string) => void;
   onAddAiCompanion: () => void;
+  onAddAiCompanionFromPreset: (value: CreateSessionAiCompanionInput) => void;
   onRemoveAiCompanion: (index: number) => void;
   onUpdateAiCompanionName: (index: number, value: string) => void;
   onToggleAiCompanionPersonalityTag: (index: number, personalityTagId: string) => void;
@@ -103,6 +117,12 @@ const DEFAULT_LAYOUT: SetupLayoutState = {
   rightWidth: 360,
   isLeftCollapsed: false,
   isRightCollapsed: false
+};
+
+const EMPTY_RUNTIME_IMAGE_MODEL_CONFIG: RuntimeImageModelConfigInput = {
+  apiKey: "",
+  baseUrl: "",
+  model: ""
 };
 
 function clampNumber(value: number, minValue: number, maxValue: number): number {
@@ -237,6 +257,38 @@ function isProfileReady(
   return hasApiKey && baseUrlReady && modelReady;
 }
 
+function getEffectiveRuntimeConfig(
+  runtimeConfig: RuntimeModelConfigInput | RuntimeImageModelConfigInput | undefined
+): RuntimeModelConfigInput {
+  return {
+    apiKey: runtimeConfig?.apiKey?.trim() || "",
+    baseUrl: runtimeConfig?.baseUrl?.trim() || "",
+    model: runtimeConfig?.model?.trim() || ""
+  };
+}
+
+function isImageProfileReady(
+  selectedProfile: BootstrapResponse["imageProfiles"][number] | null,
+  runtimeImageModelConfig: RuntimeModelConfigInput
+): boolean {
+  if (!selectedProfile) {
+    return false;
+  }
+
+  if (selectedProfile.dependence === "Mock" || selectedProfile.configured) {
+    return true;
+  }
+
+  const hasApiKey = (runtimeImageModelConfig.apiKey?.trim() ?? "").length > 0;
+  const hasBaseUrl = (runtimeImageModelConfig.baseUrl?.trim() ?? "").length > 0;
+  const hasModel = (runtimeImageModelConfig.model?.trim() ?? "").length > 0;
+  const baseUrlReady =
+    !selectedProfile.urlRequirements || hasBaseUrl || Boolean(selectedProfile.baseUrl);
+  const modelReady = hasModel || Boolean(selectedProfile.baseModel);
+
+  return hasApiKey && baseUrlReady && modelReady;
+}
+
 function SettingField(props: {
   label: string;
   hint: string;
@@ -256,6 +308,7 @@ function SettingField(props: {
 export function GameSetupScreen(props: GameSetupScreenProps) {
   const text = useUiText();
   const setupText = text.gameSetupScreen;
+  const settingsText = text.settingsScreen;
   const playModeOptions = getPlayModeOptions(text);
   const gmArchitectureOptions = getGmArchitectureOptions(text);
   const logViewOptions = getLogViewOptions(text);
@@ -271,6 +324,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
+    imageProfileId,
+    runtimeImageModelConfig,
     debugEnabled,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -296,12 +351,15 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onGmArchitectureChange,
     onModelAccessModeChange,
     onModelProfileIdChange,
+    onImageProfileIdChange,
+    onImageProfileRuntimeConfigChange,
     onDebugEnabledChange,
     onLogViewModeChange,
     onOpeningPreviewDeliveryModeChange,
     onMarkdownFontSizeChange,
     onCharacterConceptChange,
     onAddAiCompanion,
+    onAddAiCompanionFromPreset,
     onRemoveAiCompanion,
     onUpdateAiCompanionName,
     onToggleAiCompanionPersonalityTag
@@ -314,6 +372,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const [isSettingsDetailOpen, setIsSettingsDetailOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<SetupDetailTab>("game");
   const [personalityEditorIndex, setPersonalityEditorIndex] = useState<number | null>(null);
+  const [savedCompanionPresets, setSavedCompanionPresets] = useState<StoredAiCompanionPreset[]>(
+    () => loadAiCompanionPresets()
+  );
+  const [isCompanionPresetPickerOpen, setIsCompanionPresetPickerOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -459,6 +521,39 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     setPersonalityEditorIndex(null);
   }
 
+  function handleOpenCompanionPresetPicker(): void {
+    setIsCompanionPresetPickerOpen(true);
+  }
+
+  function handleCloseCompanionPresetPicker(): void {
+    setIsCompanionPresetPickerOpen(false);
+  }
+
+  function handleSaveCompanionPreset(companion: CreateSessionAiCompanionInput): void {
+    setSavedCompanionPresets(storeAiCompanionPreset(companion));
+  }
+
+  function handleLoadCompanionPreset(preset: StoredAiCompanionPreset): void {
+    if (companionLimitReached) {
+      return;
+    }
+
+    onAddAiCompanionFromPreset({
+      displayName: preset.displayName,
+      personalityTagIds: preset.personalityTagIds
+    });
+    setIsCompanionPresetPickerOpen(false);
+  }
+
+  function formatPresetTimestamp(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString();
+  }
+
   const selectedRule =
     bootstrap?.catalog.find((item) => item.directoryName === ruleDirectoryName) ?? null;
   const selectedStory =
@@ -469,7 +564,16 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     bootstrap?.modelProfiles.filter((item) => item.accessMode === modelAccessMode) ?? [];
   const selectedProfile =
     availableProfiles.find((item) => item.id === modelProfileId) ?? availableProfiles[0] ?? null;
+  const selectedImageProfile =
+    bootstrap?.imageProfiles.find((item) => item.id === imageProfileId) ??
+    bootstrap?.imageProfiles[0] ??
+    null;
+  const effectiveImageRuntimeConfig = getEffectiveRuntimeConfig(runtimeImageModelConfig);
   const profileReady = isProfileReady(modelAccessMode, selectedProfile, runtimeModelConfig);
+  const imageProfileReady = isImageProfileReady(
+    selectedImageProfile,
+    effectiveImageRuntimeConfig
+  );
   const coverAsset = selectedStory?.assets.find((item) => item.type === "cover") ?? null;
   const previewLines = buildPreviewLines(
     selectedStory?.intro ?? selectedRule?.ruleIntro ?? null,
@@ -490,6 +594,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const resolvedModelName =
     runtimeModelConfig.model?.trim() ||
     selectedProfile?.baseModel ||
+    setupText.model.notConfigured;
+  const resolvedImageModelName =
+    effectiveImageRuntimeConfig.model?.trim() ||
+    selectedImageProfile?.baseModel ||
     setupText.model.notConfigured;
   const trimmedCharacterConcept = characterConcept.trim();
   const characterAssistShowsComplete = trimmedCharacterConcept.length > 0;
@@ -513,6 +621,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const personalityTags = bootstrap?.personalityTags ?? [];
   const isStoryMode = playMode === "story_mode";
   const companionLimitReached = aiCompanions.length >= 3;
+  const hasSavedCompanionPresets = savedCompanionPresets.length > 0;
   const editingCompanion =
     personalityEditorIndex !== null ? aiCompanions[personalityEditorIndex] ?? null : null;
   const editingCompanionSelectedTags = editingCompanion
@@ -659,6 +768,17 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     );
   }
 
+  function updateImageRuntimeConfig(patch: Partial<RuntimeImageModelConfigInput>): void {
+    if (!selectedImageProfile) {
+      return;
+    }
+
+    onImageProfileRuntimeConfigChange(selectedImageProfile.id, {
+      ...effectiveImageRuntimeConfig,
+      ...patch
+    });
+  }
+
   function renderModelSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
     const containerClassName =
       layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
@@ -778,6 +898,147 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     );
   }
 
+  function renderImageModelSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
+    const containerClassName =
+      layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
+
+    return (
+      <>
+        <div className={containerClassName}>
+          <SettingField
+            label={settingsText.imageModelProfile}
+            hint={selectedImageProfile?.description ?? setupText.fields.modelProfileHint}
+          >
+            <select
+              value={selectedImageProfile?.id ?? imageProfileId}
+              onChange={(event) => onImageProfileIdChange(event.target.value)}
+            >
+              {bootstrap?.imageProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </SettingField>
+
+          <SettingField
+            label={settingsText.imageModelNameOverride}
+            hint={
+              selectedImageProfile?.baseModel
+                ? setupText.model.referenceModel(selectedImageProfile.baseModel)
+                : settingsText.modelPlaceholder
+            }
+          >
+            <input
+              className="text-input"
+              placeholder={selectedImageProfile?.baseModel ?? settingsText.modelPlaceholder}
+              type="text"
+              value={effectiveImageRuntimeConfig.model}
+              onChange={(event) =>
+                updateImageRuntimeConfig({
+                  model: event.target.value
+                })
+              }
+            />
+          </SettingField>
+
+          <SettingField
+            label={settingsText.imageApiKeyOverride}
+            hint={settingsText.apiKeyPlaceholder}
+          >
+            <input
+              autoComplete="new-password"
+              className="text-input"
+              placeholder={settingsText.apiKeyPlaceholder}
+              type="password"
+              value={effectiveImageRuntimeConfig.apiKey}
+              onChange={(event) =>
+                updateImageRuntimeConfig({
+                  apiKey: event.target.value
+                })
+              }
+            />
+          </SettingField>
+
+          <SettingField
+            label={settingsText.imageBaseUrlOverride}
+            hint={settingsText.baseUrlPlaceholder}
+          >
+            <input
+              className="text-input"
+              placeholder={selectedImageProfile?.baseUrl ?? settingsText.baseUrlPlaceholder}
+              type="text"
+              value={effectiveImageRuntimeConfig.baseUrl}
+              onChange={(event) =>
+                updateImageRuntimeConfig({
+                  baseUrl: event.target.value
+                })
+              }
+            />
+          </SettingField>
+        </div>
+
+        <div className="button-row">
+          <button
+            className="ghost-button"
+            onClick={() =>
+              selectedImageProfile
+                ? onImageProfileRuntimeConfigChange(
+                    selectedImageProfile.id,
+                    EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
+                  )
+                : undefined
+            }
+            type="button"
+          >
+            {settingsText.clearImageModelOverride}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  function renderCapabilityList(
+    features:
+      | BootstrapResponse["modelProfiles"][number]["featureDetails"]
+      | BootstrapResponse["imageProfiles"][number]["featureDetails"]
+  ): React.ReactNode {
+    return (
+      <div className="model-capability-list">
+        {features.map((feature) => (
+          <div
+            key={feature.key}
+            className={`model-capability-item ${
+              feature.supported
+                ? "model-capability-item-supported"
+                : "model-capability-item-unsupported"
+            }`}
+          >
+            <div className="model-capability-row">
+              <span className="model-capability-label">{feature.label}</span>
+              <span className="model-capability-state">
+                {feature.supported ? setupText.model.supported : setupText.model.unsupported}
+              </span>
+            </div>
+            <div className="model-capability-meta">
+              {feature.model
+                ? setupText.model.referenceModel(feature.model)
+                : setupText.model.noSpecificModel}
+              {feature.url ? (
+                <>
+                  {" · "}
+                  <a href={feature.url} rel="noreferrer" target="_blank">
+                    {setupText.model.officialDocs}
+                  </a>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function renderPersonalityTagSection(
     companionIndex: number,
     section: {
@@ -823,6 +1084,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       companion.displayName.trim() || setupText.companions.namePlaceholder(index + 1);
     const previewTags = selectedTags.slice(0, 6);
     const hiddenTagCount = selectedTags.length - previewTags.length;
+    const canSavePreset =
+      companion.displayName.trim().length > 0 || companion.personalityTagIds.length > 0;
 
     return (
       <div className="companion-card companion-editor-card" key={`companion-${index}`}>
@@ -873,6 +1136,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         </div>
 
         <div className="companion-editor-actions">
+          <button
+            className="ghost-button"
+            disabled={!canSavePreset}
+            onClick={() => handleSaveCompanionPreset(companion)}
+            type="button"
+          >
+            {setupText.companions.savePresetButton}
+          </button>
           <button
             className="ghost-button"
             onClick={() => handleOpenPersonalityEditor(index)}
@@ -962,6 +1233,107 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     );
   }
 
+  function renderCompanionPresetPickerModal(): React.ReactNode {
+    if (!isCompanionPresetPickerOpen) {
+      return null;
+    }
+
+    return (
+      <div
+        aria-label={setupText.companions.loadPresetTitle}
+        className="companion-personality-modal-backdrop"
+        onClick={handleCloseCompanionPresetPicker}
+        role="dialog"
+      >
+        <div
+          className="companion-personality-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="companion-personality-modal-header">
+            <div>
+              <div className="eyebrow">{setupText.companions.eyebrow}</div>
+              <h2>{setupText.companions.loadPresetTitle}</h2>
+              <div className="summary-text">
+                {setupText.companions.loadPresetDescription}
+              </div>
+            </div>
+            <button
+              className="ghost-button ghost-button-small"
+              onClick={handleCloseCompanionPresetPicker}
+              type="button"
+            >
+              {setupText.modal.close}
+            </button>
+          </div>
+
+          <div className="companion-personality-modal-summary">
+            {hasSavedCompanionPresets ? (
+              <div className="companion-preset-list">
+                {savedCompanionPresets.map((preset) => {
+                  const selectedTags = personalityTags.filter((tag) =>
+                    preset.personalityTagIds.includes(tag.id)
+                  );
+                  const previewTags = selectedTags.slice(0, 6);
+                  const hiddenTagCount = selectedTags.length - previewTags.length;
+                  const presetDisplayName =
+                    preset.displayName.trim() || setupText.companions.presetNameFallback;
+
+                  return (
+                    <article className="companion-preset-item" key={preset.id}>
+                      <div className="companion-preset-head">
+                        <div className="companion-preset-meta">
+                          <div className="selection-card-title">{presetDisplayName}</div>
+                          <div className="summary-text">
+                            {setupText.companions.selectedCount(preset.personalityTagIds.length)}
+                          </div>
+                          <div className="summary-text">
+                            {setupText.companions.presetSavedAt(
+                              formatPresetTimestamp(preset.updatedAt)
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          className="ghost-button ghost-button-small"
+                          disabled={companionLimitReached}
+                          onClick={() => handleLoadCompanionPreset(preset)}
+                          type="button"
+                        >
+                          {setupText.companions.usePresetButton}
+                        </button>
+                      </div>
+
+                      {selectedTags.length ? (
+                        <div className="companion-selected-tags">
+                          {previewTags.map((tag) => (
+                            <span className="badge" key={tag.id}>
+                              {tag.keyword}
+                            </span>
+                          ))}
+                          {hiddenTagCount > 0 ? (
+                            <span className="badge">+{hiddenTagCount}</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="companion-selected-placeholder">
+                          {setupText.companions.selectedPreviewEmpty}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state companion-preset-modal-empty">
+                {setupText.companions.noSavedPresets}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderCompanionCards(gridClassName?: string): React.ReactNode {
     return (
       <div className={gridClassName ?? "companion-list"}>
@@ -989,17 +1361,30 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <div className="companion-card">
           <div className="selection-card-title">{setupText.companions.addTitle}</div>
           <div className="summary-text">{setupText.companions.addDescription}</div>
+          <div className="summary-text">
+            {setupText.companions.savedPresetCount(savedCompanionPresets.length)}
+          </div>
           {companionLimitReached ? (
             <div className="summary-text">{setupText.companions.limitReached}</div>
           ) : null}
-          <button
-            className="ghost-button"
-            disabled={companionLimitReached}
-            onClick={onAddAiCompanion}
-            type="button"
-          >
-            {setupText.companions.addButton}
-          </button>
+          <div className="companion-editor-actions">
+            <button
+              className="ghost-button"
+              disabled={companionLimitReached}
+              onClick={onAddAiCompanion}
+              type="button"
+            >
+              {setupText.companions.addButton}
+            </button>
+            <button
+              className="ghost-button"
+              disabled={companionLimitReached || !hasSavedCompanionPresets}
+              onClick={handleOpenCompanionPresetPicker}
+              type="button"
+            >
+              {setupText.companions.loadPresetButton}
+            </button>
+          </div>
         </div>
 
         <div className="companion-card">
@@ -1144,8 +1529,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <div className="settings-model-grid">
           <article className="summary-card settings-model-card">
             <div className="setup-section-heading">
-              <div className="eyebrow">{setupText.detailTabs.model.label}</div>
-              <div className="summary-title">{setupText.model.entryTitle}</div>
+              <div className="eyebrow">{settingsText.textModelEyebrow}</div>
+              <div className="summary-title">{settingsText.textModelTitle}</div>
             </div>
             {renderModelSettingsFields("detail")}
           </article>
@@ -1153,51 +1538,50 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           {selectedProfile ? (
             <article className="summary-card settings-model-card">
               <div className="setup-section-heading">
-                <div className="eyebrow">{setupText.model.capabilitiesTitle}</div>
+                <div className="eyebrow">{settingsText.textModelEyebrow}</div>
                 <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
                 <div className="summary-text">
                   {setupText.model.capabilitiesDescription}
                 </div>
               </div>
-              <div className="model-capability-list">
-                {selectedProfile.featureDetails.map((feature) => (
-                  <div
-                    key={feature.key}
-                    className={`model-capability-item ${
-                      feature.supported
-                        ? "model-capability-item-supported"
-                        : "model-capability-item-unsupported"
-                    }`}
-                  >
-                    <div className="model-capability-row">
-                      <span className="model-capability-label">{feature.label}</span>
-                      <span className="model-capability-state">
-                        {feature.supported
-                          ? setupText.model.supported
-                          : setupText.model.unsupported}
-                      </span>
-                    </div>
-                    <div className="model-capability-meta">
-                      {feature.model
-                        ? setupText.model.referenceModel(feature.model)
-                        : setupText.model.noSpecificModel}
-                      {feature.url ? (
-                        <>
-                          {" · "}
-                          <a href={feature.url} rel="noreferrer" target="_blank">
-                            {setupText.model.officialDocs}
-                          </a>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {renderCapabilityList(selectedProfile.featureDetails)}
             </article>
           ) : (
             <article className="summary-card settings-model-card">
               <div className="setup-section-heading">
-                <div className="eyebrow">{setupText.model.capabilitiesTitle}</div>
+                <div className="eyebrow">{settingsText.textModelEyebrow}</div>
+                <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
+              </div>
+              <div className="summary-text">{setupText.model.noCapabilities}</div>
+            </article>
+          )}
+
+          <article className="summary-card settings-model-card">
+            <div className="setup-section-heading">
+              <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
+              <div className="summary-title">{settingsText.imageModelTitle}</div>
+              {selectedImageProfile?.description ? (
+                <div className="summary-text">{selectedImageProfile.description}</div>
+              ) : null}
+            </div>
+            {renderImageModelSettingsFields("detail")}
+          </article>
+
+          {selectedImageProfile ? (
+            <article className="summary-card settings-model-card">
+              <div className="setup-section-heading">
+                <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
+                <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
+                <div className="summary-text">
+                  {selectedImageProfile.message || setupText.model.noExplanation}
+                </div>
+              </div>
+              {renderCapabilityList(selectedImageProfile.featureDetails)}
+            </article>
+          ) : (
+            <article className="summary-card settings-model-card">
+              <div className="setup-section-heading">
+                <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
                 <div className="summary-title">{setupText.model.capabilitiesTitle}</div>
               </div>
               <div className="summary-text">{setupText.model.noCapabilities}</div>
@@ -1208,7 +1592,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         <article className="summary-card settings-model-entry">
           <div className="settings-model-entry-head">
             <div>
-              <div className="eyebrow">{setupText.model.summaryTitle}</div>
+              <div className="eyebrow">{settingsText.textModelEyebrow}</div>
               <div className="summary-title">{setupText.model.summaryTitle}</div>
             </div>
           </div>
@@ -1230,6 +1614,35 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             <div className="summary-text">
               {setupText.model.message(
                 selectedProfile?.message ?? setupText.model.noExplanation
+              )}
+            </div>
+          </div>
+        </article>
+
+        <article className="summary-card settings-model-entry">
+          <div className="settings-model-entry-head">
+            <div>
+              <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
+              <div className="summary-title">{settingsText.imageModelTitle}</div>
+            </div>
+          </div>
+          <div className="settings-model-entry-grid">
+            <div className="summary-text">
+              {setupText.model.profile(
+                selectedImageProfile?.name ?? setupText.model.notConfigured
+              )}
+            </div>
+            <div className="summary-text">
+              {setupText.model.resolvedModel(resolvedImageModelName)}
+            </div>
+            <div className="summary-text">
+              {setupText.model.status(
+                imageProfileReady ? setupText.model.ready : setupText.model.needsConfig
+              )}
+            </div>
+            <div className="summary-text">
+              {setupText.model.message(
+                selectedImageProfile?.message ?? setupText.model.noExplanation
               )}
             </div>
           </div>
@@ -1339,8 +1752,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                   <article className="summary-card setup-section-card">
                     <div className="setup-section-heading">
-                      <div className="eyebrow">{setupText.detailTabs.model.label}</div>
-                      <div className="summary-title">{setupText.detailTabs.model.label}</div>
+                      <div className="eyebrow">{settingsText.textModelEyebrow}</div>
+                      <div className="summary-title">{settingsText.textModelTitle}</div>
                       <div className="summary-text">
                         {setupText.overview.modelDescription}
                       </div>
@@ -1360,6 +1773,37 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       <div className="summary-text">
                         {setupText.model.status(
                           profileReady ? setupText.model.ready : setupText.model.needsConfig
+                        )}
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="summary-card setup-section-card">
+                    <div className="setup-section-heading">
+                      <div className="eyebrow">{settingsText.imageModelEyebrow}</div>
+                      <div className="summary-title">{settingsText.imageModelTitle}</div>
+                      {selectedImageProfile?.description ? (
+                        <div className="summary-text">{selectedImageProfile.description}</div>
+                      ) : null}
+                    </div>
+                    {renderImageModelSettingsFields("sidebar")}
+                    <div className="setup-section-summary-list">
+                      <div className="summary-text">
+                        {setupText.model.currentProfile(
+                          selectedImageProfile?.name ?? setupText.model.notConfigured
+                        )}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.resolvedModel(resolvedImageModelName)}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.status(
+                          imageProfileReady ? setupText.model.ready : setupText.model.needsConfig
+                        )}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.message(
+                          selectedImageProfile?.message ?? setupText.model.noExplanation
                         )}
                       </div>
                     </div>
@@ -1688,6 +2132,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       ) : null}
 
       {renderPersonalityEditorModal()}
+      {renderCompanionPresetPickerModal()}
 
       {coverAsset && isCoverExpanded ? (
         <div

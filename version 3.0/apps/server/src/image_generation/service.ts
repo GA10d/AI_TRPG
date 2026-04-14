@@ -711,7 +711,7 @@ export async function generateImage(
       providerConfig.model
     ) {
       const generated =
-        providerConfig.profileId === "doubao-image"
+        providerConfig.profileId.startsWith("doubao-image")
           ? await generateDoubaoImage({
               baseUrl: providerConfig.baseUrl,
               apiKey: providerConfig.apiKey,
