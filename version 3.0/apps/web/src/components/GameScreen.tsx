@@ -14,10 +14,18 @@ import type {
   NpcRosterEntry,
   PlaythroughGraphBundle,
   RuntimeImageModelConfigInput,
+  SessionMemory,
   SessionSnapshot,
+  SessionRuntimeContextPack,
   StoryControlMode
 } from "../../../../packages/shared-types/src/index.ts";
-import { fetchNpcRoster, generateSceneImage } from "../lib/trpgApiClient.ts";
+import {
+  fetchNpcRoster,
+  fetchSessionContextPack,
+  fetchSessionMemory,
+  generateSceneImage,
+  rebuildSessionMemory
+} from "../lib/trpgApiClient.ts";
 import { useUiText } from "../locales/index.tsx";
 import type { SavedGameRecord } from "../storage.ts";
 import {
@@ -167,6 +175,12 @@ export function GameScreen(props: GameScreenProps) {
     Record<string, ImageGenerationResponse>
   >({});
   const [generatingNpcId, setGeneratingNpcId] = useState<string | null>(null);
+  const [debugMemory, setDebugMemory] = useState<SessionMemory | null>(null);
+  const [debugNarratorContextPack, setDebugNarratorContextPack] = useState<SessionRuntimeContextPack | null>(null);
+  const [debugCompanionContextPack, setDebugCompanionContextPack] = useState<SessionRuntimeContextPack | null>(null);
+  const [debugMemoryLoading, setDebugMemoryLoading] = useState(false);
+  const [debugMemoryError, setDebugMemoryError] = useState<string | null>(null);
+  const [isRebuildingMemory, setIsRebuildingMemory] = useState(false);
 
   const actionLocked = isBootstrappingSession || isOpeningRevealInProgress;
   const publicStoryMessages =
@@ -180,6 +194,7 @@ export function GameScreen(props: GameScreenProps) {
     companionParticipants.find((participant) => participant.id === selectedPrivateChatTargetId) ??
     companionParticipants[0] ??
     null;
+  const debugCompanionParticipant = selectedPrivateChatTarget ?? companionParticipants[0] ?? null;
   const privateThreadId =
     localHumanParticipantId && selectedPrivateChatTarget
       ? buildPrivateChatThreadId(localHumanParticipantId, selectedPrivateChatTarget.id)
@@ -363,6 +378,12 @@ export function GameScreen(props: GameScreenProps) {
     setGeneratedPortraits({});
     setGeneratingNpcId(null);
     setActiveDrawer("none");
+    setDebugMemory(null);
+    setDebugNarratorContextPack(null);
+    setDebugCompanionContextPack(null);
+    setDebugMemoryError(null);
+    setDebugMemoryLoading(false);
+    setIsRebuildingMemory(false);
   }, [snapshot?.session.id]);
 
   useEffect(() => {
@@ -460,6 +481,60 @@ export function GameScreen(props: GameScreenProps) {
     };
   }, [activeDrawer, actionLocked, snapshot]);
 
+  useEffect(() => {
+    if (
+      activeDrawer !== "details" ||
+      !snapshot ||
+      !snapshot.session.settings.debugEnabled
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setDebugMemoryLoading(true);
+    setDebugMemoryError(null);
+
+    void Promise.all([
+      fetchSessionMemory(snapshot.session.id),
+      fetchSessionContextPack({
+        sessionId: snapshot.session.id,
+        target: "narrator"
+      }),
+      debugCompanionParticipant
+        ? fetchSessionContextPack({
+            sessionId: snapshot.session.id,
+            target: "companion",
+            participantId: debugCompanionParticipant.id
+          })
+        : Promise.resolve(null)
+    ])
+      .then(([memoryResponse, narratorContextResponse, companionContextResponse]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setDebugMemory(memoryResponse.memory);
+        setDebugNarratorContextPack(narratorContextResponse.contextPack);
+        setDebugCompanionContextPack(companionContextResponse?.contextPack ?? null);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setDebugMemoryError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDebugMemoryLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDrawer, debugCompanionParticipant, snapshot]);
+
   function handleResizeSidePanel(event: ReactPointerEvent<HTMLDivElement>): void {
     const containerRect = topPanelsRef.current?.getBoundingClientRect();
     if (!containerRect || window.innerWidth <= 900) {
@@ -517,6 +592,40 @@ export function GameScreen(props: GameScreenProps) {
   async function handleLoadSavedGame(record: SavedGameRecord): Promise<void> {
     setActiveDrawer("none");
     await onLoadSavedGame(record);
+  }
+
+  async function handleRebuildMemory(): Promise<void> {
+    if (!snapshot) {
+      return;
+    }
+
+    setIsRebuildingMemory(true);
+    setDebugMemoryError(null);
+    try {
+      const rebuilt = await rebuildSessionMemory(snapshot.session.id);
+      setDebugMemory(rebuilt.memory);
+
+      const narratorContextResponse = await fetchSessionContextPack({
+        sessionId: snapshot.session.id,
+        target: "narrator"
+      });
+      setDebugNarratorContextPack(narratorContextResponse.contextPack);
+
+      if (debugCompanionParticipant) {
+        const companionContextResponse = await fetchSessionContextPack({
+          sessionId: snapshot.session.id,
+          target: "companion",
+          participantId: debugCompanionParticipant.id
+        });
+        setDebugCompanionContextPack(companionContextResponse.contextPack);
+      } else {
+        setDebugCompanionContextPack(null);
+      }
+    } catch (error) {
+      setDebugMemoryError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRebuildingMemory(false);
+    }
   }
 
   async function handleGenerateNpcPortrait(npc: NpcRosterEntry): Promise<void> {
@@ -1373,6 +1482,81 @@ export function GameScreen(props: GameScreenProps) {
                   ) : null}
                   <pre>{endingJudgeJson}</pre>
                 </div>
+
+                {snapshot.session.settings.debugEnabled ? (
+                  <>
+                    <div className="summary-card">
+                      <div className="game-panel-head">
+                        <div>
+                          <div className="meta-label">{text.gameScreen.memoryDebug}</div>
+                          <div className="summary-text">
+                            {text.gameScreen.memoryDebugDescription}
+                          </div>
+                        </div>
+                        <button
+                          className="ghost-button"
+                          disabled={debugMemoryLoading || isRebuildingMemory}
+                          onClick={() => void handleRebuildMemory()}
+                          type="button"
+                        >
+                          {isRebuildingMemory
+                            ? text.gameScreen.memoryRebuilding
+                            : text.gameScreen.memoryRebuild}
+                        </button>
+                      </div>
+
+                      {debugMemoryLoading ? (
+                        <div className="empty-state">{text.common.loading}</div>
+                      ) : null}
+                      {debugMemoryError ? (
+                        <div className="info-banner info-banner-warning">{debugMemoryError}</div>
+                      ) : null}
+
+                      {debugMemory ? (
+                        <>
+                          <div className="debug-memory-stats">
+                            <div className="summary-text">
+                              {text.gameScreen.memoryFacts(debugMemory.facts.length)}
+                            </div>
+                            <div className="summary-text">
+                              {text.gameScreen.memoryOpenLoops(debugMemory.openLoops.length)}
+                            </div>
+                            <div className="summary-text">
+                              {text.gameScreen.memoryEpisodes(
+                                debugMemory.episodeSummaries.length
+                              )}
+                            </div>
+                          </div>
+                          <pre>{JSON.stringify(debugMemory, null, 2)}</pre>
+                        </>
+                      ) : !debugMemoryLoading ? (
+                        <div className="empty-state">{text.gameScreen.noMemoryDebugData}</div>
+                      ) : null}
+                    </div>
+
+                    <div className="summary-card">
+                      <div className="meta-label">{text.gameScreen.narratorContextPack}</div>
+                      <pre>
+                        {debugNarratorContextPack?.assembledText ??
+                          text.gameScreen.noMemoryDebugData}
+                      </pre>
+                    </div>
+
+                    {debugCompanionParticipant ? (
+                      <div className="summary-card">
+                        <div className="meta-label">
+                          {text.gameScreen.companionContextPack(
+                            debugCompanionParticipant.displayName
+                          )}
+                        </div>
+                        <pre>
+                          {debugCompanionContextPack?.assembledText ??
+                            text.gameScreen.noMemoryDebugData}
+                        </pre>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
 
                 <div className="summary-card">
                   <div className="meta-label">{text.gameScreen.replayLog}</div>

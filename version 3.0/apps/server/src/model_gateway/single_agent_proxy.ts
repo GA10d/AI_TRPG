@@ -7,8 +7,10 @@ import {
   buildEndingJudgeSystemPrompt,
   buildEndingJudgeUserPrompt,
   buildNarratorSystemPrompt,
+  parseStructuredJsonObject,
   buildSessionOpeningTaskText,
   buildTurnTaskText,
+  buildStructuredAssistantSystemPrompt,
   loadEndingJudgeOutputSchema,
   parseEndingJudgeDecision
 } from "../single_agent/service.ts";
@@ -17,6 +19,8 @@ import type {
   EndingJudgeInput,
   EndingJudgeOutput,
   InitialSessionNarrationInput,
+  StructuredAssistantInput,
+  StructuredAssistantOutput,
   TurnNarrationInput,
   TurnNarrationOutput
 } from "./types.ts";
@@ -315,7 +319,7 @@ function buildDefaultEndingJudgeDecision() {
   } as const;
 }
 
-function shouldAttemptStrictEndingJudgeSchema(config: ServerProxyConfig): boolean {
+function shouldAttemptStrictStructuredSchema(config: ServerProxyConfig): boolean {
   return config.profileId !== "deepseek" && config.profileId !== "custom-openai-compatible";
 }
 
@@ -878,6 +882,64 @@ export async function generateTurnNarrationViaSingleAgentServerProxy(
   };
 }
 
+export async function generateStructuredAssistantOutputViaServerProxy(
+  input: StructuredAssistantInput
+): Promise<StructuredAssistantOutput> {
+  const config = getServerProxyConfig({
+    modelProfileId: input.modelProfileId,
+    runtimeModelConfig: input.runtimeModelConfig
+  });
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: input.systemPrompt
+    },
+    {
+      role: "user",
+      content: input.userPrompt
+    }
+  ];
+
+  let completion: TextCompletionResult | null = null;
+  let data: Record<string, unknown> | null = null;
+
+  if (shouldAttemptStrictStructuredSchema(config)) {
+    try {
+      completion = await callChatCompletion(config, messages, {
+        temperature: input.temperature ?? 0,
+        responseFormat: {
+          type: "json_schema",
+          name: input.schemaName,
+          schema: input.outputSchema,
+          strict: true
+        }
+      });
+      data = parseStructuredJsonObject(completion.text);
+    } catch {
+      completion = null;
+      data = null;
+    }
+  }
+
+  if (!completion || !data) {
+    completion = await callChatCompletion(config, messages, {
+      temperature: input.temperature ?? 0,
+      responseFormat: {
+        type: "json_object"
+      }
+    });
+    data = parseStructuredJsonObject(completion.text);
+  }
+
+  return {
+    data,
+    rawText: completion.text,
+    provider: `${config.providerLabel}:${config.model}`,
+    mode: "server_proxy",
+    meta: buildNarratorMeta(config, completion)
+  };
+}
+
 export async function judgeEndingViaServerProxy(
   input: EndingJudgeInput
 ): Promise<EndingJudgeOutput> {
@@ -903,39 +965,25 @@ export async function judgeEndingViaServerProxy(
     }
   ];
 
-  let completion: TextCompletionResult | null = null;
   let judgeDecision = null;
-
-  if (shouldAttemptStrictEndingJudgeSchema(config)) {
-    try {
-      const outputSchema = await loadEndingJudgeOutputSchema();
-      completion = await callChatCompletion(config, messages, {
-        temperature: 0,
-        responseFormat: {
-          type: "json_schema",
-          name: "ending_judge_decision",
-          schema: outputSchema,
-          strict: true
-        }
-      });
-      judgeDecision = parseEndingJudgeDecision(completion.text);
-    } catch {
-      completion = null;
-      judgeDecision = null;
-    }
-  }
-
-  if (!completion || !judgeDecision) {
-    completion = await callChatCompletion(config, messages, {
-      temperature: 0,
-      responseFormat: {
-        type: "json_object"
-      }
-    });
-  }
+  let rawText = "";
+  let meta: TurnNarrationOutput["meta"] | null = null;
 
   try {
-    judgeDecision ??= parseEndingJudgeDecision(completion.text);
+    const structured = await generateStructuredAssistantOutputViaServerProxy({
+      accessMode: input.accessMode,
+      modelProfileId: input.modelProfileId,
+      runtimeModelConfig: input.runtimeModelConfig,
+      locale: input.locale,
+      systemPrompt,
+      userPrompt: messages[1]?.content ?? "",
+      schemaName: "ending_judge_decision",
+      outputSchema: await loadEndingJudgeOutputSchema(),
+      temperature: 0
+    });
+    rawText = structured.rawText;
+    meta = structured.meta;
+    judgeDecision = parseEndingJudgeDecision(structured.rawText);
   } catch {
     judgeDecision = buildDefaultEndingJudgeDecision();
   }
@@ -945,9 +993,16 @@ export async function judgeEndingViaServerProxy(
   return {
     adjudication,
     judgeDecision,
-    rawText: completion.text,
+    rawText,
     provider: `${config.providerLabel}:${config.model}`,
     mode: "server_proxy",
-    meta: buildNarratorMeta(config, completion)
+    meta: meta ?? {
+      provider: `${config.providerLabel}:${config.model}`,
+      mode: "server_proxy",
+      model: config.model,
+      durationMs: null,
+      estimatedCost: null,
+      usage: null
+    }
   };
 }

@@ -7,28 +7,56 @@ import {
   fromLocaleCode
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
-  EndingJudgeDecision,
   EndingAdjudication,
+  EndingJudgeDecision,
   EndingType,
   LocaleCode
 } from "../../../../packages/shared-types/src/index.ts";
 
 type PromptKind = "narrator";
+export type StructuredPromptKind =
+  | "ending_judge"
+  | "session_memory_fact_extractor"
+  | "session_memory_episode_compressor";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../..");
 const singleAgentPromptDir = join(projectRoot, "apps", "prompt", "single_agent");
 const endingJudgePromptDir = join(projectRoot, "apps", "prompt", "ending_judge");
-const endingJudgeSystemPromptPath = join(endingJudgePromptDir, "system_prompt.txt");
-const endingJudgeOutputSchemaPath = join(endingJudgePromptDir, "output_schema.json");
+const sessionMemoryPromptDir = join(projectRoot, "apps", "prompt", "session_memory");
 
 const promptFileMap: Record<PromptKind, string> = {
   narrator: "narrator_prompt.txt"
 };
 
 const promptCache = new Map<PromptKind, string>();
-let cachedEndingJudgeSystemPrompt: string | null = null;
-let cachedEndingJudgeOutputSchema: Record<string, unknown> | null = null;
+const structuredPromptSpecMap: Record<
+  StructuredPromptKind,
+  {
+    dir: string;
+    promptFile: string;
+    schemaFile: string;
+  }
+> = {
+  ending_judge: {
+    dir: endingJudgePromptDir,
+    promptFile: "system_prompt.txt",
+    schemaFile: "output_schema.json"
+  },
+  session_memory_fact_extractor: {
+    dir: sessionMemoryPromptDir,
+    promptFile: "fact_extractor_system_prompt.txt",
+    schemaFile: "fact_extractor_output_schema.json"
+  },
+  session_memory_episode_compressor: {
+    dir: sessionMemoryPromptDir,
+    promptFile: "episode_compressor_system_prompt.txt",
+    schemaFile: "episode_compressor_output_schema.json"
+  }
+};
+
+const structuredPromptCache = new Map<StructuredPromptKind, string>();
+const structuredSchemaCache = new Map<StructuredPromptKind, Record<string, unknown>>();
 
 async function loadPrompt(kind: PromptKind): Promise<string> {
   const cachedPrompt = promptCache.get(kind);
@@ -45,24 +73,40 @@ export async function loadNarratorPrompt(): Promise<string> {
   return loadPrompt("narrator");
 }
 
-export async function loadEndingJudgePrompt(): Promise<string> {
-  if (cachedEndingJudgeSystemPrompt !== null) {
-    return cachedEndingJudgeSystemPrompt;
+export async function loadStructuredTaskPrompt(kind: StructuredPromptKind): Promise<string> {
+  const cachedPrompt = structuredPromptCache.get(kind);
+  if (cachedPrompt) {
+    return cachedPrompt;
   }
 
-  cachedEndingJudgeSystemPrompt = (await readFile(endingJudgeSystemPromptPath, "utf8")).trim();
-  return cachedEndingJudgeSystemPrompt;
+  const spec = structuredPromptSpecMap[kind];
+  const prompt = (await readFile(join(spec.dir, spec.promptFile), "utf8")).trim();
+  structuredPromptCache.set(kind, prompt);
+  return prompt;
+}
+
+export async function loadStructuredTaskOutputSchema(
+  kind: StructuredPromptKind
+): Promise<Record<string, unknown>> {
+  const cachedSchema = structuredSchemaCache.get(kind);
+  if (cachedSchema) {
+    return cachedSchema;
+  }
+
+  const spec = structuredPromptSpecMap[kind];
+  const schema = JSON.parse(
+    await readFile(join(spec.dir, spec.schemaFile), "utf8")
+  ) as Record<string, unknown>;
+  structuredSchemaCache.set(kind, schema);
+  return schema;
+}
+
+export async function loadEndingJudgePrompt(): Promise<string> {
+  return loadStructuredTaskPrompt("ending_judge");
 }
 
 export async function loadEndingJudgeOutputSchema(): Promise<Record<string, unknown>> {
-  if (cachedEndingJudgeOutputSchema !== null) {
-    return cachedEndingJudgeOutputSchema;
-  }
-
-  cachedEndingJudgeOutputSchema = JSON.parse(
-    await readFile(endingJudgeOutputSchemaPath, "utf8")
-  ) as Record<string, unknown>;
-  return cachedEndingJudgeOutputSchema;
+  return loadStructuredTaskOutputSchema("ending_judge");
 }
 
 function buildAdditionalLanguageInstruction(
@@ -76,7 +120,7 @@ function buildAdditionalLanguageInstruction(
   }
 
   const language = fromLocaleCode(locale);
-  return `请严格用以下语言回答：${language.nativeName}（${language.code}）`;
+  return `Use ${language.nativeName} (${language.code}) for all user-facing text.`;
 }
 
 export async function buildNarratorSystemPrompt(
@@ -95,19 +139,29 @@ export async function buildNarratorSystemPrompt(
   ].filter(Boolean).join("\n");
 }
 
-export async function buildEndingJudgeSystemPrompt(
+export async function buildStructuredAssistantSystemPrompt(
+  kind: StructuredPromptKind,
   locale: LocaleCode,
   options?: {
     profileId?: string;
   }
 ): Promise<string> {
-  const basePrompt = await loadEndingJudgePrompt();
+  const basePrompt = await loadStructuredTaskPrompt(kind);
   return [
     basePrompt,
     "",
     buildLanguageSystemPrompt(locale),
     buildAdditionalLanguageInstruction(locale, options)
   ].filter(Boolean).join("\n");
+}
+
+export async function buildEndingJudgeSystemPrompt(
+  locale: LocaleCode,
+  options?: {
+    profileId?: string;
+  }
+): Promise<string> {
+  return buildStructuredAssistantSystemPrompt("ending_judge", locale, options);
 }
 
 function normalizePlayerInfo(playerInfo: string): string {
@@ -189,7 +243,7 @@ export function buildEndingJudgeUserPrompt(input: {
   ].join("\n");
 }
 
-function extractJsonPayload(rawText: string): string {
+export function extractJsonPayload(rawText: string): string {
   const trimmed = rawText.trim();
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
     return trimmed;
@@ -206,7 +260,11 @@ function extractJsonPayload(rawText: string): string {
     return trimmed.slice(firstBrace, lastBrace + 1);
   }
 
-  throw new Error("Ending judge did not return a JSON object.");
+  throw new Error("Structured assistant did not return a JSON object.");
+}
+
+export function parseStructuredJsonObject(rawText: string): Record<string, unknown> {
+  return JSON.parse(extractJsonPayload(rawText)) as Record<string, unknown>;
 }
 
 function normalizeTrimmedString(rawValue: unknown): string {
@@ -233,7 +291,7 @@ function buildDefaultEndingJudgeDecision(): EndingJudgeDecision {
 }
 
 export function parseEndingJudgeDecision(rawText: string): EndingJudgeDecision {
-  const payload = JSON.parse(extractJsonPayload(rawText)) as {
+  const payload = parseStructuredJsonObject(rawText) as {
     GameOver?: unknown;
     Reason?: unknown;
     EndingId?: unknown;

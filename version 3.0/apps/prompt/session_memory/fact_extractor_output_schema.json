@@ -1,0 +1,303 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "newFacts",
+    "supersededFactIds",
+    "resolvedFactIds",
+    "newOpenLoops",
+    "resolvedOpenLoopIds",
+    "newEntities",
+    "shouldRefreshEpisodeSummary"
+  ],
+  "properties": {
+    "newFacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "scope",
+          "text",
+          "entityIds",
+          "sourceMessageIds",
+          "roundFirstSeen",
+          "roundLastSeen",
+          "status",
+          "confidence",
+          "priority"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "identity",
+              "location",
+              "relationship",
+              "clue",
+              "item",
+              "goal",
+              "state_change",
+              "secret",
+              "question",
+              "status"
+            ]
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "visibility"
+            ],
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "private",
+                  "gm_only"
+                ]
+              },
+              "participantId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "entityIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceMessageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roundFirstSeen": {
+            "type": "integer"
+          },
+          "roundLastSeen": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "superseded",
+              "resolved"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "supersededFactIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resolvedFactIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "newOpenLoops": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "title",
+          "summary",
+          "entityIds",
+          "relatedFactIds",
+          "sourceMessageIds",
+          "introducedRound",
+          "lastMentionedRound",
+          "priority",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "visibility"
+            ],
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "private",
+                  "gm_only"
+                ]
+              },
+              "participantId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "entityIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "relatedFactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceMessageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "introducedRound": {
+            "type": "integer"
+          },
+          "lastMentionedRound": {
+            "type": "integer"
+          },
+          "priority": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "resolvedOpenLoopIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "newEntities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "name",
+          "aliases",
+          "summary",
+          "relatedFactIds",
+          "tags",
+          "lastUpdatedRound"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "visibility"
+            ],
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "private",
+                  "gm_only"
+                ]
+              },
+              "participantId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "relatedFactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastUpdatedRound": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "shouldRefreshEpisodeSummary": {
+      "type": "boolean"
+    }
+  }
+}

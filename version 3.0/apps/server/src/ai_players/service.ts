@@ -125,10 +125,10 @@ function buildAiRoundUserPrompt(input: {
     "Selected personality tags:",
     personalitySummary,
     "",
-    "Public story context:",
+    "Runtime context pack:",
     input.publicStoryContext,
     "",
-    "Relevant private chat context for this character:",
+    "Supplemental private notes:",
     input.privateContext,
     "",
     "Already prepared party actions for this round:",
@@ -157,7 +157,7 @@ function buildAiPrivateChatUserPrompt(input: {
     `Character name: ${input.participant.displayName}`,
     `Private chat partner: ${input.localHumanName}`,
     "",
-    "Public story context:",
+    "Runtime context pack:",
     input.publicStoryContext,
     "",
     "Private chat history with this partner:",
@@ -186,6 +186,7 @@ export async function generateAiRoundDraft(input: {
   personalityTags: AiPersonalityTag[];
   participants: Participant[];
   messages: Message[];
+  publicStoryContext?: string;
   privateContext?: string;
   preparedInputs: RoundDraft[];
 }): Promise<RoundDraft> {
@@ -194,7 +195,9 @@ export async function generateAiRoundDraft(input: {
     locale: input.locale,
     personalityTags: input.personalityTags
   });
-  const publicStoryContext = buildPublicStoryContext(input.messages, input.participants);
+  const publicStoryContext =
+    input.publicStoryContext ??
+    buildPublicStoryContext(input.messages, input.participants);
   const privateContext = input.privateContext?.trim() || "No relevant private chat history.";
   const result = await modelGateway.generatePromptedText({
     accessMode: input.accessMode,

@@ -13,6 +13,7 @@ import {
 } from "./openai_compatible.ts";
 import {
   generateInitialSessionNarrationViaServerProxy,
+  generateStructuredAssistantOutputViaServerProxy,
   generateTurnNarrationViaSingleAgentServerProxy,
   judgeEndingViaServerProxy
 } from "./single_agent_proxy.ts";
@@ -26,6 +27,8 @@ import type {
   OpeningGenerationOutput,
   PromptedTextGenerationInput,
   PromptedTextGenerationOutput,
+  StructuredAssistantInput,
+  StructuredAssistantOutput,
   TurnNarrationInput,
   TurnNarrationOutput
 } from "./types.ts";
@@ -253,6 +256,61 @@ class MockModelGateway implements ModelGateway {
       }
     };
   }
+
+  async generateStructuredAssistantOutput(
+    input: StructuredAssistantInput
+  ): Promise<StructuredAssistantOutput> {
+    const loweredSchemaName = input.schemaName.toLowerCase();
+    const defaultMeta = {
+      provider: "mock-local",
+      mode: "mock" as const,
+      model: "mock-local",
+      durationMs: 0,
+      estimatedCost: {
+        amount: 0,
+        currency: "USD" as const,
+        pricingModel: "mock-local",
+        note: "Mock mode does not consume billable tokens."
+      },
+      usage: {
+        promptTokens: null,
+        completionTokens: null,
+        totalTokens: null,
+        promptCacheHitTokens: null,
+        promptCacheMissTokens: null
+      }
+    };
+
+    let data: Record<string, unknown>;
+    if (loweredSchemaName.includes("fact_extractor")) {
+      data = {
+        newFacts: [],
+        supersededFactIds: [],
+        resolvedFactIds: [],
+        newOpenLoops: [],
+        resolvedOpenLoopIds: [],
+        newEntities: [],
+        shouldRefreshEpisodeSummary: true
+      };
+    } else if (loweredSchemaName.includes("episode_compressor")) {
+      data = {
+        title: "Recent developments",
+        summary: input.userPrompt.slice(0, 240).trim() || "No summary available.",
+        keyFactIds: [],
+        openLoopIds: []
+      };
+    } else {
+      data = {};
+    }
+
+    return {
+      data,
+      rawText: JSON.stringify(data, null, 2),
+      provider: "mock-local",
+      mode: "mock",
+      meta: defaultMeta
+    };
+  }
 }
 
 class ServerProxyModelGateway implements ModelGateway {
@@ -285,6 +343,12 @@ class ServerProxyModelGateway implements ModelGateway {
     input: PromptedTextGenerationInput
   ): Promise<PromptedTextGenerationOutput> {
     return generatePromptedTextViaServerProxy(input);
+  }
+
+  async generateStructuredAssistantOutput(
+    input: StructuredAssistantInput
+  ): Promise<StructuredAssistantOutput> {
+    return generateStructuredAssistantOutputViaServerProxy(input);
   }
 }
 

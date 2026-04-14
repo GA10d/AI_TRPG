@@ -2963,6 +2963,13 @@ pre {
   gap: 12px;
 }
 
+.debug-memory-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .game-npc-list {
   min-height: 0;
   display: grid;

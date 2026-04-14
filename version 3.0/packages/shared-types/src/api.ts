@@ -7,6 +7,8 @@ import type {
 import type {
   AiPersonalityTag,
   AiGenerationMetadata,
+  SessionMemory,
+  SessionRuntimeContextPack,
   Message,
   ModelAccessMode,
   ReplayEvent,
@@ -160,6 +162,22 @@ export type SessionSnapshot = {
   messages: Message[];
   replay: ReplayEvent[];
   contentSummary: SessionContentSummary;
+  memory?: SessionMemory;
+};
+
+export type SessionMemoryDebugResponse = {
+  sessionId: string;
+  memory: SessionMemory;
+};
+
+export type SessionMemoryRebuildResponse = {
+  snapshot: SessionSnapshot;
+  memory: SessionMemory;
+};
+
+export type SessionContextPackDebugResponse = {
+  sessionId: string;
+  contextPack: SessionRuntimeContextPack;
 };
 
 export type SessionCreateStage =

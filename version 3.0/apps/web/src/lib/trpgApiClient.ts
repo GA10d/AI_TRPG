@@ -17,7 +17,10 @@ import type {
   SavedGameRecord,
   SaveBundle,
   SendPrivateChatRequest,
+  SessionContextPackDebugResponse,
   SessionCreateStreamEvent,
+  SessionMemoryDebugResponse,
+  SessionMemoryRebuildResponse,
   SessionSnapshot,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
@@ -313,6 +316,52 @@ export async function fetchSession(sessionId: string): Promise<SessionSnapshot> 
   try {
     const response = await fetch(`/api/sessions/${sessionId}`);
     return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchSessionMemory(
+  sessionId: string
+): Promise<SessionMemoryDebugResponse> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/memory`);
+    return parseJson<SessionMemoryDebugResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchSessionContextPack(input: {
+  sessionId: string;
+  target: "narrator" | "companion" | "private_chat";
+  participantId?: string | null;
+}): Promise<SessionContextPackDebugResponse> {
+  try {
+    const searchParams = new URLSearchParams({
+      target: input.target
+    });
+    if (input.participantId) {
+      searchParams.set("participantId", input.participantId);
+    }
+
+    const response = await fetch(
+      `/api/sessions/${input.sessionId}/context-pack?${searchParams.toString()}`
+    );
+    return parseJson<SessionContextPackDebugResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function rebuildSessionMemory(
+  sessionId: string
+): Promise<SessionMemoryRebuildResponse> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/memory/rebuild`, {
+      method: "POST"
+    });
+    return parseJson<SessionMemoryRebuildResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

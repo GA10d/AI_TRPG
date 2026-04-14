@@ -18,9 +18,11 @@ import type {
   SendPrivateChatRequest,
   SaveBundle,
   SessionCreateStage,
+  SessionMemory,
   Session,
   SessionAiCompanion,
   SessionContentSummary,
+  SessionRuntimeContextPack,
   SessionSnapshot,
   StoryControlMode,
   SubmitTurnRequest,
@@ -35,6 +37,15 @@ import {
 import { buildSystemCreatedMessage } from "../mock/index.ts";
 import { loadPlayableContentBundle } from "../content/index.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
+import {
+  buildCompanionContextPack,
+  buildDebugContextPack,
+  buildNarratorContextPack,
+  buildPrivateChatContextPack,
+  createEmptySessionMemory,
+  rebuildSnapshotMemory,
+  updateSnapshotMemory
+} from "./memory.ts";
 import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
 
 function nowIso(): string {
@@ -319,7 +330,23 @@ function buildSaveBundle(
     messages: snapshot.messages,
     replay: snapshot.replay,
     contentSummary: snapshot.contentSummary,
+    memory: snapshot.memory,
     runtimeConfig: runtimeConfig ?? undefined
+  };
+}
+
+async function attachUpdatedMemory(
+  snapshot: SessionSnapshot,
+  newMessages: Message[],
+  runtimeConfig: SessionRuntimeConfig | null
+): Promise<SessionSnapshot> {
+  return {
+    ...snapshot,
+    memory: await updateSnapshotMemory({
+      snapshot,
+      newMessages,
+      runtimeConfig
+    })
   };
 }
 
@@ -607,6 +634,7 @@ async function createSessionSnapshotInternal(
     session,
     messages,
     replay,
+    memory: createEmptySessionMemory(timestamp),
     contentSummary: {
       ruleTitle,
       storyTitle,
@@ -617,11 +645,20 @@ async function createSessionSnapshotInternal(
     }
   };
 
-  store.save(snapshot, {
+  const snapshotWithMemory = await attachUpdatedMemory(
+    snapshot,
+    messages.filter((message) => message.visibility !== "system"),
+    {
+      modelProfileId,
+      runtimeModelConfig: request.runtimeModelConfig
+    }
+  );
+
+  store.save(snapshotWithMemory, {
     modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig
   });
-  return snapshot;
+  return snapshotWithMemory;
 }
 
 export async function createSessionSnapshot(
@@ -695,6 +732,12 @@ export async function prepareRound(
       })
     );
   } else {
+    const primaryContextPack = buildCompanionContextPack({
+      snapshot: current,
+      participantId: primaryParticipant.id,
+      round: targetRound,
+      preparedInputs: []
+    });
     const generatedPrimaryDraft = await generateAiRoundDraft({
       accessMode: current.session.modelAccessMode,
       modelProfileId:
@@ -708,11 +751,8 @@ export async function prepareRound(
       personalityTags: [],
       participants: current.session.participants,
       messages: current.messages,
-      privateContext: buildRelevantPrivateContextForParticipant(
-        current.session,
-        current.messages,
-        primaryParticipant.id
-      ),
+      publicStoryContext: primaryContextPack.assembledText,
+      privateContext: "Private context is already included in the runtime context pack above.",
       preparedInputs: []
     });
 
@@ -723,8 +763,15 @@ export async function prepareRound(
   }
 
   const companionDrafts = await Promise.all(
-    companionParticipants.map((participant) =>
-      generateAiRoundDraft({
+    companionParticipants.map((participant) => {
+      const companionContextPack = buildCompanionContextPack({
+        snapshot: current,
+        participantId: participant.id,
+        round: targetRound,
+        preparedInputs: preparedDrafts
+      });
+
+      return generateAiRoundDraft({
         accessMode: current.session.modelAccessMode,
         modelProfileId:
           runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
@@ -737,14 +784,11 @@ export async function prepareRound(
         personalityTags: companionTagMap.get(participant.id) ?? [],
         participants: current.session.participants,
         messages: current.messages,
-        privateContext: buildRelevantPrivateContextForParticipant(
-          current.session,
-          current.messages,
-          participant.id
-        ),
+        publicStoryContext: companionContextPack.assembledText,
+        privateContext: "Private context is already included in the runtime context pack above.",
         preparedInputs: preparedDrafts
-      })
-    )
+      });
+    })
   );
 
   const nextRoundState = {
@@ -841,6 +885,18 @@ export async function commitPreparedRound(
   }));
 
   const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const narratorInputSnapshot: SessionSnapshot = {
+    ...current,
+    messages: [
+      ...current.messages,
+      ...playerMessages
+    ]
+  };
+  const narratorContextPack = buildNarratorContextPack({
+    snapshot: narratorInputSnapshot,
+    latestPlayerInput: committedPartyInput,
+    round: nextRound
+  });
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
     modelProfileId:
@@ -850,7 +906,7 @@ export async function commitPreparedRound(
     storyTitle: current.contentSummary.storyTitle,
     playerInput: committedPartyInput,
     round: nextRound,
-    conversationContext: buildConversationContext(current.session, current.messages)
+    conversationContext: narratorContextPack.assembledText
   });
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
@@ -941,7 +997,7 @@ export async function commitPreparedRound(
     });
   }
 
-  return store.update(sessionId, (latest) => ({
+  const updatedSnapshot = store.update(sessionId, (latest) => ({
     ...latest,
     session: {
       ...latest.session,
@@ -976,6 +1032,21 @@ export async function commitPreparedRound(
       ...replayEntries
     ]
   }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  const snapshotWithMemory = await attachUpdatedMemory(
+    updatedSnapshot,
+    [
+      ...playerMessages,
+      gmMessage
+    ],
+    runtimeConfig
+  );
+  store.save(snapshotWithMemory);
+  return snapshotWithMemory;
 }
 
 export async function updateStoryControlMode(
@@ -1107,7 +1178,7 @@ export async function submitManualNarration(
     });
   }
 
-  return store.update(sessionId, () => ({
+  const updatedSnapshot = store.update(sessionId, () => ({
     ...current,
     session: {
       ...current.session,
@@ -1142,6 +1213,20 @@ export async function submitManualNarration(
       ...replayEntries
     ]
   }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  const snapshotWithMemory = await attachUpdatedMemory(
+    updatedSnapshot,
+    [
+      gmMessage
+    ],
+    runtimeConfig
+  );
+  store.save(snapshotWithMemory);
+  return snapshotWithMemory;
 }
 
 export async function sendPrivateChat(
@@ -1200,6 +1285,15 @@ export async function sendPrivateChat(
     ...current.messages,
     humanMessage
   ];
+  const privateChatInputSnapshot: SessionSnapshot = {
+    ...current,
+    messages: interimMessages
+  };
+  const privateChatContextPack = buildPrivateChatContextPack({
+    snapshot: privateChatInputSnapshot,
+    participantId: targetParticipant.id,
+    latestMessage: trimmedContent
+  });
   const privateReply = await generateAiPrivateChatReply({
     accessMode: current.session.modelAccessMode,
     modelProfileId:
@@ -1212,8 +1306,8 @@ export async function sendPrivateChat(
     personalityTags: getCompanionTagMap(current.session).get(targetParticipant.id) ?? [],
     participants: current.session.participants,
     messages: interimMessages,
-    publicStoryContext: buildConversationContext(current.session, interimMessages),
-    privateThreadContext: buildPrivateThreadContext(current.session, interimMessages, threadId),
+    publicStoryContext: privateChatContextPack.assembledText,
+    privateThreadContext: "Private thread context is already included in the runtime context pack above.",
     latestMessage: trimmedContent
   });
   const aiTimestamp = nowIso();
@@ -1233,7 +1327,7 @@ export async function sendPrivateChat(
     tags: ["private_chat", "ai_private_chat", `provider:${privateReply.provider}`]
   };
 
-  return store.update(sessionId, () => ({
+  const updatedSnapshot = store.update(sessionId, () => ({
     ...current,
     session: {
       ...current.session,
@@ -1276,6 +1370,21 @@ export async function sendPrivateChat(
       }
     ]
   }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  const snapshotWithMemory = await attachUpdatedMemory(
+    updatedSnapshot,
+    [
+      humanMessage,
+      aiReplyMessage
+    ],
+    runtimeConfig
+  );
+  store.save(snapshotWithMemory);
+  return snapshotWithMemory;
 }
 
 export async function submitTurn(
@@ -1331,6 +1440,18 @@ export async function submitTurn(
 
   const runtimeConfig = store.getRuntimeConfig(sessionId);
   const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const narratorInputSnapshot: SessionSnapshot = {
+    ...current,
+    messages: [
+      ...current.messages,
+      playerMessage
+    ]
+  };
+  const narratorContextPack = buildNarratorContextPack({
+    snapshot: narratorInputSnapshot,
+    latestPlayerInput: labeledPlayerInput,
+    round: nextRound
+  });
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
     modelProfileId:
@@ -1340,7 +1461,7 @@ export async function submitTurn(
     storyTitle: current.contentSummary.storyTitle,
     playerInput: labeledPlayerInput,
     round: nextRound,
-    conversationContext: buildConversationContext(current.session, current.messages)
+    conversationContext: narratorContextPack.assembledText
   });
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
@@ -1430,7 +1551,7 @@ export async function submitTurn(
     });
   }
 
-  return store.update(sessionId, () => ({
+  const updatedSnapshot = store.update(sessionId, () => ({
     ...current,
     session: {
       ...current.session,
@@ -1467,6 +1588,21 @@ export async function submitTurn(
       ...replayEntries
     ]
   }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  const snapshotWithMemory = await attachUpdatedMemory(
+    updatedSnapshot,
+    [
+      playerMessage,
+      gmMessage
+    ],
+    runtimeConfig
+  );
+  store.save(snapshotWithMemory);
+  return snapshotWithMemory;
 }
 
 export function createSaveBundleForSession(
@@ -1528,6 +1664,7 @@ export function loadSessionFromSaveBundle(
       ...saveBundle.replay,
       loadEvent
     ],
+    memory: saveBundle.memory ?? createEmptySessionMemory(loadedAt),
     contentSummary: saveBundle.contentSummary ?? buildFallbackContentSummary(saveBundle.session)
   };
 
@@ -1538,5 +1675,53 @@ export function loadSessionFromSaveBundle(
   });
 
   return snapshot;
+}
+
+export function getSessionMemoryState(
+  sessionId: string,
+  store: InMemorySessionStore
+): SessionMemory | null {
+  const snapshot = store.get(sessionId);
+  return snapshot?.memory ?? null;
+}
+
+export function getSessionContextPackState(
+  sessionId: string,
+  target: "narrator" | "companion" | "private_chat",
+  store: InMemorySessionStore,
+  participantId?: string | null
+): SessionRuntimeContextPack | null {
+  const snapshot = store.get(sessionId);
+  if (!snapshot) {
+    return null;
+  }
+
+  return buildDebugContextPack({
+    snapshot,
+    target,
+    participantId
+  });
+}
+
+export async function rebuildSessionMemoryForSession(
+  sessionId: string,
+  store: InMemorySessionStore
+): Promise<SessionSnapshot | null> {
+  const snapshot = store.get(sessionId);
+  if (!snapshot) {
+    return null;
+  }
+
+  const runtimeConfig = store.getRuntimeConfig(sessionId);
+  const nextMemory = await rebuildSnapshotMemory({
+    snapshot,
+    runtimeConfig
+  });
+  const nextSnapshot = {
+    ...snapshot,
+    memory: nextMemory
+  };
+  store.save(nextSnapshot);
+  return nextSnapshot;
 }
 

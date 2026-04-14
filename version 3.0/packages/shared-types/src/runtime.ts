@@ -240,6 +240,137 @@ export type SessionContentSummary = {
   storyDirectoryName?: string;
 };
 
+export type SessionMemoryVisibility =
+  | "public"
+  | "private"
+  | "gm_only";
+
+export type SessionMemoryScope = {
+  visibility: SessionMemoryVisibility;
+  participantId?: string | null;
+};
+
+export type SessionFactKind =
+  | "identity"
+  | "location"
+  | "relationship"
+  | "clue"
+  | "item"
+  | "goal"
+  | "state_change"
+  | "secret"
+  | "question"
+  | "status";
+
+export type SessionFactStatus =
+  | "active"
+  | "superseded"
+  | "resolved";
+
+export type SessionFact = {
+  id: string;
+  kind: SessionFactKind;
+  scope: SessionMemoryScope;
+  text: string;
+  entityIds: string[];
+  sourceMessageIds: string[];
+  roundFirstSeen: number;
+  roundLastSeen: number;
+  status: SessionFactStatus;
+  confidence: number;
+  priority: number;
+  tags?: string[];
+};
+
+export type SessionOpenLoop = {
+  id: string;
+  scope: SessionMemoryScope;
+  title: string;
+  summary: string;
+  entityIds: string[];
+  relatedFactIds: string[];
+  sourceMessageIds: string[];
+  introducedRound: number;
+  lastMentionedRound: number;
+  priority: number;
+  status: "open" | "resolved";
+  tags?: string[];
+};
+
+export type SessionEpisodeSummary = {
+  id: string;
+  scope: SessionMemoryScope;
+  title: string;
+  summary: string;
+  roundStart: number;
+  roundEnd: number;
+  keyFactIds: string[];
+  openLoopIds: string[];
+  sourceMessageIds: string[];
+  createdAt: string;
+};
+
+export type SessionEntityMemory = {
+  id: string;
+  scope: SessionMemoryScope;
+  name: string;
+  aliases: string[];
+  summary: string;
+  relatedFactIds: string[];
+  tags: string[];
+  lastUpdatedRound: number;
+};
+
+export type SessionMemory = {
+  version: number;
+  facts: SessionFact[];
+  openLoops: SessionOpenLoop[];
+  episodeSummaries: SessionEpisodeSummary[];
+  entities: SessionEntityMemory[];
+  lastProcessedMessageId?: string | null;
+  updatedAt: string;
+};
+
+export type SessionMemoryDelta = {
+  newFacts: SessionFact[];
+  supersededFactIds: string[];
+  resolvedFactIds: string[];
+  newOpenLoops: SessionOpenLoop[];
+  resolvedOpenLoopIds: string[];
+  newEntities: SessionEntityMemory[];
+  shouldRefreshEpisodeSummary: boolean;
+};
+
+export type EpisodeCompressionResult = {
+  title: string;
+  summary: string;
+  keyFactIds: string[];
+  openLoopIds: string[];
+};
+
+export type SessionRuntimeContextPackTarget =
+  | "narrator"
+  | "companion_public_turn"
+  | "private_chat";
+
+export type SessionContextPackSection = {
+  key: string;
+  label: string;
+  lines: string[];
+};
+
+export type SessionRuntimeContextPack = {
+  target: SessionRuntimeContextPackTarget;
+  participantId?: string | null;
+  round: number;
+  assembledText: string;
+  sections: SessionContextPackSection[];
+  retrievedFactIds: string[];
+  retrievedOpenLoopIds: string[];
+  recentMessageIds: string[];
+  episodeSummaryIds: string[];
+};
+
 export type SaveRuntimeConfig = {
   modelProfileId?: string;
   runtimeModelConfig?: {
@@ -256,6 +387,7 @@ export type SaveBundle = {
   messages: Message[];
   replay: ReplayEvent[];
   contentSummary?: SessionContentSummary;
+  memory?: SessionMemory;
   runtimeConfig?: SaveRuntimeConfig;
 };
 

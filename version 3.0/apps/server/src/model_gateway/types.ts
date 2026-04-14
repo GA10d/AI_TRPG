@@ -94,6 +94,26 @@ export type PromptedTextGenerationOutput = {
   meta: AiGenerationMetadata;
 };
 
+export type StructuredAssistantInput = {
+  accessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+  locale: LocaleCode;
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  outputSchema: Record<string, unknown>;
+  temperature?: number;
+};
+
+export type StructuredAssistantOutput = {
+  data: Record<string, unknown>;
+  rawText: string;
+  provider: string;
+  mode: ModelAccessMode;
+  meta: AiGenerationMetadata;
+};
+
 export interface ModelGateway {
   generateOpening(input: OpeningGenerationInput): Promise<OpeningGenerationOutput>;
   streamOpening(
@@ -108,4 +128,7 @@ export interface ModelGateway {
   generatePromptedText(
     input: PromptedTextGenerationInput
   ): Promise<PromptedTextGenerationOutput>;
+  generateStructuredAssistantOutput(
+    input: StructuredAssistantInput
+  ): Promise<StructuredAssistantOutput>;
 }

@@ -25,8 +25,11 @@ import type {
   PickLocalSaveDirectoryRequest,
   UpdateLocalSaveSettingsRequest,
   PrepareRoundRequest,
+  SessionContextPackDebugResponse,
   SendPrivateChatRequest,
   SessionCreateStreamEvent,
+  SessionMemoryDebugResponse,
+  SessionMemoryRebuildResponse,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
   UpdateStoryControlModeRequest
@@ -61,8 +64,11 @@ import {
   createSaveBundleForSession,
   createSessionSnapshot,
   createSessionSnapshotWithProgress,
+  getSessionContextPackState,
+  getSessionMemoryState,
   loadSessionFromSaveBundle,
   prepareRound,
+  rebuildSessionMemoryForSession,
   sendPrivateChat,
   submitManualNarration,
   submitTurn,
@@ -787,6 +793,100 @@ async function handleApiRequest(
       ...result,
       saveRecord
     });
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/memory") &&
+    request.method === "GET"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/memory", "");
+    const memory = getSessionMemoryState(sessionId, store);
+
+    if (!memory) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `session not found: ${sessionId}`
+      });
+      return true;
+    }
+
+    const payload: SessionMemoryDebugResponse = {
+      sessionId,
+      memory
+    };
+    sendJson(response, 200, payload);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/memory/rebuild") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname
+      .replace("/api/sessions/", "")
+      .replace("/memory/rebuild", "");
+    const snapshot = await rebuildSessionMemoryForSession(sessionId, store);
+
+    if (!snapshot || !snapshot.memory) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `session not found: ${sessionId}`
+      });
+      return true;
+    }
+
+    const payload: SessionMemoryRebuildResponse = {
+      snapshot,
+      memory: snapshot.memory
+    };
+    sendJson(response, 200, payload);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/context-pack") &&
+    request.method === "GET"
+  ) {
+    const sessionId = url.pathname
+      .replace("/api/sessions/", "")
+      .replace("/context-pack", "");
+    const targetParam = url.searchParams.get("target")?.trim() ?? "narrator";
+    const target =
+      targetParam === "companion" || targetParam === "private_chat"
+        ? targetParam
+        : "narrator";
+    const participantId = url.searchParams.get("participantId")?.trim() ?? null;
+    if (target !== "narrator" && !participantId) {
+      sendJson(response, 400, {
+        error: "INVALID_CONTEXT_PACK_REQUEST",
+        message: "participantId is required for companion and private_chat context packs."
+      });
+      return true;
+    }
+    const contextPack = getSessionContextPackState(
+      sessionId,
+      target,
+      store,
+      participantId
+    );
+
+    if (!contextPack) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `session not found: ${sessionId}`
+      });
+      return true;
+    }
+
+    const payload: SessionContextPackDebugResponse = {
+      sessionId,
+      contextPack
+    };
+    sendJson(response, 200, payload);
     return true;
   }
 
