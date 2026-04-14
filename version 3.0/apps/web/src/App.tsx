@@ -9,6 +9,7 @@ import type {
   GenerateOpeningPreviewRequest,
   LocalSaveSettings,
   Message,
+  PersistedComicProject,
   ReplayEvent,
   SaveBundle,
   SaveRuntimeConfig,
@@ -27,6 +28,7 @@ import {
   generateOpeningPreview,
   loadSavedGame,
   loadSaveBundle,
+  loadWorldlineComicProject,
   pickLocalSaveDirectory,
   prepareRound,
   sendPrivateChat,
@@ -34,6 +36,7 @@ import {
   streamCreateSession,
   streamOpeningPreview,
   submitTurn,
+  upsertWorldlineComicPage,
   updateLocalSaveSettings,
   updateStoryControlMode
 } from "./lib/trpgApiClient.ts";
@@ -346,6 +349,163 @@ function buildPreparedTurnCapturePreview(
     .join(" | ");
 }
 
+type WorldlineComicPlan = {
+  worldlineId: string;
+  pageIndex: number;
+  roundStart: number;
+  roundEnd: number;
+  storyPrompt: string;
+  storyMemorySummary?: string;
+};
+
+function inferMessageChannel(message: Message): Message["channel"] {
+  if (message.channel) {
+    return message.channel;
+  }
+
+  if (message.visibility === "system" || message.kind === "system") {
+    return "system";
+  }
+
+  if (message.visibility === "private" || message.kind === "private_chat") {
+    return "private_chat";
+  }
+
+  return "public_story";
+}
+
+function buildWorldlineComicMemorySummary(snapshot: SessionSnapshot): string | undefined {
+  const latestEpisodes = (snapshot.memory?.episodeSummaries ?? []).slice(-2);
+  const openLoops = (snapshot.memory?.openLoops ?? [])
+    .filter((item) => item.status === "open")
+    .slice(0, 3);
+
+  const sections: string[] = [];
+
+  if (latestEpisodes.length > 0) {
+    sections.push(
+      [
+        "Recent episode summaries:",
+        ...latestEpisodes.map((item) => `- ${item.title}: ${item.summary}`)
+      ].join("\n")
+    );
+  }
+
+  if (openLoops.length > 0) {
+    sections.push(
+      [
+        "Open questions:",
+        ...openLoops.map((item) => `- ${item.title}: ${item.summary}`)
+      ].join("\n")
+    );
+  }
+
+  const summary = sections.join("\n\n").trim();
+  return summary || undefined;
+}
+
+function buildWorldlineComicStoryPrompt(
+  snapshot: SessionSnapshot,
+  roundStart: number,
+  roundEnd: number
+): string {
+  const participantNames = new Map(
+    snapshot.session.participants.map((participant) => [participant.id, participant.displayName])
+  );
+  const relevantMessages = snapshot.messages.filter((message) => {
+    if (inferMessageChannel(message) !== "public_story") {
+      return false;
+    }
+
+    if (message.round < roundStart || message.round > roundEnd) {
+      return false;
+    }
+
+    return (
+      message.kind === "player_input" ||
+      message.kind === "gm_narration" ||
+      message.kind === "gm_dialogue"
+    );
+  });
+
+  const lines: string[] = [
+    `Story: ${snapshot.contentSummary.storyTitle}`,
+    `Rulebook: ${snapshot.contentSummary.ruleTitle}`,
+    roundStart === 0
+      ? "Adapt the opening plus the first completed round into one comic page."
+      : `Adapt rounds ${roundStart} to ${roundEnd} into one comic page.`,
+    ""
+  ];
+
+  for (const message of relevantMessages) {
+    const speaker =
+      message.kind === "player_input"
+        ? participantNames.get(message.senderId) ?? "Player"
+        : "Narrator";
+    const roundLabel = message.round === 0 ? "Opening" : `Round ${message.round}`;
+    lines.push(`[${roundLabel} | ${speaker}]`);
+    lines.push(message.content.trim());
+    lines.push("");
+  }
+
+  const endingState = snapshot.session.gameState.endingState;
+  if (endingState && roundEnd === endingState.confirmedAtRound) {
+    lines.push("[Ending]");
+    lines.push(`${endingState.title}: ${endingState.summary}`);
+  }
+
+  return lines.join("\n").trim();
+}
+
+function buildWorldlineComicPlan(
+  snapshot: SessionSnapshot,
+  worldlineId: string | null | undefined
+): WorldlineComicPlan | null {
+  const normalizedWorldlineId = worldlineId?.trim() ?? "";
+  if (!normalizedWorldlineId) {
+    return null;
+  }
+
+  const currentRound = snapshot.session.currentRound;
+  if (currentRound <= 0) {
+    return null;
+  }
+
+  const endingRound = snapshot.session.gameState.endingState?.confirmedAtRound ?? null;
+  const isEndingRound = endingRound !== null && endingRound === currentRound;
+
+  let pageIndex: number | null = null;
+  let roundStart = currentRound;
+
+  if (currentRound === 1) {
+    pageIndex = 0;
+    roundStart = 0;
+  } else if (isEndingRound) {
+    pageIndex = 1 + Math.floor(Math.max(currentRound - 2, 0) / 3);
+  } else if ((currentRound - 1) % 3 === 0) {
+    pageIndex = 1 + Math.floor((currentRound - 4) / 3);
+    roundStart = Math.max(2, currentRound - 2);
+  }
+
+  if (pageIndex === null) {
+    return null;
+  }
+
+  const storyPrompt = buildWorldlineComicStoryPrompt(snapshot, roundStart, currentRound);
+  if (!storyPrompt) {
+    return null;
+  }
+
+  return {
+    worldlineId: normalizedWorldlineId,
+    pageIndex,
+    roundStart,
+    roundEnd: currentRound,
+    storyPrompt,
+    storyMemorySummary: buildWorldlineComicMemorySummary(snapshot)
+  };
+}
+
 export function App() {
   const [view, setView] = useState<AppView>("menu");
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
@@ -367,6 +527,11 @@ export function App() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [worldlineComicProject, setWorldlineComicProject] = useState<PersistedComicProject | null>(
+    null
+  );
+  const [isComicLoading, setIsComicLoading] = useState(false);
+  const [isComicGenerating, setIsComicGenerating] = useState(false);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
   const [aiCompanions, setAiCompanions] = useState<CreateSessionAiCompanionInput[]>([]);
@@ -740,6 +905,45 @@ export function App() {
     snapshot,
     view
   ]);
+
+  useEffect(() => {
+    const worldlineId = activeGraphBundle?.graph.id ?? null;
+    if (view !== "game" || !worldlineId) {
+      setWorldlineComicProject(null);
+      setIsComicLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsComicLoading(true);
+
+    void refreshWorldlineComicProject(worldlineId)
+      .then((project) => {
+        if (!cancelled) {
+          setWorldlineComicProject(project);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setWorldlineComicProject(null);
+          appendGameActivity(
+            uiText.gameScreen.comicLoadFailed(
+              error instanceof Error ? error.message : String(error)
+            ),
+            "error"
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsComicLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeGraphBundle?.graph.id, uiLocale, view]);
 
   useEffect(() => {
     autoPreparedRoundKeyRef.current = null;
@@ -1118,6 +1322,59 @@ export function App() {
       activeSessionRuntimeConfig ??
       buildSnapshotFallbackRuntimeConfig(currentSnapshot, profileIdOverride)
     );
+  }
+
+  async function refreshWorldlineComicProject(
+    worldlineId: string
+  ): Promise<PersistedComicProject | null> {
+    const normalizedWorldlineId = worldlineId.trim();
+    if (!normalizedWorldlineId) {
+      return null;
+    }
+
+    return loadWorldlineComicProject(normalizedWorldlineId);
+  }
+
+  async function maybeGenerateWorldlineComic(
+    nextSnapshot: SessionSnapshot,
+    worldlineId: string | null | undefined
+  ): Promise<void> {
+    const plan = buildWorldlineComicPlan(nextSnapshot, worldlineId);
+    if (!plan) {
+      return;
+    }
+
+    setIsComicGenerating(true);
+    appendGameActivity(uiText.gameScreen.comicGenerationStart(plan.pageIndex));
+
+    try {
+      const result = await upsertWorldlineComicPage(plan.worldlineId, {
+        storyTitle: nextSnapshot.contentSummary.storyTitle,
+        ruleTitle: nextSnapshot.contentSummary.ruleTitle,
+        locale: nextSnapshot.contentSummary.resolvedLocale,
+        pageIndex: plan.pageIndex,
+        storyPrompt: plan.storyPrompt,
+        storyMemorySummary: plan.storyMemorySummary,
+        imageProfileId,
+        runtimeImageModelConfig
+      });
+
+      setWorldlineComicProject(result.project);
+      appendGameActivity(
+        result.created
+          ? uiText.gameScreen.comicGenerationDone(plan.pageIndex)
+          : uiText.gameScreen.comicAlreadyExists(plan.pageIndex)
+      );
+    } catch (error) {
+      appendGameActivity(
+        uiText.gameScreen.comicGenerationFailed(
+          error instanceof Error ? error.message : String(error)
+        ),
+        "error"
+      );
+    } finally {
+      setIsComicGenerating(false);
+    }
   }
 
   function updateAdvancedTextModelConfig(
@@ -1616,12 +1873,16 @@ export function App() {
         playerInput: primaryInputOverride?.trim() || undefined
       });
       commitSnapshot(nextSnapshot);
-      captureTurn(
+      const nextGraphBundle = captureTurn(
         nextSnapshot,
         getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId),
         capturePreview
       );
       setTurnInput("");
+      void maybeGenerateWorldlineComic(
+        nextSnapshot,
+        nextGraphBundle?.graph.id ?? activeGraphBundle?.graph.id ?? null
+      );
       appendGameActivity(uiText.app.status.commitRoundLogDone(nextSnapshot.session.currentRound));
       setStatus({
         message:
@@ -1667,12 +1928,16 @@ export function App() {
         playerInput
       });
       commitSnapshot(nextSnapshot);
-      captureTurn(
+      const nextGraphBundle = captureTurn(
         nextSnapshot,
         getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId),
         playerInput
       );
       setTurnInput("");
+      void maybeGenerateWorldlineComic(
+        nextSnapshot,
+        nextGraphBundle?.graph.id ?? activeGraphBundle?.graph.id ?? null
+      );
       setStatus({
         message:
           wasAlreadyEnded
@@ -2160,7 +2425,9 @@ export function App() {
     });
 
     try {
-      const result = await createSave(snapshot.session.id);
+      const result = await createSave(snapshot.session.id, {
+        worldlineId: activeGraphBundle?.graph.id ?? null
+      });
       commitSnapshot(result.snapshot);
       commitSaveRecord(result.saveRecord);
       syncSavedBundle(result.saveBundle);
@@ -2250,7 +2517,8 @@ export function App() {
       setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         nextSnapshot,
-        restoredRuntimeConfig
+        restoredRuntimeConfig,
+        recentSave.worldlineId ?? undefined
       );
       setView("game");
       setStatus({
@@ -2341,7 +2609,8 @@ export function App() {
       setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         nextSnapshot,
-        restoredRuntimeConfig
+        restoredRuntimeConfig,
+        record.worldlineId ?? undefined
       );
       setView("game");
       setStatus({
@@ -2811,6 +3080,9 @@ export function App() {
           autoCommitCountdown={autoCommitCountdown}
           isSaving={isSaving}
           savedGames={savedGames}
+          comicProject={worldlineComicProject}
+          isComicLoading={isComicLoading}
+          isComicGenerating={isComicGenerating}
           isRestoring={isRestoring}
           isResumingBranch={isResumingBranch}
           showAiMetadata={showAiMetadata}

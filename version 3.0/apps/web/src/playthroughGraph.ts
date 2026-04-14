@@ -70,11 +70,13 @@ function clipPreview(content: string | null | undefined, maxLength = 84): string
 
 function buildSaveBundleFromSnapshot(
   snapshot: SessionSnapshot,
-  runtimeConfig?: SaveRuntimeConfig
+  runtimeConfig: SaveRuntimeConfig | undefined,
+  worldlineId: string
 ): SaveBundle {
   return {
     schemaVersion: snapshot.session.schemaVersion,
     savedAt: snapshot.session.updatedAt,
+    worldlineId,
     session: snapshot.session,
     messages: snapshot.messages,
     replay: snapshot.replay,
@@ -350,11 +352,12 @@ function buildEdge(
 
 function buildRootGraphBundle(
   snapshot: SessionSnapshot,
-  runtimeConfig?: SaveRuntimeConfig
+  runtimeConfig: SaveRuntimeConfig | undefined,
+  preferredGraphId?: string
 ): PlaythroughGraphBundle {
-  const graphId = generateId("graph");
+  const graphId = preferredGraphId ?? generateId("graph");
   const routeId = `route_main_${graphId}`;
-  const saveBundle = buildSaveBundleFromSnapshot(snapshot, runtimeConfig);
+  const saveBundle = buildSaveBundleFromSnapshot(snapshot, runtimeConfig, graphId);
   const { node, snapshotBlob } = buildNodeFromSnapshot(graphId, snapshot, saveBundle, {
     parentNodeId: null
   });
@@ -400,9 +403,10 @@ export function loadActivePlaythroughGraph(): PlaythroughGraphBundle | null {
 
 export function startPlaythroughGraph(
   snapshot: SessionSnapshot,
-  runtimeConfig?: SaveRuntimeConfig
+  runtimeConfig?: SaveRuntimeConfig,
+  preferredGraphId?: string
 ): PlaythroughGraphBundle {
-  return upsertGraphBundle(buildRootGraphBundle(snapshot, runtimeConfig));
+  return upsertGraphBundle(buildRootGraphBundle(snapshot, runtimeConfig, preferredGraphId));
 }
 
 export function appendSnapshotToActivePlaythrough(
@@ -416,7 +420,7 @@ export function appendSnapshotToActivePlaythrough(
   }
 
   const parentNodeId = currentBundle.graph.currentNodeId;
-  const saveBundle = buildSaveBundleFromSnapshot(snapshot, runtimeConfig);
+  const saveBundle = buildSaveBundleFromSnapshot(snapshot, runtimeConfig, currentBundle.graph.id);
   const { node, snapshotBlob } = buildNodeFromSnapshot(
     currentBundle.graph.id,
     snapshot,
@@ -535,7 +539,8 @@ export function syncCurrentPlaythroughSaveBundle(
 
 export function relinkActivePlaythroughToSnapshot(
   snapshot: SessionSnapshot,
-  runtimeConfig?: SaveRuntimeConfig
+  runtimeConfig?: SaveRuntimeConfig,
+  preferredGraphId?: string
 ): PlaythroughGraphBundle | null {
   const graphBundles = loadGraphBundles();
   for (const bundle of graphBundles) {
@@ -557,7 +562,7 @@ export function relinkActivePlaythroughToSnapshot(
     return upsertGraphBundle(nextBundle);
   }
 
-  return startPlaythroughGraph(snapshot, runtimeConfig);
+  return startPlaythroughGraph(snapshot, runtimeConfig, preferredGraphId);
 }
 
 export function relinkActivePlaythroughToSaveBundle(
@@ -592,7 +597,11 @@ export function relinkActivePlaythroughToSaveBundle(
   }
 
   if (fallbackSnapshot) {
-    return startPlaythroughGraph(fallbackSnapshot, runtimeConfig);
+    return startPlaythroughGraph(
+      fallbackSnapshot,
+      runtimeConfig,
+      saveBundle.worldlineId ?? undefined
+    );
   }
 
   return null;

@@ -14,6 +14,7 @@ import type {
   BootstrapResponse,
   CharacterConceptAssistRequest,
   CommitRoundRequest,
+  CreateSaveRequest,
   ComicMetadataGenerationRequest,
   ComicPageGenerationRequest,
   CreatePersistedComicRequest,
@@ -32,6 +33,7 @@ import type {
   SessionMemoryRebuildResponse,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
+  UpsertWorldlineComicPageRequest,
   UpdateStoryControlModeRequest
 } from "../../../packages/shared-types/src/index.ts";
 import {
@@ -54,8 +56,10 @@ import {
   generateComicMetadata,
   generateComicPage,
   listPersistedComicProjects,
+  loadWorldlineComicProject,
   loadPersistedComicProject,
-  listComicPromptPresets
+  listComicPromptPresets,
+  upsertWorldlineComicPage
 } from "./comic_generation/index.ts";
 import { resolveComicAssetAbsolutePath } from "./comic_generation/storage.ts";
 import {
@@ -529,6 +533,32 @@ async function handleApiRequest(
     return true;
   }
 
+  const worldlineComicPagesMatch = url.pathname.match(/^\/api\/worldline-comics\/([^/]+)\/pages$/u);
+  if (worldlineComicPagesMatch && request.method === "POST") {
+    const worldlineId = decodeURIComponent(worldlineComicPagesMatch[1]);
+    const payload = await readJsonBody<UpsertWorldlineComicPageRequest>(request);
+    const result = await upsertWorldlineComicPage(defaultComicRoot, worldlineId, payload);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  const worldlineComicMatch = url.pathname.match(/^\/api\/worldline-comics\/([^/]+)$/u);
+  if (worldlineComicMatch && request.method === "GET") {
+    const worldlineId = decodeURIComponent(worldlineComicMatch[1]);
+
+    try {
+      const result = await loadWorldlineComicProject(defaultComicRoot, worldlineId);
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 404, {
+        error: "WORLDLINE_COMIC_NOT_FOUND",
+        message: `Worldline comic not found: ${worldlineId}`
+      });
+    }
+
+    return true;
+  }
+
   const comicProjectPagesMatch = url.pathname.match(/^\/api\/comics\/projects\/([^/]+)\/pages$/u);
   if (comicProjectPagesMatch && request.method === "POST") {
     const comicId = decodeURIComponent(comicProjectPagesMatch[1]);
@@ -777,7 +807,12 @@ async function handleApiRequest(
 
   if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/save") && request.method === "POST") {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/save", "");
-    const result = createSaveBundleForSession(sessionId, store);
+    const payload = await readJsonBody<CreateSaveRequest>(request).catch(() => ({
+      worldlineId: null
+    }));
+    const result = createSaveBundleForSession(sessionId, store, {
+      worldlineId: payload.worldlineId ?? null
+    });
 
     if (!result) {
       sendJson(response, 404, {

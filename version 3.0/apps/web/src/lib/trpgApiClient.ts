@@ -3,6 +3,7 @@ import type {
   CharacterConceptAssistRequest,
   CharacterConceptAssistResponse,
   CommitRoundRequest,
+  CreateSaveRequest,
   CreateSaveResponse,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
@@ -24,8 +25,11 @@ import type {
   SessionSnapshot,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
+  UpsertWorldlineComicPageRequest,
+  UpsertWorldlineComicPageResponse,
   UpdateLocalSaveSettingsRequest,
-  UpdateStoryControlModeRequest
+  UpdateStoryControlModeRequest,
+  PersistedComicProject
 } from "../../../../packages/shared-types/src/index.ts";
 
 type OpeningPreviewStreamEvent =
@@ -425,12 +429,56 @@ export async function generateSceneImage(
   }
 }
 
-export async function createSave(sessionId: string): Promise<CreateSaveResponse> {
+export async function createSave(
+  sessionId: string,
+  payload: CreateSaveRequest = {}
+): Promise<CreateSaveResponse> {
   try {
     const response = await fetch(`/api/sessions/${sessionId}/save`, {
-      method: "POST"
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
     });
     return parseJson<CreateSaveResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function loadWorldlineComicProject(
+  worldlineId: string
+): Promise<PersistedComicProject | null> {
+  try {
+    const response = await fetch(`/api/worldline-comics/${encodeURIComponent(worldlineId)}`);
+    if (response.status === 404) {
+      return null;
+    }
+
+    return parseJson<PersistedComicProject>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function upsertWorldlineComicPage(
+  worldlineId: string,
+  payload: UpsertWorldlineComicPageRequest
+): Promise<UpsertWorldlineComicPageResponse> {
+  try {
+    const response = await fetch(
+      `/api/worldline-comics/${encodeURIComponent(worldlineId)}/pages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    return parseJson<UpsertWorldlineComicPageResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

@@ -149,6 +149,10 @@ export type LoadSaveRequest = {
   saveBundle: SaveBundle;
 };
 
+export type CreateSaveRequest = {
+  worldlineId?: string | null;
+};
+
 export type LocalSaveSettings = {
   saveDirectory: string | null;
   effectiveSaveDirectory: string;
@@ -216,10 +220,49 @@ export type SessionCreateStreamEvent =
       message: string;
     };
 
+export type TurnResolutionStage =
+  | "requesting_narrator"
+  | "waiting_turn_narration"
+  | "judging_ending"
+  | "finalizing_turn"
+  | "memory_deferred";
+
+export type TurnResolutionStreamEvent =
+  | {
+      type: "stage";
+      stage: TurnResolutionStage;
+      label: string;
+      detail: string;
+      progress: number;
+    }
+  | {
+      type: "done";
+      snapshot: SessionSnapshot;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
 export type CreateSaveResponse = {
   snapshot: SessionSnapshot;
   saveBundle: SaveBundle;
   saveRecord: SavedGameRecord;
+};
+
+export type UpsertWorldlineComicPageRequest = {
+  storyTitle: string;
+  ruleTitle: string;
+  locale: LocaleCode;
+  pageIndex: number;
+  storyPrompt: string;
+  storyMemorySummary?: string;
+  imageProfileId?: string;
+  runtimeImageModelConfig?: RuntimeImageModelConfigInput;
+};
+
+export type UpsertWorldlineComicPageResponse = PersistedComicMutationResponse & {
+  created: boolean;
 };
 
 export type ModelFeatureSummary = {

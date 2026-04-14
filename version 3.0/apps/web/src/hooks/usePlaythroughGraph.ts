@@ -23,9 +23,10 @@ export function usePlaythroughGraph() {
 
   function beginFromSnapshot(
     snapshot: SessionSnapshot,
-    runtimeConfig?: SaveRuntimeConfig
+    runtimeConfig?: SaveRuntimeConfig,
+    preferredWorldlineId?: string
   ): PlaythroughGraphBundle {
-    const nextBundle = startPlaythroughGraph(snapshot, runtimeConfig);
+    const nextBundle = startPlaythroughGraph(snapshot, runtimeConfig, preferredWorldlineId);
     setActiveGraphBundle(nextBundle);
     return nextBundle;
   }
@@ -48,9 +49,14 @@ export function usePlaythroughGraph() {
 
   function relinkSnapshot(
     snapshot: SessionSnapshot,
-    runtimeConfig?: SaveRuntimeConfig
+    runtimeConfig?: SaveRuntimeConfig,
+    preferredWorldlineId?: string
   ): PlaythroughGraphBundle | null {
-    const nextBundle = relinkActivePlaythroughToSnapshot(snapshot, runtimeConfig);
+    const nextBundle = relinkActivePlaythroughToSnapshot(
+      snapshot,
+      runtimeConfig,
+      preferredWorldlineId
+    );
     setActiveGraphBundle(nextBundle);
     return nextBundle;
   }

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 
 import {
   buildLanguageSystemPrompt,
@@ -14,9 +15,12 @@ import type {
   ComicPageGenerationResponse,
   ComicPromptPresetResponse,
   ComicReferenceImageInput,
+  ComicStylePreset,
   CreatePersistedComicRequest,
   ImageGenerationRequest,
-  ImageReferenceInput
+  ImageReferenceInput,
+  UpsertWorldlineComicPageRequest,
+  UpsertWorldlineComicPageResponse
 } from "../../../../packages/shared-types/src/index.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
 import { generateImage } from "../image_generation/service.ts";
@@ -145,6 +149,108 @@ function buildFallbackDescription(storyPrompt: string, styleName: string): strin
     : `${styleName} comic concept.`;
 
   return description.length > 200 ? `${description.slice(0, 197)}...` : description;
+}
+
+function buildWorldlineComicTitle(storyTitle: string): string {
+  const cleanStoryTitle = compactWhitespace(storyTitle);
+  return cleanStoryTitle || "Worldline Comic";
+}
+
+function buildWorldlineComicDescription(ruleTitle: string, storyTitle: string): string {
+  const cleanRuleTitle = compactWhitespace(ruleTitle);
+  const cleanStoryTitle = compactWhitespace(storyTitle);
+  const combined = [cleanRuleTitle, cleanStoryTitle].filter(Boolean).join(" / ");
+  return combined || "TRPG worldline comic archive.";
+}
+
+function inferMimeTypeFromFileName(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+
+  if (lower.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (lower.endsWith(".gif")) {
+    return "image/gif";
+  }
+
+  return "image/png";
+}
+
+function buildRecoveredComicStyle(): ComicStylePreset {
+  return {
+    id: "recovered",
+    name: "Recovered",
+    prompt: "Recovered from copied local worldline comic assets."
+  };
+}
+
+function buildRecoveredComicAsset(
+  comicRoot: string,
+  worldlineId: string,
+  fileName: string
+) {
+  const relativePath = `pages/${fileName}`;
+  return {
+    relativePath,
+    storagePath: join(comicRoot, worldlineId, "pages", fileName),
+    apiPath: `/api/comic-assets/${encodeURIComponent(worldlineId)}/pages/${encodeURIComponent(fileName)}`,
+    mimeType: inferMimeTypeFromFileName(fileName)
+  };
+}
+
+async function recoverCopiedWorldlineComicProject(
+  comicRoot: string,
+  worldlineId: string
+) {
+  const pagesDir = join(comicRoot, worldlineId, "pages");
+  const entries = await readdir(pagesDir, {
+    withFileTypes: true
+  });
+  const numberedFiles = entries
+    .filter((entry) => entry.isFile() && /^\d+\.(png|jpe?g|webp|gif)$/iu.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+
+  if (numberedFiles.length === 0) {
+    throw new Error(`Worldline comic not found: ${worldlineId}`);
+  }
+
+  const now = new Date().toISOString();
+  const recoveredStyle = buildRecoveredComicStyle();
+  return writeComicProjectToDisk(comicRoot, {
+    comicId: worldlineId,
+    createdAt: now,
+    updatedAt: now,
+    title: "Recovered Worldline Comic",
+    description: "Recovered from copied local comic pages.",
+    storyPrompt: "",
+    style: recoveredStyle,
+    pageCount: numberedFiles.length,
+    storageRoot: "",
+    coverImage: buildRecoveredComicAsset(comicRoot, worldlineId, numberedFiles[0]),
+    references: [],
+    pages: numberedFiles.map((fileName) => {
+      const pageIndex = Number.parseInt(fileName, 10);
+      return {
+        pageId: `recovered_${pageIndex}`,
+        pageNumber: pageIndex + 1,
+        storyPrompt: "",
+        revisedPrompt: "",
+        continuationContext: null,
+        negativePrompt: null,
+        provider: "recovered-local",
+        createdAt: now,
+        style: recoveredStyle,
+        image: buildRecoveredComicAsset(comicRoot, worldlineId, fileName),
+        characterReferenceIds: [],
+        previousPageNumber: pageIndex > 0 ? pageIndex : null
+      };
+    })
+  });
 }
 
 function parseMetadataJson(rawText: string): {
@@ -600,5 +706,148 @@ export async function appendPersistedComicPage(
   return {
     project: nextProject,
     page: nextProject.pages.at(-1)!
+  };
+}
+
+export async function loadWorldlineComicProject(
+  comicRoot: string,
+  worldlineId: string
+) {
+  const normalizedWorldlineId = compactWhitespace(worldlineId);
+  const project = await loadComicProjectFromDisk(comicRoot, normalizedWorldlineId).catch(() =>
+    recoverCopiedWorldlineComicProject(comicRoot, normalizedWorldlineId)
+  );
+
+  if (project.comicId === normalizedWorldlineId) {
+    return project;
+  }
+
+  return writeComicProjectToDisk(comicRoot, {
+    ...project,
+    comicId: normalizedWorldlineId,
+    storageRoot: ""
+  });
+}
+
+export async function upsertWorldlineComicPage(
+  comicRoot: string,
+  worldlineId: string,
+  request: UpsertWorldlineComicPageRequest
+): Promise<UpsertWorldlineComicPageResponse> {
+  const normalizedWorldlineId = compactWhitespace(worldlineId);
+  const storyPrompt = request.storyPrompt.trim();
+
+  if (!normalizedWorldlineId) {
+    throw new Error("Worldline comic id is required.");
+  }
+
+  if (!storyPrompt) {
+    throw new Error("Worldline comic story prompt is required.");
+  }
+
+  const pageIndex = Math.max(0, Math.floor(request.pageIndex));
+  const pageNumber = pageIndex + 1;
+  const now = new Date().toISOString();
+  const existingProject = await loadWorldlineComicProject(comicRoot, normalizedWorldlineId).catch(
+    () => null
+  );
+
+  if (existingProject) {
+    const existingPage = existingProject.pages.find((page) => page.pageNumber === pageNumber);
+    if (existingPage) {
+      return {
+        project: existingProject,
+        page: existingPage,
+        created: false
+      };
+    }
+  }
+
+  const generatedPage = await generateComicPage({
+    storyPrompt,
+    styleId: existingProject?.style.id,
+    pageNumber,
+    storyMemorySummary: compactWhitespace(request.storyMemorySummary ?? "") || undefined,
+    previousPages: existingProject
+      ? await buildPersistedPreviousPages(existingProject)
+      : undefined,
+    imageProfileId: request.imageProfileId,
+    runtimeImageModelConfig: request.runtimeImageModelConfig
+  });
+
+  const pageId = `page_${randomUUID().slice(0, 8)}`;
+  const persistedImage = await saveComicAssetToDisk({
+    comicRoot,
+    comicId: normalizedWorldlineId,
+    folderName: "pages",
+    fileNameStem: String(pageIndex),
+    sourceUrl: generatedPage.imageUrl
+  });
+
+  if (!existingProject) {
+    const createdProject = await writeComicProjectToDisk(comicRoot, {
+      comicId: normalizedWorldlineId,
+      createdAt: now,
+      updatedAt: now,
+      title: buildWorldlineComicTitle(request.storyTitle),
+      description: buildWorldlineComicDescription(request.ruleTitle, request.storyTitle),
+      storyPrompt,
+      style: generatedPage.style,
+      pageCount: 1,
+      storageRoot: "",
+      coverImage: persistedImage,
+      references: [],
+      pages: [
+        {
+          pageId,
+          pageNumber,
+          storyPrompt,
+          revisedPrompt: generatedPage.revisedPrompt,
+          continuationContext: generatedPage.continuationContext,
+          negativePrompt: null,
+          provider: generatedPage.provider,
+          createdAt: now,
+          style: generatedPage.style,
+          image: persistedImage,
+          characterReferenceIds: [],
+          previousPageNumber: null
+        }
+      ]
+    });
+
+    return {
+      project: createdProject,
+      page: createdProject.pages[0],
+      created: true
+    };
+  }
+
+  const nextProject = await writeComicProjectToDisk(comicRoot, {
+    ...existingProject,
+    updatedAt: now,
+    pageCount: existingProject.pageCount + 1,
+    pages: [
+      ...existingProject.pages,
+      {
+        pageId,
+        pageNumber,
+        storyPrompt,
+        revisedPrompt: generatedPage.revisedPrompt,
+        continuationContext: generatedPage.continuationContext,
+        negativePrompt: null,
+        provider: generatedPage.provider,
+        createdAt: now,
+        style: generatedPage.style,
+        image: persistedImage,
+        characterReferenceIds: [],
+        previousPageNumber: existingProject.pages.at(-1)?.pageNumber ?? null
+      }
+    ]
+  });
+
+  return {
+    project: nextProject,
+    page: nextProject.pages.at(-1)!,
+    created: true
   };
 }

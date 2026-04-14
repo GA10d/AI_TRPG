@@ -407,6 +407,7 @@ export type SaveRuntimeConfig = {
 export type SaveBundle = {
   schemaVersion?: string;
   savedAt: string;
+  worldlineId?: string | null;
   session: Session;
   messages: Message[];
   replay: ReplayEvent[];
@@ -419,6 +420,7 @@ export type SavedGameRecord = {
   saveId: string;
   savedAt: string;
   sessionId: string;
+  worldlineId?: string | null;
   ruleTitle: string;
   storyTitle: string;
   locale: string;

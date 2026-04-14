@@ -45,6 +45,7 @@ function buildRecord(
     saveId,
     savedAt: saveBundle.savedAt,
     sessionId: saveBundle.session.id,
+    worldlineId: saveBundle.worldlineId ?? null,
     ruleTitle: contentSummary?.ruleTitle ?? saveBundle.session.ruleId,
     storyTitle: contentSummary?.storyTitle ?? saveBundle.session.storyId,
     locale: contentSummary?.resolvedLocale ?? saveBundle.session.locale,

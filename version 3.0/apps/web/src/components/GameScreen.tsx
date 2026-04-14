@@ -13,6 +13,7 @@ import type {
   ImagePromptTemplateConfig,
   Message,
   NpcRosterEntry,
+  PersistedComicProject,
   PlaythroughGraphBundle,
   RoundDraft,
   RuntimeImageModelConfigInput,
@@ -75,6 +76,9 @@ type GameScreenProps = {
   isRestoring: boolean;
   isResumingBranch: boolean;
   savedGames: SavedGameRecord[];
+  comicProject: PersistedComicProject | null;
+  isComicLoading: boolean;
+  isComicGenerating: boolean;
   showAiMetadata: boolean;
   markdownFontSize: MarkdownFontSizePreset;
   storyControlMode: StoryControlMode | null;
@@ -96,7 +100,7 @@ type GameScreenProps = {
 
 type SidePanelMode = "history" | "round" | "worldline" | "judge" | "reasoning";
 
-type GameDrawer = "none" | "saves" | "npcs" | "details" | "private_chat";
+type GameDrawer = "none" | "saves" | "comics" | "npcs" | "details" | "private_chat";
 
 type ReasoningRecord = {
   id: string;
@@ -190,6 +194,9 @@ export function GameScreen(props: GameScreenProps) {
     isRestoring,
     isResumingBranch,
     savedGames,
+    comicProject,
+    isComicLoading,
+    isComicGenerating,
     showAiMetadata,
     markdownFontSize,
     storyControlMode,
@@ -223,6 +230,7 @@ export function GameScreen(props: GameScreenProps) {
   const [selectedPrivateChatTargetId, setSelectedPrivateChatTargetId] = useState<string | null>(null);
   const [privateChatDrafts, setPrivateChatDrafts] = useState<Record<string, string>>({});
   const [manualNarrationDraft, setManualNarrationDraft] = useState("");
+  const [comicLightboxPageNumber, setComicLightboxPageNumber] = useState<number | null>(null);
   const [generatedPortraits, setGeneratedPortraits] = useState<
     Record<string, ImageGenerationResponse>
   >({});
@@ -269,6 +277,18 @@ export function GameScreen(props: GameScreenProps) {
   const historyContextMessages = latestNarration
     ? publicStoryMessages.filter((message) => message.id !== latestNarration.id)
     : publicStoryMessages;
+  const comicPages = comicProject?.pages ?? [];
+  const comicLightboxPage =
+    comicPages.find((page) => page.pageNumber === comicLightboxPageNumber) ?? null;
+  const comicLightboxIndex = comicLightboxPage
+    ? comicPages.findIndex((page) => page.pageNumber === comicLightboxPage.pageNumber)
+    : -1;
+  const previousComicLightboxPage =
+    comicLightboxIndex > 0 ? comicPages[comicLightboxIndex - 1] : null;
+  const nextComicLightboxPage =
+    comicLightboxIndex >= 0 && comicLightboxIndex < comicPages.length - 1
+      ? comicPages[comicLightboxIndex + 1]
+      : null;
   const isSessionEnded = snapshot?.session.status === "ended";
   const hasEndingState = Boolean(snapshot?.session.gameState.endingState);
   const primaryPlayerMode = snapshot?.session.partySetup?.primaryPlayerMode ?? "human";
@@ -496,6 +516,7 @@ export function GameScreen(props: GameScreenProps) {
     setSelectedPrivateChatTargetId(null);
     setPrivateChatDrafts({});
     setManualNarrationDraft("");
+    setComicLightboxPageNumber(null);
     setSidePanelMode("history");
     setSidePanelWidth(420);
     setComposerHeight(240);
@@ -515,6 +536,21 @@ export function GameScreen(props: GameScreenProps) {
       setSidePanelMode("history");
     }
   }, [sidePanelMode, supportsReasoningPanel]);
+
+  useEffect(() => {
+    if (activeDrawer !== "comics") {
+      setComicLightboxPageNumber(null);
+    }
+  }, [activeDrawer]);
+
+  useEffect(() => {
+    if (
+      comicLightboxPageNumber !== null &&
+      !comicPages.some((page) => page.pageNumber === comicLightboxPageNumber)
+    ) {
+      setComicLightboxPageNumber(null);
+    }
+  }, [comicLightboxPageNumber, comicPages]);
 
   useEffect(() => {
     function syncPanelBounds(): void {
@@ -873,6 +909,14 @@ export function GameScreen(props: GameScreenProps) {
             type="button"
           >
             {isRestoring ? text.common.loading : text.common.load}
+          </button>
+          <button
+            className="ghost-button"
+            disabled={actionLocked}
+            onClick={() => setActiveDrawer("comics")}
+            type="button"
+          >
+            {text.gameScreen.comicButton}
           </button>
           {companionParticipants.length ? (
             <button
@@ -1359,6 +1403,75 @@ export function GameScreen(props: GameScreenProps) {
               </div>
             ) : null}
 
+            {activeDrawer === "comics" ? (
+              <div className="game-drawer-body">
+                <div className="screen-header">
+                  <div>
+                    <div className="eyebrow">{text.gameScreen.comicEyebrow}</div>
+                    <h2>{text.gameScreen.comicTitle}</h2>
+                    <p className="lead">{text.gameScreen.comicDescription}</p>
+                  </div>
+                  <div className="button-row header-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => setActiveDrawer("none")}
+                      type="button"
+                    >
+                      {text.common.close}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="summary-text game-comic-hint">
+                  {isComicGenerating
+                    ? text.gameScreen.comicGeneratingHint
+                    : comicProject
+                      ? text.gameScreen.comicCount(comicPages.length)
+                      : text.gameScreen.comicEmpty}
+                </div>
+
+                {isComicLoading ? (
+                  <div className="empty-state">{text.common.loading}</div>
+                ) : comicPages.length ? (
+                  <div className="game-comic-grid">
+                    {comicPages.map((page) => (
+                      <article className="summary-card game-comic-card" key={page.pageId}>
+                        <div className="game-comic-card-head">
+                          <div>
+                            <div className="meta-label">
+                              {text.gameScreen.comicPageLabel(page.pageNumber - 1)}
+                            </div>
+                            <div className="summary-text">
+                              {formatDateTime(page.createdAt)}
+                            </div>
+                          </div>
+                          <button
+                            className="ghost-button"
+                            onClick={() => setComicLightboxPageNumber(page.pageNumber)}
+                            type="button"
+                          >
+                            {text.gameScreen.comicOpenLightbox}
+                          </button>
+                        </div>
+
+                        <img
+                          alt={text.gameScreen.comicPageAlt(page.pageNumber - 1)}
+                          className="game-comic-preview"
+                          src={page.image.apiPath}
+                        />
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    {isComicGenerating
+                      ? text.gameScreen.comicGeneratingHint
+                      : text.gameScreen.comicEmpty}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             {activeDrawer === "private_chat" ? (
               <div className="game-drawer-body">
                 <div className="screen-header">
@@ -1775,6 +1888,60 @@ export function GameScreen(props: GameScreenProps) {
               </div>
             ) : null}
           </aside>
+        </div>
+      ) : null}
+
+      {comicLightboxPage ? (
+        <div className="game-comic-lightbox" onClick={() => setComicLightboxPageNumber(null)}>
+          <div
+            className="game-comic-lightbox-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="game-comic-lightbox-head">
+              <div>
+                <div className="meta-label">
+                  {text.gameScreen.comicPageLabel(comicLightboxPage.pageNumber - 1)}
+                </div>
+                <div className="summary-text">
+                  {formatDateTime(comicLightboxPage.createdAt)}
+                </div>
+              </div>
+              <button
+                className="ghost-button"
+                onClick={() => setComicLightboxPageNumber(null)}
+                type="button"
+              >
+                {text.common.close}
+              </button>
+            </div>
+
+            <img
+              alt={text.gameScreen.comicPageAlt(comicLightboxPage.pageNumber - 1)}
+              className="game-comic-lightbox-image"
+              src={comicLightboxPage.image.apiPath}
+            />
+
+            <div className="button-row game-comic-lightbox-actions">
+              <button
+                className="ghost-button"
+                disabled={!previousComicLightboxPage}
+                onClick={() =>
+                  setComicLightboxPageNumber(previousComicLightboxPage?.pageNumber ?? null)
+                }
+                type="button"
+              >
+                {text.gameScreen.comicPrevPage}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={!nextComicLightboxPage}
+                onClick={() => setComicLightboxPageNumber(nextComicLightboxPage?.pageNumber ?? null)}
+                type="button"
+              >
+                {text.gameScreen.comicNextPage}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

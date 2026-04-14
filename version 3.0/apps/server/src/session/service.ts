@@ -311,6 +311,17 @@ type CreateSessionSnapshotOptions = {
   onStage?: SessionCreateProgressHandler;
 };
 
+type TurnResolutionProgressHandler = (event: {
+  stage: "requesting_narrator" | "waiting_turn_narration" | "judging_ending" | "finalizing_turn" | "memory_deferred";
+  label: string;
+  detail: string;
+  progress: number;
+}) => void | Promise<void>;
+
+type TurnResolutionOptions = {
+  onStage?: TurnResolutionProgressHandler;
+};
+
 type SessionRoleModelConfig = NonNullable<
   NonNullable<SessionRuntimeConfig["roleModelConfigs"]>["narrator"]
 >;
@@ -333,11 +344,13 @@ async function emitCreateSessionStage(
 function buildSaveBundle(
   snapshot: SessionSnapshot,
   runtimeConfig: SessionRuntimeConfig | null,
-  savedAt: string
+  savedAt: string,
+  worldlineId?: string | null
 ): SaveBundle {
   return {
     schemaVersion: snapshot.session.schemaVersion,
     savedAt,
+    worldlineId: worldlineId ?? undefined,
     session: snapshot.session,
     messages: snapshot.messages,
     replay: snapshot.replay,
@@ -771,14 +784,9 @@ async function createSessionSnapshotInternal(
     aiCompanions
   });
 
-  const snapshotWithMemory = await attachUpdatedMemory(
-    snapshot,
-    messages.filter((message) => message.visibility !== "system"),
-    sessionRuntimeConfig
-  );
-
-  store.save(snapshotWithMemory, sessionRuntimeConfig);
-  return snapshotWithMemory;
+  store.save(snapshot, sessionRuntimeConfig);
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return snapshot;
 }
 
 export async function createSessionSnapshot(
@@ -961,7 +969,8 @@ export async function prepareRound(
 export async function commitPreparedRound(
   sessionId: string,
   request: CommitRoundRequest,
-  store: InMemorySessionStore
+  store: InMemorySessionStore,
+  options?: TurnResolutionOptions
 ): Promise<SessionSnapshot | null> {
   const current = store.get(sessionId);
   if (!current) {
@@ -1030,7 +1039,14 @@ export async function commitPreparedRound(
     latestPlayerInput: committedPartyInput,
     round: nextRound
   });
-  const turnNarration = await modelGateway.generateTurnNarration({
+  await emitTurnResolutionStage(
+    options,
+    "requesting_narrator",
+    "整理主持人输入",
+    "正在整理队伍输入，并组装主持人需要的上下文。",
+    0.18
+  );
+  const turnNarrationPromise = modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
     modelProfileId: narratorRuntimeSelection.modelProfileId,
     runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
@@ -1040,6 +1056,21 @@ export async function commitPreparedRound(
     round: nextRound,
     conversationContext: narratorContextPack.assembledText
   });
+  await emitTurnResolutionStage(
+    options,
+    "waiting_turn_narration",
+    "等待主持人回复",
+    "队伍输入已经提交，正在等待主持人生成本轮回复。",
+    0.54
+  );
+  const turnNarration = await turnNarrationPromise;
+  await emitTurnResolutionStage(
+    options,
+    "judging_ending",
+    "进行结局判定",
+    "主持人已回复，正在检查这段回复是否触发结局。",
+    0.8
+  );
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
     modelProfileId: narratorRuntimeSelection.modelProfileId,
@@ -1128,6 +1159,14 @@ export async function commitPreparedRound(
     });
   }
 
+  await emitTurnResolutionStage(
+    options,
+    "finalizing_turn",
+    "写入本轮结果",
+    "正在把队伍输入、主持人回复和判定结果写入会话。",
+    0.94
+  );
+
   const updatedSnapshot = store.update(sessionId, (latest) => ({
     ...latest,
     session: {
@@ -1167,17 +1206,16 @@ export async function commitPreparedRound(
   if (!updatedSnapshot) {
     return null;
   }
-
-  const snapshotWithMemory = await attachUpdatedMemory(
-    updatedSnapshot,
-    [
-      ...playerMessages,
-      gmMessage
-    ],
-    runtimeConfig
+  store.save(updatedSnapshot);
+  await emitTurnResolutionStage(
+    options,
+    "memory_deferred",
+    "后台刷新记忆",
+    "本轮已提交完成，memory 会在后台异步更新，不再阻塞你继续游戏。",
+    1
   );
-  store.save(snapshotWithMemory);
-  return snapshotWithMemory;
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
 }
 
 export async function updateStoryControlMode(
@@ -1528,7 +1566,8 @@ export async function sendPrivateChat(
 export async function submitTurn(
   sessionId: string,
   request: SubmitTurnRequest,
-  store: InMemorySessionStore
+  store: InMemorySessionStore,
+  options?: TurnResolutionOptions
 ): Promise<SessionSnapshot | null> {
   const trimmedInput = request.playerInput.trim();
   if (trimmedInput.length === 0) {
@@ -1594,7 +1633,14 @@ export async function submitTurn(
     latestPlayerInput: labeledPlayerInput,
     round: nextRound
   });
-  const turnNarration = await modelGateway.generateTurnNarration({
+  await emitTurnResolutionStage(
+    options,
+    "requesting_narrator",
+    "整理主持人输入",
+    "正在整理你的行动，并组装主持人需要的上下文。",
+    0.18
+  );
+  const turnNarrationPromise = modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
     modelProfileId: narratorRuntimeSelection.modelProfileId,
     runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
@@ -1604,6 +1650,21 @@ export async function submitTurn(
     round: nextRound,
     conversationContext: narratorContextPack.assembledText
   });
+  await emitTurnResolutionStage(
+    options,
+    "waiting_turn_narration",
+    "等待主持人回复",
+    "你的行动已经提交，正在等待主持人生成本轮回复。",
+    0.54
+  );
+  const turnNarration = await turnNarrationPromise;
+  await emitTurnResolutionStage(
+    options,
+    "judging_ending",
+    "进行结局判定",
+    "主持人已回复，正在检查这段回复是否触发结局。",
+    0.8
+  );
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
     modelProfileId: narratorRuntimeSelection.modelProfileId,
@@ -1691,6 +1752,14 @@ export async function submitTurn(
     });
   }
 
+  await emitTurnResolutionStage(
+    options,
+    "finalizing_turn",
+    "写入本轮结果",
+    "正在把你的行动、主持人回复和判定结果写入会话。",
+    0.94
+  );
+
   const updatedSnapshot = store.update(sessionId, () => ({
     ...current,
     session: {
@@ -1732,22 +1801,24 @@ export async function submitTurn(
   if (!updatedSnapshot) {
     return null;
   }
-
-  const snapshotWithMemory = await attachUpdatedMemory(
-    updatedSnapshot,
-    [
-      playerMessage,
-      gmMessage
-    ],
-    runtimeConfig
+  store.save(updatedSnapshot);
+  await emitTurnResolutionStage(
+    options,
+    "memory_deferred",
+    "后台刷新记忆",
+    "本轮已提交完成，memory 会在后台异步更新，不再阻塞你继续游戏。",
+    1
   );
-  store.save(snapshotWithMemory);
-  return snapshotWithMemory;
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
 }
 
 export function createSaveBundleForSession(
   sessionId: string,
-  store: InMemorySessionStore
+  store: InMemorySessionStore,
+  options?: {
+    worldlineId?: string | null;
+  }
 ): {
   snapshot: SessionSnapshot;
   saveBundle: SaveBundle;
@@ -1779,7 +1850,12 @@ export function createSaveBundleForSession(
 
   return {
     snapshot: nextSnapshot,
-    saveBundle: buildSaveBundle(nextSnapshot, runtimeConfig, savedAt)
+    saveBundle: buildSaveBundle(
+      nextSnapshot,
+      runtimeConfig,
+      savedAt,
+      options?.worldlineId ?? null
+    )
   };
 }
 
@@ -1842,6 +1918,60 @@ export function getSessionContextPackState(
     target,
     participantId
   });
+}
+
+async function emitTurnResolutionStage(
+  options: TurnResolutionOptions | undefined,
+  stage: "requesting_narrator" | "waiting_turn_narration" | "judging_ending" | "finalizing_turn" | "memory_deferred",
+  label: string,
+  detail: string,
+  progress: number
+): Promise<void> {
+  await options?.onStage?.({
+    stage,
+    label,
+    detail,
+    progress
+  });
+}
+
+const memoryRefreshChains = new Map<string, Promise<void>>();
+
+function scheduleBackgroundMemoryRefresh(
+  sessionId: string,
+  store: InMemorySessionStore,
+  options?: {
+    onQueued?: () => void | Promise<void>;
+  }
+): void {
+  const previous = memoryRefreshChains.get(sessionId) ?? Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(async () => {
+      await options?.onQueued?.();
+      const latestSnapshot = store.get(sessionId);
+      if (!latestSnapshot) {
+        return;
+      }
+
+      const runtimeConfig = store.getRuntimeConfig(sessionId);
+      const nextMemory = await rebuildSnapshotMemory({
+        snapshot: latestSnapshot,
+        runtimeConfig
+      });
+
+      store.update(sessionId, (current) => ({
+        ...current,
+        memory: nextMemory
+      }));
+    })
+    .finally(() => {
+      if (memoryRefreshChains.get(sessionId) === next) {
+        memoryRefreshChains.delete(sessionId);
+      }
+    });
+
+  memoryRefreshChains.set(sessionId, next);
 }
 
 export async function rebuildSessionMemoryForSession(
