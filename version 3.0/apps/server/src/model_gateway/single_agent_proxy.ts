@@ -140,6 +140,31 @@ type ChatCompletionResponseFormat =
       strict?: boolean;
     };
 
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof DOMException && error.name === "AbortError"
+  ) || (
+    error instanceof Error &&
+    error.name === "AbortError"
+  );
+}
+
+function normalizeGatewayError(
+  error: unknown,
+  config: ServerProxyConfig,
+  operationLabel: string
+): Error {
+  if (isAbortError(error)) {
+    return new Error(
+      `${config.profileName} ${operationLabel} timed out after ${Math.round(
+        config.timeoutMs / 1000
+      )}s. You can raise TRPG_SERVER_PROXY_TIMEOUT_MS if needed.`
+    );
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 function normalizeContent(rawContent: unknown): string {
   if (typeof rawContent === "string") {
     return rawContent.trim();
@@ -303,6 +328,8 @@ async function callChatCompletion(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeGatewayError(error, config, "request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -544,6 +571,8 @@ async function callOpenAiResponsesWithFiles(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeGatewayError(error, config, "responses request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -608,6 +637,8 @@ async function callOpenAiResponsesWithInlineFiles(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeGatewayError(error, config, "responses request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -679,6 +710,8 @@ async function callGeminiGenerateContentWithFiles(
       durationMs: Date.now() - startedAt,
       usage: buildGeminiUsage(data)
     };
+  } catch (error) {
+    throw normalizeGatewayError(error, config, "generateContent request");
   } finally {
     clearTimeout(timeoutHandle);
   }

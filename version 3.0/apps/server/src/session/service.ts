@@ -340,14 +340,18 @@ async function attachUpdatedMemory(
   newMessages: Message[],
   runtimeConfig: SessionRuntimeConfig | null
 ): Promise<SessionSnapshot> {
-  return {
-    ...snapshot,
-    memory: await updateSnapshotMemory({
-      snapshot,
-      newMessages,
-      runtimeConfig
-    })
-  };
+  try {
+    return {
+      ...snapshot,
+      memory: await updateSnapshotMemory({
+        snapshot,
+        newMessages,
+        runtimeConfig
+      })
+    };
+  } catch {
+    return snapshot;
+  }
 }
 
 async function resolveSessionAiCompanions(

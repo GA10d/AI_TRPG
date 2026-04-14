@@ -1481,6 +1481,10 @@ img {
 .companion-preset-list {
   display: grid;
   gap: 12px;
+  align-content: start;
+  max-height: min(420px, calc(100vh - 260px));
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .companion-preset-item {

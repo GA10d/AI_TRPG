@@ -120,6 +120,14 @@ function parseOptionalNumber(rawValue: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function resolveDefaultTimeoutMs(profileId: string): number {
+  if (profileId === "doubao") {
+    return 180_000;
+  }
+
+  return 60_000;
+}
+
 function normalizeDependence(profile: ModelProfileDefinition): ServerProxyDependence {
   return profile.dependence === "Google" ? "Google" : "OpenAI";
 }
@@ -339,7 +347,10 @@ export function getServerProxyConfig(input: {
     model,
     temperature: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TEMPERATURE"), 0.7),
     maxTokens: parseOptionalNumber(envFirst("TRPG_SERVER_PROXY_MAX_TOKENS")),
-    timeoutMs: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"), 60_000),
+    timeoutMs: parseNumberOrDefault(
+      envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"),
+      resolveDefaultTimeoutMs(profile.id)
+    ),
     providerLabel: resolveProviderLabel(profile),
     features: profile.features
   };
