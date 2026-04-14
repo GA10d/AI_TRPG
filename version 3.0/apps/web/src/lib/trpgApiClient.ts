@@ -25,6 +25,7 @@ import type {
   SessionSnapshot,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
+  TurnResolutionStreamEvent,
   UpsertWorldlineComicPageRequest,
   UpsertWorldlineComicPageResponse,
   UpdateLocalSaveSettingsRequest,
@@ -325,6 +326,82 @@ export async function fetchSession(sessionId: string): Promise<SessionSnapshot> 
   }
 }
 
+async function readTurnResolutionStream(
+  response: Response,
+  options?: {
+    onStage?: (event: Extract<TurnResolutionStreamEvent, { type: "stage" }>) => void;
+  }
+): Promise<SessionSnapshot> {
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  if (!response.body) {
+    throw new Error("The turn resolution stream did not return readable data.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalSnapshot: SessionSnapshot | null = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value ?? new Uint8Array(), {
+        stream: !done
+      });
+
+      let newlineIndex = buffer.indexOf("\n");
+      while (newlineIndex >= 0) {
+        const rawLine = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        newlineIndex = buffer.indexOf("\n");
+
+        if (!rawLine) {
+          continue;
+        }
+
+        const event = JSON.parse(rawLine) as TurnResolutionStreamEvent;
+        if (event.type === "stage") {
+          options?.onStage?.(event);
+          continue;
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.message || "Turn resolution streaming failed.");
+        }
+
+        finalSnapshot = event.snapshot;
+      }
+
+      if (done) {
+        break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const trailing = buffer.trim();
+  if (trailing) {
+    const event = JSON.parse(trailing) as TurnResolutionStreamEvent;
+    if (event.type === "stage") {
+      options?.onStage?.(event);
+    } else if (event.type === "error") {
+      throw new Error(event.message || "Turn resolution streaming failed.");
+    } else {
+      finalSnapshot = event.snapshot;
+    }
+  }
+
+  if (!finalSnapshot) {
+    throw new Error("The turn resolution stream ended without a final session payload.");
+  }
+
+  return finalSnapshot;
+}
+
 export async function fetchSessionMemory(
   sessionId: string
 ): Promise<SessionMemoryDebugResponse> {
@@ -606,6 +683,30 @@ export async function submitTurn(
   }
 }
 
+export async function streamSubmitTurn(
+  sessionId: string,
+  payload: SubmitTurnRequest,
+  options?: {
+    signal?: AbortSignal;
+    onStage?: (event: Extract<TurnResolutionStreamEvent, { type: "stage" }>) => void;
+  }
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/turns/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal
+    });
+
+    return await readTurnResolutionStream(response, options);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
 export async function prepareRound(
   sessionId: string,
   payload: PrepareRoundRequest
@@ -639,6 +740,30 @@ export async function commitPreparedRound(
     });
 
     return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function streamCommitPreparedRound(
+  sessionId: string,
+  payload: CommitRoundRequest = {},
+  options?: {
+    signal?: AbortSignal;
+    onStage?: (event: Extract<TurnResolutionStreamEvent, { type: "stage" }>) => void;
+  }
+): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/rounds/commit/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal
+    });
+
+    return await readTurnResolutionStream(response, options);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

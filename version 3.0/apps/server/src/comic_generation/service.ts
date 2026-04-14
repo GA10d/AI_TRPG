@@ -19,6 +19,8 @@ import type {
   CreatePersistedComicRequest,
   ImageGenerationRequest,
   ImageReferenceInput,
+  PersistedComicPage,
+  PersistedComicProject,
   UpsertWorldlineComicPageRequest,
   UpsertWorldlineComicPageResponse
 } from "../../../../packages/shared-types/src/index.ts";
@@ -202,18 +204,58 @@ function buildRecoveredComicAsset(
   };
 }
 
-async function recoverCopiedWorldlineComicProject(
+type NumberedWorldlineComicFile = {
+  fileName: string;
+  pageIndex: number;
+};
+
+async function listNumberedWorldlineComicFiles(
   comicRoot: string,
   worldlineId: string
-) {
+): Promise<NumberedWorldlineComicFile[]> {
   const pagesDir = join(comicRoot, worldlineId, "pages");
   const entries = await readdir(pagesDir, {
     withFileTypes: true
   });
-  const numberedFiles = entries
+
+  return entries
     .filter((entry) => entry.isFile() && /^\d+\.(png|jpe?g|webp|gif)$/iu.test(entry.name))
-    .map((entry) => entry.name)
-    .sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+    .map((entry) => ({
+      fileName: entry.name,
+      pageIndex: Number.parseInt(entry.name, 10)
+    }))
+    .sort((left, right) => left.pageIndex - right.pageIndex);
+}
+
+function buildRecoveredComicPage(args: {
+  comicRoot: string;
+  worldlineId: string;
+  fileName: string;
+  pageIndex: number;
+  createdAt: string;
+  style: ComicStylePreset;
+}): PersistedComicPage {
+  return {
+    pageId: `recovered_${args.pageIndex}`,
+    pageNumber: args.pageIndex + 1,
+    storyPrompt: "",
+    revisedPrompt: "",
+    continuationContext: null,
+    negativePrompt: null,
+    provider: "recovered-local",
+    createdAt: args.createdAt,
+    style: args.style,
+    image: buildRecoveredComicAsset(args.comicRoot, args.worldlineId, args.fileName),
+    characterReferenceIds: [],
+    previousPageNumber: args.pageIndex > 0 ? args.pageIndex : null
+  };
+}
+
+async function recoverCopiedWorldlineComicProject(
+  comicRoot: string,
+  worldlineId: string
+) {
+  const numberedFiles = await listNumberedWorldlineComicFiles(comicRoot, worldlineId);
 
   if (numberedFiles.length === 0) {
     throw new Error(`Worldline comic not found: ${worldlineId}`);
@@ -231,25 +273,64 @@ async function recoverCopiedWorldlineComicProject(
     style: recoveredStyle,
     pageCount: numberedFiles.length,
     storageRoot: "",
-    coverImage: buildRecoveredComicAsset(comicRoot, worldlineId, numberedFiles[0]),
+    coverImage: buildRecoveredComicAsset(comicRoot, worldlineId, numberedFiles[0].fileName),
     references: [],
-    pages: numberedFiles.map((fileName) => {
-      const pageIndex = Number.parseInt(fileName, 10);
-      return {
-        pageId: `recovered_${pageIndex}`,
-        pageNumber: pageIndex + 1,
-        storyPrompt: "",
-        revisedPrompt: "",
-        continuationContext: null,
-        negativePrompt: null,
-        provider: "recovered-local",
+    pages: numberedFiles.map(({ fileName, pageIndex }) =>
+      buildRecoveredComicPage({
+        comicRoot,
+        worldlineId,
+        fileName,
+        pageIndex,
         createdAt: now,
-        style: recoveredStyle,
-        image: buildRecoveredComicAsset(comicRoot, worldlineId, fileName),
-        characterReferenceIds: [],
-        previousPageNumber: pageIndex > 0 ? pageIndex : null
-      };
-    })
+        style: recoveredStyle
+      })
+    )
+  });
+}
+
+async function syncWorldlineComicProjectWithLocalPages(
+  comicRoot: string,
+  worldlineId: string,
+  project: PersistedComicProject
+): Promise<PersistedComicProject> {
+  const numberedFiles = await listNumberedWorldlineComicFiles(comicRoot, worldlineId).catch(() => []);
+  if (numberedFiles.length === 0) {
+    return project;
+  }
+
+  const existingPageNumbers = new Set(project.pages.map((page) => page.pageNumber));
+  const existingRelativePaths = new Set(
+    project.pages.map((page) => page.image.relativePath.replace(/\\/g, "/").toLowerCase())
+  );
+  const recoveredCreatedAt = project.updatedAt || project.createdAt || new Date().toISOString();
+  const missingPages = numberedFiles.flatMap(({ fileName, pageIndex }) => {
+    const pageNumber = pageIndex + 1;
+    const relativePath = `pages/${fileName}`.toLowerCase();
+    if (existingPageNumbers.has(pageNumber) || existingRelativePaths.has(relativePath)) {
+      return [];
+    }
+
+    return [
+      buildRecoveredComicPage({
+        comicRoot,
+        worldlineId,
+        fileName,
+        pageIndex,
+        createdAt: recoveredCreatedAt,
+        style: project.style
+      })
+    ];
+  });
+
+  if (missingPages.length === 0) {
+    return project;
+  }
+
+  return writeComicProjectToDisk(comicRoot, {
+    ...project,
+    updatedAt: new Date().toISOString(),
+    pageCount: project.pages.length + missingPages.length,
+    pages: [...project.pages, ...missingPages]
   });
 }
 
@@ -714,19 +795,19 @@ export async function loadWorldlineComicProject(
   worldlineId: string
 ) {
   const normalizedWorldlineId = compactWhitespace(worldlineId);
-  const project = await loadComicProjectFromDisk(comicRoot, normalizedWorldlineId).catch(() =>
+  let project = await loadComicProjectFromDisk(comicRoot, normalizedWorldlineId).catch(() =>
     recoverCopiedWorldlineComicProject(comicRoot, normalizedWorldlineId)
   );
 
-  if (project.comicId === normalizedWorldlineId) {
-    return project;
+  if (project.comicId !== normalizedWorldlineId) {
+    project = await writeComicProjectToDisk(comicRoot, {
+      ...project,
+      comicId: normalizedWorldlineId,
+      storageRoot: ""
+    });
   }
 
-  return writeComicProjectToDisk(comicRoot, {
-    ...project,
-    comicId: normalizedWorldlineId,
-    storageRoot: ""
-  });
+  return syncWorldlineComicProjectWithLocalPages(comicRoot, normalizedWorldlineId, project);
 }
 
 export async function upsertWorldlineComicPage(

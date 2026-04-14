@@ -45,8 +45,7 @@ import {
   buildNarratorContextPack,
   buildPrivateChatContextPack,
   createEmptySessionMemory,
-  rebuildSnapshotMemory,
-  updateSnapshotMemory
+  rebuildSnapshotMemory
 } from "./memory.ts";
 import {
   resolveNarratorRuntimeSelection,
@@ -358,25 +357,6 @@ function buildSaveBundle(
     memory: snapshot.memory,
     runtimeConfig: runtimeConfig ?? undefined
   };
-}
-
-async function attachUpdatedMemory(
-  snapshot: SessionSnapshot,
-  newMessages: Message[],
-  runtimeConfig: SessionRuntimeConfig | null
-): Promise<SessionSnapshot> {
-  try {
-    return {
-      ...snapshot,
-      memory: await updateSnapshotMemory({
-        snapshot,
-        newMessages,
-        runtimeConfig
-      })
-    };
-  } catch {
-    return snapshot;
-  }
 }
 
 async function resolveSessionAiCompanions(
@@ -1390,15 +1370,9 @@ export async function submitManualNarration(
     return null;
   }
 
-  const snapshotWithMemory = await attachUpdatedMemory(
-    updatedSnapshot,
-    [
-      gmMessage
-    ],
-    runtimeConfig
-  );
-  store.save(snapshotWithMemory);
-  return snapshotWithMemory;
+  store.save(updatedSnapshot);
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
 }
 
 export async function sendPrivateChat(
@@ -1551,16 +1525,9 @@ export async function sendPrivateChat(
     return null;
   }
 
-  const snapshotWithMemory = await attachUpdatedMemory(
-    updatedSnapshot,
-    [
-      humanMessage,
-      aiReplyMessage
-    ],
-    runtimeConfig
-  );
-  store.save(snapshotWithMemory);
-  return snapshotWithMemory;
+  store.save(updatedSnapshot);
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
 }
 
 export async function submitTurn(

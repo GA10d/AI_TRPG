@@ -21,7 +21,6 @@ import type {
 } from "../../../packages/shared-types/src/index.ts";
 import {
   assistCharacterConcept,
-  commitPreparedRound,
   createSave,
   fetchLocalSaveSettings,
   fetchSession,
@@ -33,9 +32,10 @@ import {
   prepareRound,
   sendPrivateChat,
   submitManualNarration,
+  streamCommitPreparedRound,
   streamCreateSession,
   streamOpeningPreview,
-  submitTurn,
+  streamSubmitTurn,
   upsertWorldlineComicPage,
   updateLocalSaveSettings,
   updateStoryControlMode
@@ -840,6 +840,18 @@ export function App() {
     appendGameActivity(uiText.app.status.prepareRoundLogWait);
   }
 
+  function applyTurnResolutionStageStatus(event: {
+    label: string;
+    detail: string;
+  }): void {
+    const detail = event.detail.trim();
+    const label = event.label.trim();
+    setStatus({
+      message: detail || label,
+      tone: "neutral"
+    });
+  }
+
   function appendCommitRoundLogs(currentSnapshot: SessionSnapshot, draftCount: number): void {
     const targetRound = currentSnapshot.session.currentRound + 1;
     appendGameActivity(uiText.app.status.commitRoundLogStart(targetRound, draftCount));
@@ -1345,7 +1357,7 @@ export function App() {
     }
 
     setIsComicGenerating(true);
-    appendGameActivity(uiText.gameScreen.comicGenerationStart(plan.pageIndex));
+    appendGameActivity(uiText.gameScreen.comicGenerationStart(plan.pageIndex + 1));
 
     try {
       const result = await upsertWorldlineComicPage(plan.worldlineId, {
@@ -1362,8 +1374,8 @@ export function App() {
       setWorldlineComicProject(result.project);
       appendGameActivity(
         result.created
-          ? uiText.gameScreen.comicGenerationDone(plan.pageIndex)
-          : uiText.gameScreen.comicAlreadyExists(plan.pageIndex)
+          ? uiText.gameScreen.comicGenerationDone(plan.pageIndex + 1)
+          : uiText.gameScreen.comicAlreadyExists(plan.pageIndex + 1)
       );
     } catch (error) {
       appendGameActivity(
@@ -1869,9 +1881,17 @@ export function App() {
 
     try {
       const capturePreview = buildPreparedTurnCapturePreview(currentSnapshot, primaryInputOverride);
-      const nextSnapshot = await commitPreparedRound(currentSnapshot.session.id, {
-        playerInput: primaryInputOverride?.trim() || undefined
-      });
+      const nextSnapshot = await streamCommitPreparedRound(
+        currentSnapshot.session.id,
+        {
+          playerInput: primaryInputOverride?.trim() || undefined
+        },
+        {
+          onStage: (event) => {
+            applyTurnResolutionStageStatus(event);
+          }
+        }
+      );
       commitSnapshot(nextSnapshot);
       const nextGraphBundle = captureTurn(
         nextSnapshot,
@@ -1924,9 +1944,17 @@ export function App() {
     });
 
     try {
-      const nextSnapshot = await submitTurn(currentSnapshot.session.id, {
-        playerInput
-      });
+      const nextSnapshot = await streamSubmitTurn(
+        currentSnapshot.session.id,
+        {
+          playerInput
+        },
+        {
+          onStage: (event) => {
+            applyTurnResolutionStageStatus(event);
+          }
+        }
+      );
       commitSnapshot(nextSnapshot);
       const nextGraphBundle = captureTurn(
         nextSnapshot,
@@ -1948,8 +1976,10 @@ export function App() {
         tone: "neutral"
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      appendReasonerTimeoutHintIfNeeded(currentSnapshot, errorMessage);
       setStatus({
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage,
         tone: "error"
       });
     } finally {

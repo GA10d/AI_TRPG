@@ -33,6 +33,7 @@ import type {
   SessionMemoryRebuildResponse,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
+  TurnResolutionStreamEvent,
   UpsertWorldlineComicPageRequest,
   UpdateStoryControlModeRequest
 } from "../../../packages/shared-types/src/index.ts";
@@ -134,6 +135,7 @@ type OpeningPreviewStreamEvent =
     };
 
 type SessionCreateNdjsonEvent = SessionCreateStreamEvent;
+type TurnResolutionNdjsonEvent = TurnResolutionStreamEvent;
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -179,6 +181,13 @@ function sendNdjsonEvent(
 function sendSessionCreateEvent(
   response: ServerResponse,
   event: SessionCreateNdjsonEvent
+): void {
+  response.write(`${JSON.stringify(event)}\n`);
+}
+
+function sendTurnResolutionEvent(
+  response: ServerResponse,
+  event: TurnResolutionNdjsonEvent
 ): void {
   response.write(`${JSON.stringify(event)}\n`);
 }
@@ -706,6 +715,70 @@ async function handleApiRequest(
 
   if (
     url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/rounds/commit/stream") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname
+      .replace("/api/sessions/", "")
+      .replace("/rounds/commit/stream", "");
+    const payload = await readJsonBody<CommitRoundRequest>(request);
+
+    response.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    response.flushHeaders?.();
+
+    try {
+      const snapshot = await commitPreparedRound(sessionId, payload, store, {
+        onStage: async (event) => {
+          if (response.writableEnded || response.destroyed) {
+            return;
+          }
+
+          sendTurnResolutionEvent(response, {
+            type: "stage",
+            ...event
+          });
+        }
+      });
+
+      if (!snapshot) {
+        if (!response.writableEnded && !response.destroyed) {
+          sendTurnResolutionEvent(response, {
+            type: "error",
+            message: `session not found: ${sessionId}`
+          });
+          response.end();
+        }
+        return true;
+      }
+
+      if (!response.writableEnded && !response.destroyed) {
+        sendTurnResolutionEvent(response, {
+          type: "done",
+          snapshot
+        });
+        response.end();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!response.writableEnded && !response.destroyed) {
+        sendTurnResolutionEvent(response, {
+          type: "error",
+          message
+        });
+        response.end();
+      }
+    }
+
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
     url.pathname.endsWith("/rounds/commit") &&
     request.method === "POST"
   ) {
@@ -802,6 +875,68 @@ async function handleApiRequest(
     }
 
     sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/turns/stream") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns/stream", "");
+    const payload = await readJsonBody<SubmitTurnRequest>(request);
+
+    response.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    response.flushHeaders?.();
+
+    try {
+      const snapshot = await submitTurn(sessionId, payload, store, {
+        onStage: async (event) => {
+          if (response.writableEnded || response.destroyed) {
+            return;
+          }
+
+          sendTurnResolutionEvent(response, {
+            type: "stage",
+            ...event
+          });
+        }
+      });
+
+      if (!snapshot) {
+        if (!response.writableEnded && !response.destroyed) {
+          sendTurnResolutionEvent(response, {
+            type: "error",
+            message: `session not found: ${sessionId}`
+          });
+          response.end();
+        }
+        return true;
+      }
+
+      if (!response.writableEnded && !response.destroyed) {
+        sendTurnResolutionEvent(response, {
+          type: "done",
+          snapshot
+        });
+        response.end();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!response.writableEnded && !response.destroyed) {
+        sendTurnResolutionEvent(response, {
+          type: "error",
+          message
+        });
+        response.end();
+      }
+    }
+
     return true;
   }
 

@@ -98,9 +98,9 @@ type GameScreenProps = {
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-type SidePanelMode = "history" | "round" | "worldline" | "judge" | "reasoning";
+type SidePanelMode = "history" | "round" | "comics" | "worldline" | "judge" | "reasoning";
 
-type GameDrawer = "none" | "saves" | "comics" | "npcs" | "details" | "private_chat";
+type GameDrawer = "none" | "saves" | "npcs" | "details" | "private_chat";
 
 type ReasoningRecord = {
   id: string;
@@ -116,6 +116,18 @@ type ReasoningRecord = {
 
 function clampPanelSize(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function formatElapsedDuration(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
 function inferMessageChannel(message: Message): Message["channel"] {
@@ -241,6 +253,8 @@ export function GameScreen(props: GameScreenProps) {
   const [debugMemoryLoading, setDebugMemoryLoading] = useState(false);
   const [debugMemoryError, setDebugMemoryError] = useState<string | null>(null);
   const [isRebuildingMemory, setIsRebuildingMemory] = useState(false);
+  const [activityStageStartedAt, setActivityStageStartedAt] = useState<number | null>(null);
+  const [activityStageNow, setActivityStageNow] = useState(() => Date.now());
 
   const actionLocked = isBootstrappingSession || isOpeningRevealInProgress;
   const publicStoryMessages =
@@ -278,6 +292,9 @@ export function GameScreen(props: GameScreenProps) {
     ? publicStoryMessages.filter((message) => message.id !== latestNarration.id)
     : publicStoryMessages;
   const comicPages = comicProject?.pages ?? [];
+  const pendingComicPageNumber = (comicPages.at(-1)?.pageNumber ?? 0) + 1;
+  const shouldShowComicGeneratingPlaceholder = isComicGenerating;
+  const hasComicEntries = comicPages.length > 0 || shouldShowComicGeneratingPlaceholder;
   const comicLightboxPage =
     comicPages.find((page) => page.pageNumber === comicLightboxPageNumber) ?? null;
   const comicLightboxIndex = comicLightboxPage
@@ -413,6 +430,27 @@ export function GameScreen(props: GameScreenProps) {
     text.gameScreen.activityLogIdle;
   const activityStatusTone =
     status.message.trim().length > 0 ? status.tone : latestActivityEntry?.tone ?? "neutral";
+  const isActivityStageTimingActive =
+    status.message.trim().length > 0 &&
+    (
+      isBootstrappingSession ||
+      isPreparingRound ||
+      isSubmittingTurn ||
+      isInjectingManualNarration ||
+      isSendingPrivateChat ||
+      isUpdatingStoryControl ||
+      isSaving ||
+      isRestoring ||
+      isResumingBranch ||
+      isComicLoading ||
+      isComicGenerating ||
+      debugMemoryLoading ||
+      isRebuildingMemory
+    );
+  const activityStatusWithTimer =
+    isActivityStageTimingActive && activityStageStartedAt !== null
+      ? `${activityStatusText} (${formatElapsedDuration(activityStageNow - activityStageStartedAt)})`
+      : activityStatusText;
   const bootstrapStatusLabel =
     sessionBootstrapState?.activeLabel ?? text.app.bootstrapStages.entered_game.label;
   const bootstrapStatusDetail =
@@ -473,6 +511,8 @@ export function GameScreen(props: GameScreenProps) {
   const sidePanelEyebrow =
     sidePanelMode === "round"
       ? text.gameScreen.roundDraftsEyebrow
+      : sidePanelMode === "comics"
+        ? text.gameScreen.comicEyebrow
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningEyebrow
       : sidePanelMode === "worldline"
@@ -483,6 +523,8 @@ export function GameScreen(props: GameScreenProps) {
   const sidePanelTitle =
     sidePanelMode === "round"
       ? text.gameScreen.roundRepliesTitle
+      : sidePanelMode === "comics"
+        ? text.gameScreen.comicTitle
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningTitle
       : sidePanelMode === "worldline"
@@ -495,6 +537,14 @@ export function GameScreen(props: GameScreenProps) {
       ? roundDrafts.length
         ? text.gameScreen.roundDraftCount(roundDrafts.length)
         : text.gameScreen.roundDraftsEmpty
+      : sidePanelMode === "comics"
+        ? isComicLoading
+          ? text.common.loading
+          : comicPages.length
+            ? text.gameScreen.comicCount(comicPages.length)
+            : isComicGenerating
+              ? text.common.creating
+              : text.common.none
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningCount(reasoningRecords.length)
       : sidePanelMode === "worldline"
@@ -538,10 +588,35 @@ export function GameScreen(props: GameScreenProps) {
   }, [sidePanelMode, supportsReasoningPanel]);
 
   useEffect(() => {
-    if (activeDrawer !== "comics") {
+    if (!isActivityStageTimingActive) {
+      setActivityStageStartedAt(null);
+      return;
+    }
+
+    const now = Date.now();
+    setActivityStageStartedAt(now);
+    setActivityStageNow(now);
+  }, [isActivityStageTimingActive, status.message]);
+
+  useEffect(() => {
+    if (!isActivityStageTimingActive || activityStageStartedAt === null) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActivityStageNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activityStageStartedAt, isActivityStageTimingActive]);
+
+  useEffect(() => {
+    if (sidePanelMode !== "comics") {
       setComicLightboxPageNumber(null);
     }
-  }, [activeDrawer]);
+  }, [sidePanelMode]);
 
   useEffect(() => {
     if (
@@ -910,14 +985,6 @@ export function GameScreen(props: GameScreenProps) {
           >
             {isRestoring ? text.common.loading : text.common.load}
           </button>
-          <button
-            className="ghost-button"
-            disabled={actionLocked}
-            onClick={() => setActiveDrawer("comics")}
-            type="button"
-          >
-            {text.gameScreen.comicButton}
-          </button>
           {companionParticipants.length ? (
             <button
               className="ghost-button"
@@ -1091,8 +1158,8 @@ export function GameScreen(props: GameScreenProps) {
             <span className="game-activity-statusline-label">
               {text.gameScreen.activityLogEyebrow}
             </span>
-            <span className="game-activity-statusline-message" title={activityStatusText}>
-              {activityStatusText}
+            <span className="game-activity-statusline-message" title={activityStatusWithTimer}>
+              {activityStatusWithTimer}
             </span>
           </div>
         </div>
@@ -1132,6 +1199,15 @@ export function GameScreen(props: GameScreenProps) {
               type="button"
             >
               {text.gameScreen.roundRepliesTab}
+            </button>
+            <button
+              className={`game-panel-toggle ${
+                sidePanelMode === "comics" ? "game-panel-toggle-active" : ""
+              }`}
+              onClick={() => setSidePanelMode("comics")}
+              type="button"
+            >
+              {text.gameScreen.comicButton}
             </button>
             {supportsReasoningPanel ? (
               <button
@@ -1244,6 +1320,74 @@ export function GameScreen(props: GameScreenProps) {
                       ? text.gameScreen.aiDraftWaiting
                       : text.gameScreen.roundDraftsDescription
                     : text.gameScreen.roundRepliesEmpty}
+                </div>
+              )
+            ) : sidePanelMode === "comics" ? (
+              hasComicEntries ? (
+                <div className="game-comic-grid">
+                  {comicPages.map((page) => (
+                    <article className="summary-card game-comic-card" key={page.pageId}>
+                      <div className="game-comic-card-head">
+                        <div>
+                          <div className="meta-label">
+                            {text.gameScreen.comicPageLabel(page.pageNumber)}
+                          </div>
+                          <div className="summary-text">
+                            {formatDateTime(page.createdAt)}
+                          </div>
+                        </div>
+                        <button
+                          className="ghost-button"
+                          onClick={() => setComicLightboxPageNumber(page.pageNumber)}
+                          type="button"
+                        >
+                          {text.gameScreen.comicOpenLightbox}
+                        </button>
+                      </div>
+
+                      <img
+                        alt={text.gameScreen.comicPageAlt(page.pageNumber)}
+                        className="game-comic-preview"
+                        src={page.image.apiPath}
+                      />
+                    </article>
+                  ))}
+                  {shouldShowComicGeneratingPlaceholder ? (
+                    <article
+                      aria-busy="true"
+                      className="summary-card game-comic-card game-comic-card-pending"
+                      key={`pending-comic-${pendingComicPageNumber}`}
+                    >
+                      <div className="game-comic-card-head">
+                        <div>
+                          <div className="meta-label">
+                            {text.gameScreen.comicPageLabel(pendingComicPageNumber)}
+                          </div>
+                          <div className="summary-text">
+                            {text.gameScreen.comicGenerationStart(pendingComicPageNumber)}
+                          </div>
+                        </div>
+                        <span className="badge">{text.common.generating}</span>
+                      </div>
+
+                      <div className="game-comic-preview-loading">
+                        <div className="game-comic-loading">
+                          <div aria-hidden="true" className="game-comic-spinner" />
+                          <div className="summary-text game-comic-loading-copy">
+                            {text.gameScreen.comicGeneratingHint}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ) : null}
+                </div>
+              ) : isComicLoading ? (
+                <div className="empty-state">{text.common.loading}</div>
+              ) : (
+                <div className="empty-state">
+                  {isComicGenerating
+                    ? text.gameScreen.comicGeneratingHint
+                    : text.gameScreen.comicEmpty}
                 </div>
               )
             ) : sidePanelMode === "worldline" ? (
@@ -1400,75 +1544,6 @@ export function GameScreen(props: GameScreenProps) {
                     <div className="empty-state">{text.gameScreen.noLocalSaves}</div>
                   )}
                 </div>
-              </div>
-            ) : null}
-
-            {activeDrawer === "comics" ? (
-              <div className="game-drawer-body">
-                <div className="screen-header">
-                  <div>
-                    <div className="eyebrow">{text.gameScreen.comicEyebrow}</div>
-                    <h2>{text.gameScreen.comicTitle}</h2>
-                    <p className="lead">{text.gameScreen.comicDescription}</p>
-                  </div>
-                  <div className="button-row header-actions">
-                    <button
-                      className="ghost-button"
-                      onClick={() => setActiveDrawer("none")}
-                      type="button"
-                    >
-                      {text.common.close}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="summary-text game-comic-hint">
-                  {isComicGenerating
-                    ? text.gameScreen.comicGeneratingHint
-                    : comicProject
-                      ? text.gameScreen.comicCount(comicPages.length)
-                      : text.gameScreen.comicEmpty}
-                </div>
-
-                {isComicLoading ? (
-                  <div className="empty-state">{text.common.loading}</div>
-                ) : comicPages.length ? (
-                  <div className="game-comic-grid">
-                    {comicPages.map((page) => (
-                      <article className="summary-card game-comic-card" key={page.pageId}>
-                        <div className="game-comic-card-head">
-                          <div>
-                            <div className="meta-label">
-                              {text.gameScreen.comicPageLabel(page.pageNumber - 1)}
-                            </div>
-                            <div className="summary-text">
-                              {formatDateTime(page.createdAt)}
-                            </div>
-                          </div>
-                          <button
-                            className="ghost-button"
-                            onClick={() => setComicLightboxPageNumber(page.pageNumber)}
-                            type="button"
-                          >
-                            {text.gameScreen.comicOpenLightbox}
-                          </button>
-                        </div>
-
-                        <img
-                          alt={text.gameScreen.comicPageAlt(page.pageNumber - 1)}
-                          className="game-comic-preview"
-                          src={page.image.apiPath}
-                        />
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    {isComicGenerating
-                      ? text.gameScreen.comicGeneratingHint
-                      : text.gameScreen.comicEmpty}
-                  </div>
-                )}
               </div>
             ) : null}
 
@@ -1900,7 +1975,7 @@ export function GameScreen(props: GameScreenProps) {
             <div className="game-comic-lightbox-head">
               <div>
                 <div className="meta-label">
-                  {text.gameScreen.comicPageLabel(comicLightboxPage.pageNumber - 1)}
+                  {text.gameScreen.comicPageLabel(comicLightboxPage.pageNumber)}
                 </div>
                 <div className="summary-text">
                   {formatDateTime(comicLightboxPage.createdAt)}
@@ -1916,7 +1991,7 @@ export function GameScreen(props: GameScreenProps) {
             </div>
 
             <img
-              alt={text.gameScreen.comicPageAlt(comicLightboxPage.pageNumber - 1)}
+              alt={text.gameScreen.comicPageAlt(comicLightboxPage.pageNumber)}
               className="game-comic-lightbox-image"
               src={comicLightboxPage.image.apiPath}
             />
