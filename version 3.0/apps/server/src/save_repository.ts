@@ -53,6 +53,7 @@ function buildRecord(
     updatedAt: saveBundle.session.updatedAt,
     modelAccessMode: saveBundle.session.modelAccessMode,
     modelProfileId:
+      saveBundle.runtimeConfig?.roleModelConfigs?.narrator?.modelProfileId ??
       saveBundle.runtimeConfig?.modelProfileId ??
       saveBundle.session.settings.modelProfileId ??
       "unknown",

@@ -22,6 +22,7 @@ import {
   buildStructuredAssistantSystemPrompt,
   loadStructuredTaskOutputSchema
 } from "../single_agent/service.ts";
+import { resolveNarratorRuntimeSelection } from "./store.ts";
 import type { SessionRuntimeConfig } from "./store.ts";
 
 const SESSION_MEMORY_VERSION = 1;
@@ -632,20 +633,22 @@ async function extractStructuredMemoryDelta(
 
   const modelGateway = getModelGateway(snapshot.session.modelAccessMode);
   const memory = getSessionMemory(snapshot);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    snapshot.session,
+    runtimeConfig
+  );
 
   try {
     const structured = await modelGateway.generateStructuredAssistantOutput({
       accessMode: snapshot.session.modelAccessMode,
-      modelProfileId:
-        runtimeConfig?.modelProfileId ?? snapshot.session.settings.modelProfileId,
-      runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+      modelProfileId: narratorRuntimeSelection.modelProfileId,
+      runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
       locale: snapshot.session.locale,
       systemPrompt: await buildStructuredAssistantSystemPrompt(
         "session_memory_fact_extractor",
         snapshot.session.locale,
         {
-          profileId:
-            runtimeConfig?.modelProfileId ?? snapshot.session.settings.modelProfileId
+          profileId: narratorRuntimeSelection.modelProfileId
         }
       ),
       userPrompt: buildStructuredExtractorUserPrompt({
@@ -724,19 +727,21 @@ async function maybeCreateEpisodeSummary(
   }
 
   const modelGateway = getModelGateway(snapshot.session.modelAccessMode);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    snapshot.session,
+    runtimeConfig
+  );
   try {
     const structured = await modelGateway.generateStructuredAssistantOutput({
       accessMode: snapshot.session.modelAccessMode,
-      modelProfileId:
-        runtimeConfig?.modelProfileId ?? snapshot.session.settings.modelProfileId,
-      runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+      modelProfileId: narratorRuntimeSelection.modelProfileId,
+      runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
       locale: snapshot.session.locale,
       systemPrompt: await buildStructuredAssistantSystemPrompt(
         "session_memory_episode_compressor",
         snapshot.session.locale,
         {
-          profileId:
-            runtimeConfig?.modelProfileId ?? snapshot.session.settings.modelProfileId
+          profileId: narratorRuntimeSelection.modelProfileId
         }
       ),
       userPrompt: buildEpisodeCompressionUserPrompt({

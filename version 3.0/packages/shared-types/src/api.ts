@@ -25,6 +25,17 @@ export type RuntimeModelConfigInput = {
   model?: string;
 };
 
+export type RoleTextModelConfigInput = {
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+};
+
+export type AdvancedTextModelConfigInput = {
+  narrator?: RoleTextModelConfigInput | null;
+  primaryPlayer?: RoleTextModelConfigInput | null;
+  companionOverrides?: Array<RoleTextModelConfigInput | null>;
+};
+
 export type RuntimeImageModelConfigInput = {
   apiKey?: string;
   baseUrl?: string;
@@ -76,6 +87,7 @@ export type CreateSessionRequest = {
   characterConcept?: string;
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
+  advancedTextModelConfig?: AdvancedTextModelConfigInput;
   aiCompanions?: CreateSessionAiCompanionInput[];
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;

@@ -170,12 +170,17 @@ function resolveModelProfileId(
   accessMode: CreateSessionRequest["modelAccessMode"],
   preferredProfileId: string | undefined
 ): string {
+  const normalizedPreferredProfileId =
+    preferredProfileId === "deepseek" ? "deepseek-chat" : preferredProfileId;
   const matchingProfiles = bootstrap.modelProfiles.filter(
     (item) => item.accessMode === accessMode
   );
 
-  if (preferredProfileId && matchingProfiles.some((item) => item.id === preferredProfileId)) {
-    return preferredProfileId;
+  if (
+    normalizedPreferredProfileId &&
+    matchingProfiles.some((item) => item.id === normalizedPreferredProfileId)
+  ) {
+    return normalizedPreferredProfileId;
   }
 
   return matchingProfiles[0]?.id ?? bootstrap.defaults.modelProfileId;

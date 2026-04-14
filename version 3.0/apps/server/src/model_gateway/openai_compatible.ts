@@ -36,9 +36,11 @@ type ChatCompletionResponse = {
   choices?: Array<{
     delta?: {
       content?: unknown;
+      reasoning_content?: unknown;
     };
     message?: {
       content?: unknown;
+      reasoning_content?: unknown;
     };
     finish_reason?: string | null;
   }>;
@@ -116,6 +118,7 @@ type GeminiFileUploadResponse = {
 
 type ChatCompletionResult = {
   text: string;
+  reasoningContent?: string | null;
   durationMs: number;
   usage: AiGenerationUsage;
 };
@@ -543,6 +546,7 @@ async function callChatCompletion(
 
     return {
       text,
+      reasoningContent: normalizeContent(data.choices?.[0]?.message?.reasoning_content),
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
@@ -1410,7 +1414,8 @@ export async function generateOpeningViaServerProxy(
         model: config.model,
         usage: completion.usage
       }),
-      usage: completion.usage
+      usage: completion.usage,
+      reasoningContent: completion.reasoningContent ?? null
     }
   };
 }
@@ -1445,7 +1450,8 @@ export async function streamOpeningViaServerProxy(
         model: config.model,
         usage: completion.usage
       }),
-      usage: completion.usage
+      usage: completion.usage,
+      reasoningContent: completion.reasoningContent ?? null
     }
   };
 }
@@ -1465,13 +1471,14 @@ export async function generateTurnNarrationViaServerProxy(
     meta: {
       provider: `${config.providerLabel}:${config.model}`,
       mode: "server_proxy",
+      model: config.model,
+      durationMs: completion.durationMs,
+      estimatedCost: estimateModelUsageCost({
         model: config.model,
-        durationMs: completion.durationMs,
-        estimatedCost: estimateModelUsageCost({
-          model: config.model,
-          usage: completion.usage
-        }),
         usage: completion.usage
+      }),
+      usage: completion.usage,
+      reasoningContent: completion.reasoningContent ?? null
     }
   };
 }
@@ -1498,7 +1505,8 @@ export async function generatePromptedTextViaServerProxy(
         model: config.model,
         usage: completion.usage
       }),
-      usage: completion.usage
+      usage: completion.usage,
+      reasoningContent: completion.reasoningContent ?? null
     }
   };
 }

@@ -7,12 +7,14 @@
 } from "react";
 
 import type {
+  AdvancedTextModelConfigInput,
   AiGenerationMetadata,
   AiPersonalityTag,
   BootstrapResponse,
   CharacterConceptAssistMode,
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
+  RoleTextModelConfigInput,
   RuntimeImageModelConfigInput,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
@@ -51,6 +53,8 @@ type GameSetupScreenProps = {
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId: string;
   runtimeModelConfig: RuntimeModelConfigInput;
+  advancedTextModelEnabled: boolean;
+  advancedTextModelConfig: AdvancedTextModelConfigInput | null;
   imageProfileId: string;
   runtimeImageModelConfig: RuntimeImageModelConfigInput;
   debugEnabled: boolean;
@@ -78,6 +82,13 @@ type GameSetupScreenProps = {
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
   onModelProfileIdChange: (value: string) => void;
+  onAdvancedTextModelEnabledChange: (value: boolean) => void;
+  onAdvancedNarratorTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
+  onAdvancedPrimaryPlayerTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
+  onAdvancedCompanionTextModelConfigChange: (
+    index: number,
+    value: RoleTextModelConfigInput | null
+  ) => void;
   onImageProfileIdChange: (value: string) => void;
   onImageProfileRuntimeConfigChange: (
     profileId: string,
@@ -306,6 +317,33 @@ function SettingField(props: {
   );
 }
 
+function normalizeRoleTextModelConfig(
+  input: RoleTextModelConfigInput | null | undefined
+): RoleTextModelConfigInput | null {
+  if (!input) {
+    return null;
+  }
+
+  const modelProfileId = input.modelProfileId?.trim() ?? "";
+  const runtimeModelConfig = getEffectiveRuntimeConfig(input.runtimeModelConfig);
+  if (
+    !modelProfileId &&
+    !runtimeModelConfig.apiKey &&
+    !runtimeModelConfig.baseUrl &&
+    !runtimeModelConfig.model
+  ) {
+    return null;
+  }
+
+  return {
+    modelProfileId: modelProfileId || undefined,
+    runtimeModelConfig:
+      runtimeModelConfig.apiKey || runtimeModelConfig.baseUrl || runtimeModelConfig.model
+        ? runtimeModelConfig
+        : undefined
+  };
+}
+
 export function GameSetupScreen(props: GameSetupScreenProps) {
   const text = useUiText();
   const setupText = text.gameSetupScreen;
@@ -325,6 +363,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
+    advancedTextModelEnabled,
+    advancedTextModelConfig,
     imageProfileId,
     runtimeImageModelConfig,
     debugEnabled,
@@ -352,6 +392,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onGmArchitectureChange,
     onModelAccessModeChange,
     onModelProfileIdChange,
+    onAdvancedTextModelEnabledChange,
+    onAdvancedNarratorTextModelConfigChange,
+    onAdvancedPrimaryPlayerTextModelConfigChange,
+    onAdvancedCompanionTextModelConfigChange,
     onImageProfileIdChange,
     onImageProfileRuntimeConfigChange,
     onDebugEnabledChange,
@@ -617,14 +661,23 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const characterAssistAriaLabel = characterConceptAssistLoading
     ? characterAssistBusyLabel
     : characterAssistButtonLabel;
-  const canAssistCharacterConcept =
-    !characterConceptAssistLoading &&
-    !isCreating &&
-    !openingPreviewLoading &&
-    hasPreviewText &&
-    profileReady;
   const personalityTags = bootstrap?.personalityTags ?? [];
   const isStoryMode = playMode === "story_mode";
+  const normalizedAdvancedTextModelConfig = advancedTextModelEnabled
+    ? {
+        narrator: normalizeRoleTextModelConfig(advancedTextModelConfig?.narrator),
+        primaryPlayer: normalizeRoleTextModelConfig(advancedTextModelConfig?.primaryPlayer),
+        companionOverrides: (advancedTextModelConfig?.companionOverrides ?? []).map((item) =>
+          normalizeRoleTextModelConfig(item)
+        )
+      }
+    : null;
+  const advancedModelOverrideCount =
+    (normalizedAdvancedTextModelConfig?.narrator ? 1 : 0) +
+    (isStoryMode && normalizedAdvancedTextModelConfig?.primaryPlayer ? 1 : 0) +
+    (normalizedAdvancedTextModelConfig?.companionOverrides ?? [])
+      .slice(0, aiCompanions.length)
+      .filter(Boolean).length;
   const companionLimitReached = aiCompanions.length >= 3;
   const hasSavedCompanionPresets = savedCompanionPresets.length > 0;
   const editingCompanion =
@@ -784,122 +837,355 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     });
   }
 
+  function buildDefaultRoleTextModelConfig(): RoleTextModelConfigInput {
+    return {
+      modelProfileId,
+      runtimeModelConfig: undefined
+    };
+  }
+
+  function isAdvancedRoleTextModelReady(
+    roleConfig: RoleTextModelConfigInput | null | undefined
+  ): boolean {
+    const normalizedRoleConfig = normalizeRoleTextModelConfig(roleConfig);
+    if (!normalizedRoleConfig) {
+      return true;
+    }
+
+    const resolvedProfileId = normalizedRoleConfig.modelProfileId ?? modelProfileId;
+    const selectedRoleProfile =
+      availableProfiles.find((profile) => profile.id === resolvedProfileId) ?? null;
+    const resolvedRuntimeModelConfig =
+      normalizedRoleConfig.runtimeModelConfig ?? runtimeModelConfig;
+
+    return isProfileReady(
+      modelAccessMode,
+      selectedRoleProfile,
+      resolvedRuntimeModelConfig
+    );
+  }
+
+  const advancedModelReady =
+    !advancedTextModelEnabled ||
+    isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.narrator) &&
+      (!isStoryMode ||
+        isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.primaryPlayer)) &&
+      (normalizedAdvancedTextModelConfig?.companionOverrides ?? [])
+        .slice(0, aiCompanions.length)
+        .every((item) => isAdvancedRoleTextModelReady(item));
+  const narratorModelReady =
+    normalizedAdvancedTextModelConfig?.narrator
+      ? isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig.narrator)
+      : profileReady;
+  const primaryPlayerModelReady =
+    !isStoryMode
+      ? true
+      : normalizedAdvancedTextModelConfig?.primaryPlayer
+        ? isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig.primaryPlayer)
+        : profileReady;
+  const companionModelsReady = aiCompanions.every((_, index) => {
+    const companionOverride =
+      normalizedAdvancedTextModelConfig?.companionOverrides?.[index] ?? null;
+    return companionOverride
+      ? isAdvancedRoleTextModelReady(companionOverride)
+      : profileReady;
+  });
+  const sessionTextModelReady =
+    narratorModelReady &&
+    primaryPlayerModelReady &&
+    companionModelsReady &&
+    advancedModelReady;
+  const canAssistCharacterConcept =
+    !characterConceptAssistLoading &&
+    !isCreating &&
+    !openingPreviewLoading &&
+    hasPreviewText &&
+    narratorModelReady;
+
+  function renderAdvancedRoleModelCard(input: {
+    title: string;
+    description: string;
+    roleConfig: RoleTextModelConfigInput | null | undefined;
+    onChange: (value: RoleTextModelConfigInput | null) => void;
+  }): React.ReactNode {
+    const normalizedRoleConfig = normalizeRoleTextModelConfig(input.roleConfig);
+    const usesDefaultModel = !normalizedRoleConfig;
+    const resolvedProfileId = normalizedRoleConfig?.modelProfileId ?? modelProfileId;
+    const selectedRoleProfile =
+      availableProfiles.find((profile) => profile.id === resolvedProfileId) ?? selectedProfile;
+    const roleReady = usesDefaultModel
+      ? profileReady
+      : isAdvancedRoleTextModelReady(normalizedRoleConfig);
+
+    return (
+      <article
+        className={`setup-advanced-model-card${
+          roleReady ? "" : " setup-advanced-model-card-warning"
+        }`}
+      >
+        <div className="setup-advanced-model-card-head">
+          <div>
+            <div className="summary-title">{input.title}</div>
+            <div className="summary-text">{input.description}</div>
+          </div>
+          <span className={`summary-chip${roleReady ? "" : " summary-chip-warning"}`}>
+            {usesDefaultModel
+              ? setupText.advancedModel.followDefaultBadge
+              : roleReady
+                ? setupText.model.ready
+                : setupText.model.needsConfig}
+          </span>
+        </div>
+
+        <label className="toggle-row">
+          <input
+            checked={usesDefaultModel}
+            type="checkbox"
+            onChange={(event) =>
+              input.onChange(
+                event.target.checked ? null : buildDefaultRoleTextModelConfig()
+              )
+            }
+          />
+          <span>{setupText.advancedModel.inheritDefault}</span>
+        </label>
+
+        {usesDefaultModel ? (
+          <div className="summary-text">
+            {setupText.advancedModel.followingDefault(
+              selectedProfile?.name ?? setupText.model.notConfigured
+            )}
+          </div>
+        ) : (
+          <label className="field">
+            <span>{setupText.advancedModel.roleModelProfile}</span>
+            <select
+              value={resolvedProfileId}
+              onChange={(event) =>
+                input.onChange({
+                  ...(normalizedRoleConfig ?? buildDefaultRoleTextModelConfig()),
+                  modelProfileId: event.target.value
+                })
+              }
+            >
+              {availableProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+            <div className="field-hint">
+              {selectedRoleProfile?.description ?? setupText.fields.modelProfileHint}
+            </div>
+          </label>
+        )}
+      </article>
+    );
+  }
+
+  function renderAdvancedTextModelSection(
+    layoutMode: "sidebar" | "detail"
+  ): React.ReactNode {
+    const sectionClassName =
+      layoutMode === "detail"
+        ? "setup-advanced-model-section setup-advanced-model-section-full"
+        : "setup-advanced-model-section";
+
+    return (
+      <div className={sectionClassName}>
+        <div className="setup-advanced-model-toggle">
+          <div>
+            <div className="summary-title">{setupText.advancedModel.title}</div>
+            <div className="summary-text">
+              {advancedTextModelEnabled
+                ? setupText.advancedModel.enabledSummary(advancedModelOverrideCount)
+                : setupText.advancedModel.description}
+            </div>
+          </div>
+          <label className="toggle-row">
+            <input
+              checked={advancedTextModelEnabled}
+              type="checkbox"
+              onChange={(event) => onAdvancedTextModelEnabledChange(event.target.checked)}
+            />
+            <span>
+              {advancedTextModelEnabled
+                ? setupText.advancedModel.enabled
+                : setupText.advancedModel.disabled}
+            </span>
+          </label>
+        </div>
+
+        {advancedTextModelEnabled ? (
+          <div className="setup-advanced-model-stack">
+            {renderAdvancedRoleModelCard({
+              title: setupText.advancedModel.narratorTitle,
+              description: setupText.advancedModel.narratorDescription,
+              roleConfig: normalizedAdvancedTextModelConfig?.narrator,
+              onChange: onAdvancedNarratorTextModelConfigChange
+            })}
+
+            {isStoryMode
+              ? renderAdvancedRoleModelCard({
+                  title: setupText.advancedModel.primaryPlayerTitle,
+                  description: setupText.advancedModel.primaryPlayerDescription,
+                  roleConfig: normalizedAdvancedTextModelConfig?.primaryPlayer,
+                  onChange: onAdvancedPrimaryPlayerTextModelConfigChange
+                })
+              : null}
+
+            {aiCompanions.length > 0 ? (
+              <div className="setup-advanced-model-group">
+                <div className="setup-advanced-model-group-title">
+                  {setupText.advancedModel.companionsTitle}
+                </div>
+                <div className="setup-advanced-model-stack">
+                  {aiCompanions.map((companion, index) =>
+                    renderAdvancedRoleModelCard({
+                      title: setupText.advancedModel.companionTitle(
+                        companion.displayName.trim() ||
+                          setupText.advancedModel.companionFallback(index + 1)
+                      ),
+                      description: setupText.advancedModel.companionDescription,
+                      roleConfig:
+                        normalizedAdvancedTextModelConfig?.companionOverrides?.[index],
+                      onChange: (value) =>
+                        onAdvancedCompanionTextModelConfigChange(index, value)
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="summary-text">
+                {setupText.advancedModel.noCompanions}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderModelSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
     const containerClassName =
       layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
 
     return (
-      <div className={containerClassName}>
-        <SettingField
-          label={setupText.fields.modelModeLabel}
-          hint={setupText.fields.modelModeHint}
-        >
-          <select
-            value={modelAccessMode}
-            onChange={(event) =>
-              onModelAccessModeChange(
-                event.target.value as CreateSessionRequest["modelAccessMode"]
-              )
-            }
+      <>
+        <div className={containerClassName}>
+          <SettingField
+            label={setupText.fields.modelModeLabel}
+            hint={setupText.fields.modelModeHint}
           >
-            {bootstrap?.modelAccessModes.map((mode) => (
-              <option key={mode.code} value={mode.code}>
-                {mode.label}
-              </option>
-            ))}
-          </select>
-        </SettingField>
+            <select
+              value={modelAccessMode}
+              onChange={(event) =>
+                onModelAccessModeChange(
+                  event.target.value as CreateSessionRequest["modelAccessMode"]
+                )
+              }
+            >
+              {bootstrap?.modelAccessModes.map((mode) => (
+                <option key={mode.code} value={mode.code}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+          </SettingField>
 
-        <SettingField
-          label={setupText.fields.modelProfileLabel}
-          hint={setupText.fields.modelProfileHint}
-        >
-          <select
-            value={selectedProfile?.id ?? modelProfileId}
-            onChange={(event) => onModelProfileIdChange(event.target.value)}
+          <SettingField
+            label={setupText.fields.modelProfileLabel}
+            hint={setupText.fields.modelProfileHint}
           >
-            {availableProfiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </select>
-        </SettingField>
+            <select
+              value={selectedProfile?.id ?? modelProfileId}
+              onChange={(event) => onModelProfileIdChange(event.target.value)}
+            >
+              {availableProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </SettingField>
 
-        <SettingField
-          label={setupText.fields.logViewLabel}
-          hint={setupText.fields.logViewHint}
-        >
-          <select
-            value={logViewMode}
-            onChange={(event) =>
-              onLogViewModeChange(
-                event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
-              )
-            }
+          <SettingField
+            label={setupText.fields.logViewLabel}
+            hint={setupText.fields.logViewHint}
           >
-            {logViewOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </SettingField>
+            <select
+              value={logViewMode}
+              onChange={(event) =>
+                onLogViewModeChange(
+                  event.target.value as NonNullable<CreateSessionRequest["logViewMode"]>
+                )
+              }
+            >
+              {logViewOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </SettingField>
 
-        <SettingField
-          label={setupText.fields.previewDeliveryLabel}
-          hint={setupText.fields.previewDeliveryHint}
-        >
-          <select
-            value={openingPreviewDeliveryMode}
-            onChange={(event) =>
-              onOpeningPreviewDeliveryModeChange(
-                event.target.value as OpeningPreviewDeliveryMode
-              )
-            }
+          <SettingField
+            label={setupText.fields.previewDeliveryLabel}
+            hint={setupText.fields.previewDeliveryHint}
           >
-            {openingPreviewDeliveryOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </SettingField>
+            <select
+              value={openingPreviewDeliveryMode}
+              onChange={(event) =>
+                onOpeningPreviewDeliveryModeChange(
+                  event.target.value as OpeningPreviewDeliveryMode
+                )
+              }
+            >
+              {openingPreviewDeliveryOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </SettingField>
 
-        <SettingField
-          label={setupText.fields.markdownFontSizeLabel}
-          hint={setupText.fields.markdownFontSizeHint}
-        >
-          <select
-            value={markdownFontSize}
-            onChange={(event) =>
-              onMarkdownFontSizeChange(
-                event.target.value as MarkdownFontSizePreset
-              )
-            }
+          <SettingField
+            label={setupText.fields.markdownFontSizeLabel}
+            hint={setupText.fields.markdownFontSizeHint}
           >
-            {markdownFontSizeOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </SettingField>
+            <select
+              value={markdownFontSize}
+              onChange={(event) =>
+                onMarkdownFontSizeChange(
+                  event.target.value as MarkdownFontSizePreset
+                )
+              }
+            >
+              {markdownFontSizeOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </SettingField>
 
-        <SettingField
-          label={setupText.fields.debugModeLabel}
-          hint={setupText.fields.debugModeHint}
-        >
-          <label className="toggle-row">
-            <input
-              checked={debugEnabled}
-              type="checkbox"
-              onChange={(event) => onDebugEnabledChange(event.target.checked)}
-            />
-            <span>{debugEnabled ? setupText.fields.debugOn : setupText.fields.debugOff}</span>
-          </label>
-        </SettingField>
-      </div>
+          <SettingField
+            label={setupText.fields.debugModeLabel}
+            hint={setupText.fields.debugModeHint}
+          >
+            <label className="toggle-row">
+              <input
+                checked={debugEnabled}
+                type="checkbox"
+                onChange={(event) => onDebugEnabledChange(event.target.checked)}
+              />
+              <span>{debugEnabled ? setupText.fields.debugOn : setupText.fields.debugOff}</span>
+            </label>
+          </SettingField>
+        </div>
+
+        {renderAdvancedTextModelSection(layoutMode)}
+      </>
     );
   }
 
@@ -1626,6 +1912,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )}
             </div>
             <div className="summary-text">
+              {advancedTextModelEnabled
+                ? setupText.advancedModel.enabledSummary(advancedModelOverrideCount)
+                : setupText.advancedModel.description}
+            </div>
+            <div className="summary-text">
               {setupText.model.message(
                 selectedProfile?.message ?? setupText.model.noExplanation
               )}
@@ -1788,6 +2079,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                         {setupText.model.status(
                           profileReady ? setupText.model.ready : setupText.model.needsConfig
                         )}
+                      </div>
+                      <div className="summary-text">
+                        {advancedTextModelEnabled
+                          ? setupText.advancedModel.enabledSummary(advancedModelOverrideCount)
+                          : setupText.advancedModel.description}
                       </div>
                     </div>
                   </article>
@@ -2073,7 +2369,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                     disabled={
                       isCreating ||
                       characterConceptAssistLoading ||
-                      !profileReady ||
+                      !sessionTextModelReady ||
                       !selectedStory
                     }
                     type="submit"

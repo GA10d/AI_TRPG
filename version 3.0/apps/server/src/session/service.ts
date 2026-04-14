@@ -6,6 +6,8 @@ import {
   getDefaultModelProfileId
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
+  AdvancedTextModelConfigInput,
+  AiGenerationMetadata,
   AiPersonalityTag,
   CommitRoundRequest,
   CreateSessionAiCompanionInput,
@@ -46,6 +48,10 @@ import {
   rebuildSnapshotMemory,
   updateSnapshotMemory
 } from "./memory.ts";
+import {
+  resolveNarratorRuntimeSelection,
+  resolveParticipantRuntimeSelection
+} from "./store.ts";
 import type { InMemorySessionStore, SessionRuntimeConfig } from "./store.ts";
 
 function nowIso(): string {
@@ -216,6 +222,7 @@ function buildDraftFromText(input: {
   isPrimary: boolean;
   editable: boolean;
   generatedAt?: string | null;
+  aiMetadata?: AiGenerationMetadata | null;
 }): RoundDraft {
   return {
     participantId: input.participant.id,
@@ -226,7 +233,8 @@ function buildDraftFromText(input: {
     source: input.source,
     content: input.content.trim(),
     editable: input.editable,
-    generatedAt: input.generatedAt ?? null
+    generatedAt: input.generatedAt ?? null,
+    aiMetadata: input.aiMetadata ?? null
   };
 }
 
@@ -303,6 +311,10 @@ type CreateSessionSnapshotOptions = {
   onStage?: SessionCreateProgressHandler;
 };
 
+type SessionRoleModelConfig = NonNullable<
+  NonNullable<SessionRuntimeConfig["roleModelConfigs"]>["narrator"]
+>;
+
 async function emitCreateSessionStage(
   options: CreateSessionSnapshotOptions | undefined,
   stage: SessionCreateStage,
@@ -375,6 +387,102 @@ async function resolveSessionAiCompanions(
   );
 }
 
+function normalizeRuntimeModelConfig(
+  input: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  } | null | undefined
+): SessionRoleModelConfig["runtimeModelConfig"] | undefined {
+  const apiKey = input?.apiKey?.trim() ?? "";
+  const baseUrl = input?.baseUrl?.trim() ?? "";
+  const model = input?.model?.trim() ?? "";
+
+  if (!apiKey && !baseUrl && !model) {
+    return undefined;
+  }
+
+  return {
+    apiKey,
+    baseUrl,
+    model
+  };
+}
+
+function normalizeRoleModelConfig(
+  input:
+    | AdvancedTextModelConfigInput["narrator"]
+    | AdvancedTextModelConfigInput["primaryPlayer"]
+    | null
+    | undefined
+): SessionRoleModelConfig | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const modelProfileId = input.modelProfileId?.trim() ?? "";
+  const runtimeModelConfig = normalizeRuntimeModelConfig(input.runtimeModelConfig);
+  if (!modelProfileId && !runtimeModelConfig) {
+    return undefined;
+  }
+
+  return {
+    modelProfileId: modelProfileId || undefined,
+    runtimeModelConfig
+  };
+}
+
+function buildCreateSessionRuntimeConfig(input: {
+  request: CreateSessionRequest;
+  primaryPlayerMode: "human" | "ai";
+  playerParticipantId: string;
+  aiCompanions: SessionAiCompanion[];
+}): SessionRuntimeConfig {
+  const globalModelProfileId =
+    input.request.modelProfileId ??
+    getDefaultModelProfileId(input.request.modelAccessMode);
+  const globalRuntimeConfig = normalizeRuntimeModelConfig(input.request.runtimeModelConfig);
+  const narratorConfig = normalizeRoleModelConfig(
+    input.request.advancedTextModelConfig?.narrator
+  );
+  const primaryPlayerConfig =
+    input.primaryPlayerMode === "ai"
+      ? normalizeRoleModelConfig(input.request.advancedTextModelConfig?.primaryPlayer)
+      : undefined;
+  const participantConfigs: NonNullable<
+    NonNullable<SessionRuntimeConfig["roleModelConfigs"]>["participants"]
+  > = {};
+
+  if (primaryPlayerConfig) {
+    participantConfigs[input.playerParticipantId] = primaryPlayerConfig;
+  }
+
+  (input.request.advancedTextModelConfig?.companionOverrides ?? []).forEach(
+    (companionConfig, index) => {
+      const normalizedConfig = normalizeRoleModelConfig(companionConfig);
+      const companion = input.aiCompanions[index];
+      if (normalizedConfig && companion) {
+        participantConfigs[companion.participantId] = normalizedConfig;
+      }
+    }
+  );
+
+  const hasParticipantConfigs = Object.keys(participantConfigs).length > 0;
+  const roleModelConfigs =
+    narratorConfig || hasParticipantConfigs
+      ? {
+          narrator: narratorConfig,
+          participants: hasParticipantConfigs ? participantConfigs : undefined
+        }
+      : undefined;
+
+  return {
+    modelProfileId: globalModelProfileId,
+    runtimeModelConfig: globalRuntimeConfig,
+    roleModelConfigs
+  };
+}
+
 async function createSessionSnapshotInternal(
   contentRoot: string,
   request: CreateSessionRequest,
@@ -407,8 +515,15 @@ async function createSessionSnapshotInternal(
     bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ?? bundle.rule.manifest.id;
   const storyTitle =
     bundle.story.manifest.title[bundle.story.manifest.defaultLocale] ?? bundle.story.manifest.id;
-  const modelProfileId =
+  const globalModelProfileId =
     request.modelProfileId ?? getDefaultModelProfileId(request.modelAccessMode);
+  const globalRuntimeModelConfig = normalizeRuntimeModelConfig(request.runtimeModelConfig);
+  const narratorRuntimeConfig =
+    normalizeRoleModelConfig(request.advancedTextModelConfig?.narrator)?.runtimeModelConfig ??
+    globalRuntimeModelConfig;
+  const narratorModelProfileId =
+    normalizeRoleModelConfig(request.advancedTextModelConfig?.narrator)?.modelProfileId ??
+    globalModelProfileId;
   const characterConcept = request.characterConcept?.trim() ?? "";
   const modelGateway = getModelGateway(request.modelAccessMode);
   const storyRecipientIds = [
@@ -435,8 +550,8 @@ async function createSessionSnapshotInternal(
 
   const openingPromise = modelGateway.generateInitialSessionNarration({
     accessMode: request.modelAccessMode,
-    modelProfileId,
-    runtimeModelConfig: request.runtimeModelConfig,
+    modelProfileId: narratorModelProfileId,
+    runtimeModelConfig: narratorRuntimeConfig,
     locale: bundle.resolvedLocale,
     ruleTitle,
     ruleText: bundle.rule.rule.content,
@@ -519,7 +634,7 @@ async function createSessionSnapshotInternal(
       logViewMode: request.logViewMode ?? DEFAULT_LOG_VIEW_MODE,
       debugEnabled: request.debugEnabled ?? true,
       promptDebugEnabled: request.promptDebugEnabled ?? false,
-      modelProfileId
+      modelProfileId: narratorModelProfileId
     },
     partySetup: {
       primaryPlayerMode,
@@ -649,19 +764,20 @@ async function createSessionSnapshotInternal(
     }
   };
 
+  const sessionRuntimeConfig = buildCreateSessionRuntimeConfig({
+    request,
+    primaryPlayerMode,
+    playerParticipantId,
+    aiCompanions
+  });
+
   const snapshotWithMemory = await attachUpdatedMemory(
     snapshot,
     messages.filter((message) => message.visibility !== "system"),
-    {
-      modelProfileId,
-      runtimeModelConfig: request.runtimeModelConfig
-    }
+    sessionRuntimeConfig
   );
 
-  store.save(snapshotWithMemory, {
-    modelProfileId,
-    runtimeModelConfig: request.runtimeModelConfig
-  });
+  store.save(snapshotWithMemory, sessionRuntimeConfig);
   return snapshotWithMemory;
 }
 
@@ -742,11 +858,15 @@ export async function prepareRound(
       round: targetRound,
       preparedInputs: []
     });
+    const primaryRuntimeSelection = resolveParticipantRuntimeSelection(
+      current.session,
+      runtimeConfig,
+      primaryParticipant.id
+    );
     const generatedPrimaryDraft = await generateAiRoundDraft({
       accessMode: current.session.modelAccessMode,
-      modelProfileId:
-        runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-      runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+      modelProfileId: primaryRuntimeSelection.modelProfileId,
+      runtimeModelConfig: primaryRuntimeSelection.runtimeModelConfig,
       locale: current.session.locale,
       storyTitle: current.contentSummary.storyTitle,
       round: targetRound,
@@ -774,12 +894,16 @@ export async function prepareRound(
         round: targetRound,
         preparedInputs: preparedDrafts
       });
+      const companionRuntimeSelection = resolveParticipantRuntimeSelection(
+        current.session,
+        runtimeConfig,
+        participant.id
+      );
 
       return generateAiRoundDraft({
         accessMode: current.session.modelAccessMode,
-        modelProfileId:
-          runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-        runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+        modelProfileId: companionRuntimeSelection.modelProfileId,
+        runtimeModelConfig: companionRuntimeSelection.runtimeModelConfig,
         locale: current.session.locale,
         storyTitle: current.contentSummary.storyTitle,
         round: targetRound,
@@ -882,6 +1006,7 @@ export async function commitPreparedRound(
     kind: "player_input",
     channel: "public_story",
     content: draft.content,
+    aiMetadata: draft.source === "ai" ? draft.aiMetadata ?? null : null,
     tags: [
       "turn_input",
       draft.isPrimary ? "primary_player" : "ai_teammate"
@@ -889,6 +1014,10 @@ export async function commitPreparedRound(
   }));
 
   const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    current.session,
+    runtimeConfig
+  );
   const narratorInputSnapshot: SessionSnapshot = {
     ...current,
     messages: [
@@ -903,9 +1032,8 @@ export async function commitPreparedRound(
   });
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     storyTitle: current.contentSummary.storyTitle,
     playerInput: committedPartyInput,
@@ -914,9 +1042,8 @@ export async function commitPreparedRound(
   });
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     round: nextRound,
     narrationText: turnNarration.text
@@ -1103,11 +1230,14 @@ export async function submitManualNarration(
   const runtimeConfig = store.getRuntimeConfig(sessionId);
   const targetRound = current.session.currentRound;
   const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    current.session,
+    runtimeConfig
+  );
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     round: targetRound,
     narrationText
@@ -1298,11 +1428,15 @@ export async function sendPrivateChat(
     participantId: targetParticipant.id,
     latestMessage: trimmedContent
   });
+  const targetRuntimeSelection = resolveParticipantRuntimeSelection(
+    current.session,
+    runtimeConfig,
+    targetParticipant.id
+  );
   const privateReply = await generateAiPrivateChatReply({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: targetRuntimeSelection.modelProfileId,
+    runtimeModelConfig: targetRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     storyTitle: current.contentSummary.storyTitle,
     participant: targetParticipant,
@@ -1444,6 +1578,10 @@ export async function submitTurn(
 
   const runtimeConfig = store.getRuntimeConfig(sessionId);
   const modelGateway = getModelGateway(current.session.modelAccessMode);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    current.session,
+    runtimeConfig
+  );
   const narratorInputSnapshot: SessionSnapshot = {
     ...current,
     messages: [
@@ -1458,9 +1596,8 @@ export async function submitTurn(
   });
   const turnNarration = await modelGateway.generateTurnNarration({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     storyTitle: current.contentSummary.storyTitle,
     playerInput: labeledPlayerInput,
@@ -1469,9 +1606,8 @@ export async function submitTurn(
   });
   const endingJudge = await modelGateway.judgeEnding({
     accessMode: current.session.modelAccessMode,
-    modelProfileId:
-      runtimeConfig?.modelProfileId ?? current.session.settings.modelProfileId,
-    runtimeModelConfig: runtimeConfig?.runtimeModelConfig,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     round: nextRound,
     narrationText: turnNarration.text
@@ -1675,7 +1811,8 @@ export function loadSessionFromSaveBundle(
   store.save(snapshot, {
     modelProfileId:
       saveBundle.runtimeConfig?.modelProfileId ?? saveBundle.session.settings.modelProfileId,
-    runtimeModelConfig: saveBundle.runtimeConfig?.runtimeModelConfig
+    runtimeModelConfig: saveBundle.runtimeConfig?.runtimeModelConfig,
+    roleModelConfigs: saveBundle.runtimeConfig?.roleModelConfigs
   });
 
   return snapshot;

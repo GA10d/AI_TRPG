@@ -166,6 +166,17 @@ export const enUs = {
       preparingRoundDrafts: "Preparing this round's party drafts...",
       preparingAiLeaderDraft: "AI protagonist is drafting the next move...",
       roundDraftsReady: "Round drafts are ready. Review them and commit when you are set.",
+      prepareRoundLogStart: (round: number) => `Starting draft preparation for round ${round}.`,
+      prepareRoundLogPrimaryAi: (name: string) =>
+        `Stage 1: generating the AI lead draft for ${name}.`,
+      prepareRoundLogPrimaryHuman: "Stage 1: recorded the primary player input.",
+      prepareRoundLogCompanions: (count: number, names: string) =>
+        `Stage 2: generating ${count} AI teammate draft(s) in parallel${names ? `: ${names}` : ""}.`,
+      prepareRoundLogWait:
+        "Waiting for the server to finish generating round drafts. If it stays here for a long time, the models are usually still working.",
+      prepareRoundLogDone: (count: number) =>
+        `Draft preparation finished. Received ${count} draft(s) for this round.`,
+      prepareRoundLogFailed: (reason: string) => `Round draft preparation failed: ${reason}`,
       enterPrivateChat: "Enter a private message first.",
       sendingPrivateChat: "Sending the private chat...",
       privateChatSent: "Private chat delivered.",
@@ -173,7 +184,16 @@ export const enUs = {
       storyControlAutoEnabled: "Story mode is now set to auto play. Upcoming rounds will prepare and commit automatically.",
       storyControlInterveneEnabled: "Story mode is now set to player intervene. You can edit the AI protagonist draft again.",
       autoRoundSubmitting: "Auto play is committing this round now...",
+      commitRoundLogCountdown: (seconds: number) =>
+        `Drafts are ready. Auto commit will start in ${seconds}s.`,
+      commitRoundLogStart: (round: number, count: number) =>
+        `Submitting round ${round} with ${count} party input(s).`,
+      commitRoundLogWait: "Waiting for the narrator response and ending judge result.",
+      commitRoundLogDone: (round: number) => `Round ${round} submission completed.`,
+      commitRoundLogFailed: (reason: string) => `Round submission failed: ${reason}`,
       autoModeSubmitLocked: "Auto play is active, so manual submission is disabled.",
+      reasonerTimeoutHint:
+        "This session is using DeepSeek Reasoner. If timeouts continue, raise TRPG_DEEPSEEK_REASONER_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS.",
       privateChatAutoModeUnavailable:
         "Private chat is unavailable during auto play. Switch back to player intervene first.",
       turnComplete: "This turn has been completed.",
@@ -364,9 +384,13 @@ export const enUs = {
     recentItems: (count: number) => `${count} items`,
     historyTab: "History",
     roundRepliesTab: "Round Replies",
+    reasoningTab: "Reasoning",
     worldlineTab: "Worldline",
     judgeTab: "Helper AI",
     endingJudgeSideLabel: "Ending Judge",
+    reasoningEyebrow: "Reasoning Content",
+    reasoningTitle: "Model reasoning log",
+    reasoningCount: (count: number) => `${count} items`,
     worldlineEyebrow: "Worldline Query",
     worldlineTitle: "Branch Timeline",
     worldlineNodeCount: (count: number) => `${count} nodes`,
@@ -386,6 +410,12 @@ export const enUs = {
     roundDraftCount: (count: number) => `${count} drafts ready`,
     roundDraftsEmpty: "No drafts yet",
     roundRepliesEmpty: "There are no current round replies to show yet.",
+    reasoningEmpty: "There is no reasoning content to inspect yet.",
+    reasoningOutputLabel: "Output",
+    reasoningContentLabel: "Reasoning content",
+    reasoningCommittedLabel: "Committed",
+    reasoningPrimaryDraftLabel: "Primary player draft",
+    reasoningCompanionDraftLabel: "AI teammate draft",
     roundDraftsDescription:
       "Prepare this round first, then review the AI teammate replies here before committing.",
     primaryDraftLabel: "Primary player draft",
@@ -395,6 +425,13 @@ export const enUs = {
     editableDraftBadge: "Editable",
     yourAction: "Your Action",
     actionTitle: "Enter the next action or line of dialogue",
+    activityLogEyebrow: "Run Log",
+    activityLogTitle: "Automation and status",
+    activityLogCount: (count: number) => `${count} items`,
+    activityLogCurrentStatus: "Current status",
+    activityLogIdle: "There is no new runtime log yet.",
+    activityLogEmpty: "There is no runtime log to show yet.",
+    activityLogErrorLabel: "Error",
     endingFollowupTitle: "Ask follow-up questions or debrief the ending",
     storyControlLabel: "Story Control",
     storyControlAuto: "Auto Play",
@@ -705,6 +742,32 @@ export const enUs = {
       notConfigured: "Not configured",
       ready: "Ready to create a session",
       needsConfig: "More configuration is required"
+    },
+    advancedModel: {
+      title: "Advanced Setup",
+      description:
+        "By default every AI follows the global text model above. Turn this on to assign separate model profiles to the narrator, AI protagonist, and each AI teammate.",
+      enabled: "Enabled",
+      disabled: "Disabled",
+      enabledSummary: (count: number) =>
+        count > 0
+          ? `${count} roles now use dedicated model profiles.`
+          : "Advanced setup is on, but every role is still following the global default model.",
+      followDefaultBadge: "Use default",
+      inheritDefault: "Follow the global default model",
+      followingDefault: (value: string) => `Currently following the global default: ${value}`,
+      roleModelProfile: "Role model profile",
+      narratorTitle: "AI Narrator",
+      narratorDescription:
+        "Handles the opening, turn narration, ending checks, and narrator-side memory work.",
+      primaryPlayerTitle: "AI Protagonist",
+      primaryPlayerDescription:
+        "Only applies in Story Mode, for the AI lead player's round draft generation.",
+      companionsTitle: "AI Teammates",
+      companionTitle: (value: string) => `AI Teammate: ${value}`,
+      companionDescription: "Used for this teammate's public round drafts and private replies.",
+      companionFallback: (index: number) => `AI Teammate ${index}`,
+      noCompanions: "There are no AI teammates yet. Add one and you can assign a separate model here."
     },
     preview: {
       eyebrow: "Opening Preview",

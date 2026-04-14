@@ -29,8 +29,14 @@ export const DEFAULT_MODEL_PROFILES = [
     providerFamily: "openai-compatible"
   },
   {
-    id: "deepseek",
-    label: "DeepSeek",
+    id: "deepseek-chat",
+    label: "DeepSeek Chat",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible"
+  },
+  {
+    id: "deepseek-reasoner",
+    label: "DeepSeek Reasoner",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible"
   },

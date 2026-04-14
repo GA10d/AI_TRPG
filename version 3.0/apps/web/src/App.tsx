@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import type {
+  AdvancedTextModelConfigInput,
   AiGenerationMetadata,
   CharacterConceptAssistMode,
   CreateSessionAiCompanionInput,
@@ -13,6 +14,7 @@ import type {
   SaveRuntimeConfig,
   SessionCreateStage,
   RoundDraft,
+  RoleTextModelConfigInput,
   SessionSnapshot,
   StoryControlMode
 } from "../../../packages/shared-types/src/index.ts";
@@ -55,7 +57,12 @@ import { SettlementPage } from "./pages/SettlementPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { StorySelectPage } from "./pages/StorySelectPage.tsx";
 import { storeWebDefaults, type SavedGameRecord } from "./storage.ts";
-import { getMenuFontScale, type AppView, type StatusState } from "./ui.ts";
+import {
+  getMenuFontScale,
+  type AppView,
+  type GameActivityLogEntry,
+  type StatusState
+} from "./ui.ts";
 
 const initialStatus: StatusState = {
   message: "",
@@ -172,6 +179,68 @@ function normalizeRuntimeConfig(
   };
 }
 
+function normalizeEditableRuntimeModelConfig(
+  input: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  } | undefined
+): RoleTextModelConfigInput["runtimeModelConfig"] {
+  return {
+    apiKey: input?.apiKey?.trim() ?? "",
+    baseUrl: input?.baseUrl?.trim() ?? "",
+    model: input?.model?.trim() ?? ""
+  };
+}
+
+function normalizeRoleTextModelConfigInput(
+  input: RoleTextModelConfigInput | null | undefined
+): RoleTextModelConfigInput | null {
+  if (!input) {
+    return null;
+  }
+
+  const modelProfileId = input.modelProfileId?.trim() ?? "";
+  const runtimeModelConfig = normalizeRuntimeConfig(input.runtimeModelConfig);
+  if (!modelProfileId && !runtimeModelConfig) {
+    return null;
+  }
+
+  return {
+    modelProfileId: modelProfileId || undefined,
+    runtimeModelConfig
+  };
+}
+
+function normalizeAdvancedTextModelConfigInput(
+  input: AdvancedTextModelConfigInput | null | undefined
+): AdvancedTextModelConfigInput | null {
+  if (!input) {
+    return null;
+  }
+
+  const narrator = normalizeRoleTextModelConfigInput(input.narrator);
+  const primaryPlayer = normalizeRoleTextModelConfigInput(input.primaryPlayer);
+  const companionOverrides = (input.companionOverrides ?? []).map((item) =>
+    normalizeRoleTextModelConfigInput(item)
+  );
+
+  while (companionOverrides.length > 0 && !companionOverrides[companionOverrides.length - 1]) {
+    companionOverrides.pop();
+  }
+
+  const hasCompanionOverride = companionOverrides.some(Boolean);
+  if (!narrator && !primaryPlayer && !hasCompanionOverride) {
+    return null;
+  }
+
+  return {
+    narrator,
+    primaryPlayer,
+    companionOverrides
+  };
+}
+
 function hasPreviewModelConfig(
   accessMode: CreateSessionRequest["modelAccessMode"],
   bootstrap: ReturnType<typeof useBootstrapState>["bootstrap"],
@@ -280,7 +349,10 @@ function buildPreparedTurnCapturePreview(
 export function App() {
   const [view, setView] = useState<AppView>("menu");
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
+  const [activeSessionRuntimeConfig, setActiveSessionRuntimeConfig] =
+    useState<SaveRuntimeConfig | null>(null);
   const [status, setStatus] = useState<StatusState>(initialStatus);
+  const [gameActivityLog, setGameActivityLog] = useState<GameActivityLogEntry[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isPreparingRound, setIsPreparingRound] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
@@ -298,6 +370,9 @@ export function App() {
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
   const [aiCompanions, setAiCompanions] = useState<CreateSessionAiCompanionInput[]>([]);
+  const [advancedTextModelEnabled, setAdvancedTextModelEnabled] = useState(false);
+  const [advancedTextModelConfig, setAdvancedTextModelConfig] =
+    useState<AdvancedTextModelConfigInput | null>(null);
   const [characterConceptAssistLoading, setCharacterConceptAssistLoading] = useState(false);
   const [characterConceptAssistMode, setCharacterConceptAssistMode] =
     useState<CharacterConceptAssistMode>("generate");
@@ -386,11 +461,31 @@ export function App() {
   } = usePlaythroughGraph();
 
   const recentSave = savedGames[0] ?? null;
+  const availableTextProfiles =
+    bootstrap?.modelProfiles.filter((profile) => profile.accessMode === modelAccessMode) ?? [];
+  const availableTextProfileIds = availableTextProfiles
+    .map((profile) => profile.id)
+    .join("|");
+  const normalizedAdvancedTextModelConfig = advancedTextModelEnabled
+    ? normalizeAdvancedTextModelConfigInput(advancedTextModelConfig)
+    : null;
+  const normalizedGlobalRuntimeModelConfig =
+    normalizeEditableRuntimeModelConfig(runtimeModelConfig);
+  const effectiveNarratorSelection = {
+    modelProfileId:
+      normalizedAdvancedTextModelConfig?.narrator?.modelProfileId?.trim() || modelProfileId,
+    runtimeModelConfig:
+      normalizedAdvancedTextModelConfig?.narrator?.runtimeModelConfig
+        ? normalizeEditableRuntimeModelConfig(
+            normalizedAdvancedTextModelConfig.narrator.runtimeModelConfig
+          )
+        : normalizedGlobalRuntimeModelConfig
+  };
   const previewModelReady = hasPreviewModelConfig(
     modelAccessMode,
     bootstrap,
-    modelProfileId,
-    runtimeModelConfig
+    effectiveNarratorSelection.modelProfileId,
+    effectiveNarratorSelection.runtimeModelConfig
   );
   const roundPreparationRequired = sessionNeedsPreparedRound(snapshot);
   const snapshotStoryControlMode = getStoryControlMode(snapshot);
@@ -403,9 +498,187 @@ export function App() {
     setStoryControlModeOverride(null);
   }, [snapshot?.session.id]);
 
+  useEffect(() => {
+    if (!snapshot) {
+      setActiveSessionRuntimeConfig(null);
+    }
+  }, [snapshot]);
+
+  useEffect(() => {
+    setGameActivityLog([]);
+  }, [snapshot?.session.id]);
+
+  useEffect(() => {
+    setAdvancedTextModelConfig((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextCompanionOverrides = [...(current.companionOverrides ?? [])].slice(
+        0,
+        aiCompanions.length
+      );
+      while (nextCompanionOverrides.length < aiCompanions.length) {
+        nextCompanionOverrides.push(null);
+      }
+
+      const nextConfig: AdvancedTextModelConfigInput = {
+        ...current,
+        companionOverrides: nextCompanionOverrides
+      };
+      const currentNormalized = normalizeAdvancedTextModelConfigInput(current);
+      const nextNormalized = normalizeAdvancedTextModelConfigInput(nextConfig);
+      return JSON.stringify(currentNormalized) === JSON.stringify(nextNormalized)
+        ? current
+        : nextConfig;
+    });
+  }, [aiCompanions.length]);
+
+  useEffect(() => {
+    if (!bootstrap || availableTextProfiles.length === 0) {
+      return;
+    }
+
+    const fallbackProfileId =
+      modelProfileId || availableTextProfiles[0]?.id || bootstrap.defaults.modelProfileId;
+
+    setAdvancedTextModelConfig((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const normalizeForAccessMode = (
+        roleConfig: RoleTextModelConfigInput | null | undefined
+      ): RoleTextModelConfigInput | null => {
+        const normalizedRole = normalizeRoleTextModelConfigInput(roleConfig);
+        if (!normalizedRole) {
+          return null;
+        }
+
+        const normalizedProfileId =
+          normalizedRole.modelProfileId === "deepseek"
+            ? "deepseek-chat"
+            : normalizedRole.modelProfileId;
+        const resolvedProfileId =
+          normalizedProfileId &&
+          availableTextProfiles.some((profile) => profile.id === normalizedProfileId)
+            ? normalizedProfileId
+            : fallbackProfileId;
+
+        return {
+          ...normalizedRole,
+          modelProfileId: resolvedProfileId
+        };
+      };
+
+      const nextConfig: AdvancedTextModelConfigInput = {
+        narrator: normalizeForAccessMode(current.narrator),
+        primaryPlayer: normalizeForAccessMode(current.primaryPlayer),
+        companionOverrides: (current.companionOverrides ?? []).map((item) =>
+          normalizeForAccessMode(item)
+        )
+      };
+
+      const currentNormalized = normalizeAdvancedTextModelConfigInput(current);
+      const nextNormalized = normalizeAdvancedTextModelConfigInput(nextConfig);
+      return JSON.stringify(currentNormalized) === JSON.stringify(nextNormalized)
+        ? current
+        : nextConfig;
+    });
+  }, [
+    availableTextProfileIds,
+    bootstrap,
+    modelAccessMode,
+    modelProfileId
+  ]);
+
+  useEffect(() => {
+    if (view !== "game" || !status.message.trim()) {
+      return;
+    }
+
+    appendGameActivity(status.message, status.tone);
+  }, [status.message, status.tone, view]);
+
   function applyLocalSaveSettings(nextSettings: LocalSaveSettings): void {
     setLocalSaveSettings(nextSettings);
     setLocalSaveDirectoryInput(nextSettings.saveDirectory ?? "");
+  }
+
+  function appendGameActivity(
+    message: string,
+    tone: StatusState["tone"] = "neutral"
+  ): void {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      return;
+    }
+
+    setGameActivityLog((current) => {
+      const lastEntry = current[current.length - 1] ?? null;
+      if (lastEntry && lastEntry.message === trimmedMessage && lastEntry.tone === tone) {
+        return current;
+      }
+
+      return [
+        ...current,
+        {
+          id: createTemporaryId("game_log"),
+          createdAt: new Date().toISOString(),
+          message: trimmedMessage,
+          tone
+        }
+      ].slice(-48);
+    });
+  }
+
+  function appendReasonerTimeoutHintIfNeeded(
+    currentSnapshot: SessionSnapshot,
+    errorMessage: string
+  ): void {
+    if (
+      currentSnapshot.session.settings.modelProfileId === "deepseek-reasoner" &&
+      /timed out after/iu.test(errorMessage)
+    ) {
+      appendGameActivity(uiText.app.status.reasonerTimeoutHint, "error");
+    }
+  }
+
+  function appendPrepareRoundLogs(currentSnapshot: SessionSnapshot, playerInput: string): void {
+    const targetRound = currentSnapshot.session.currentRound + 1;
+    const participantsById = new Map(
+      currentSnapshot.session.participants.map((participant) => [participant.id, participant])
+    );
+    const primaryParticipant =
+      participantsById.get(currentSnapshot.session.playerParticipantId) ?? null;
+    const companionNames = (currentSnapshot.session.companionParticipantIds ?? [])
+      .map((participantId) => participantsById.get(participantId)?.displayName ?? "")
+      .filter(Boolean);
+
+    appendGameActivity(uiText.app.status.prepareRoundLogStart(targetRound));
+
+    if (primaryParticipant?.role === "ai_player") {
+      appendGameActivity(uiText.app.status.prepareRoundLogPrimaryAi(primaryParticipant.displayName));
+    } else {
+      appendGameActivity(uiText.app.status.prepareRoundLogPrimaryHuman);
+    }
+
+    if (companionNames.length > 0) {
+      appendGameActivity(
+        uiText.app.status.prepareRoundLogCompanions(
+          companionNames.length,
+          companionNames.join("、")
+        )
+      );
+    }
+
+    appendGameActivity(uiText.app.status.prepareRoundLogWait);
+  }
+
+  function appendCommitRoundLogs(currentSnapshot: SessionSnapshot, draftCount: number): void {
+    const targetRound = currentSnapshot.session.currentRound + 1;
+    appendGameActivity(uiText.app.status.commitRoundLogStart(targetRound, draftCount));
+    appendGameActivity(uiText.app.status.commitRoundLogWait);
   }
 
   useEffect(() => {
@@ -458,7 +731,7 @@ export function App() {
 
     relinkSnapshot(
       snapshot,
-      buildSaveRuntimeConfig(snapshot.session.settings.modelProfileId)
+      getGraphRuntimeConfig(snapshot, snapshot.session.settings.modelProfileId)
     );
   }, [
     activeGraphBundle,
@@ -533,8 +806,8 @@ export function App() {
           playMode,
           gmArchitecture,
           modelAccessMode,
-          modelProfileId,
-          runtimeModelConfig,
+          modelProfileId: effectiveNarratorSelection.modelProfileId,
+          runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
           debugEnabled,
           promptDebugEnabled: false,
           logViewMode,
@@ -593,11 +866,13 @@ export function App() {
     openingPreviewDeliveryMode,
     openingPreviewRegenerateNonce,
     modelAccessMode,
-    modelProfileId,
     playMode,
     previewModelReady,
     ruleDirectoryName,
-    runtimeModelConfig,
+    effectiveNarratorSelection.modelProfileId,
+    effectiveNarratorSelection.runtimeModelConfig.apiKey,
+    effectiveNarratorSelection.runtimeModelConfig.baseUrl,
+    effectiveNarratorSelection.runtimeModelConfig.model,
     storyDirectoryName,
     view
   ]);
@@ -709,6 +984,9 @@ export function App() {
     }
 
     if (autoCommitCountdown === null) {
+      appendGameActivity(
+        uiText.app.status.commitRoundLogCountdown(AUTO_COMMIT_COUNTDOWN_SECONDS)
+      );
       setAutoCommitCountdown(AUTO_COMMIT_COUNTDOWN_SECONDS);
       return;
     }
@@ -758,12 +1036,136 @@ export function App() {
   ]);
 
   function buildSaveRuntimeConfig(
+    currentSnapshot?: SessionSnapshot | null,
+    profileIdOverride?: string
+  ): SaveRuntimeConfig {
+    const normalizedConfig = normalizeAdvancedTextModelConfigInput(
+      advancedTextModelEnabled ? advancedTextModelConfig : null
+    );
+    const roleModelConfigs: NonNullable<SaveRuntimeConfig["roleModelConfigs"]> = {};
+    const participantRoleConfigs: NonNullable<
+      NonNullable<SaveRuntimeConfig["roleModelConfigs"]>["participants"]
+    > = {};
+
+    if (normalizedConfig?.narrator) {
+      roleModelConfigs.narrator = {
+        modelProfileId: normalizedConfig.narrator.modelProfileId,
+        runtimeModelConfig: normalizeRuntimeConfig(
+          normalizedConfig.narrator.runtimeModelConfig
+        )
+      };
+    }
+
+    if (currentSnapshot && normalizedConfig?.primaryPlayer) {
+      participantRoleConfigs[currentSnapshot.session.playerParticipantId] = {
+        modelProfileId: normalizedConfig.primaryPlayer.modelProfileId,
+        runtimeModelConfig: normalizeRuntimeConfig(
+          normalizedConfig.primaryPlayer.runtimeModelConfig
+        )
+      };
+    }
+
+    if (currentSnapshot) {
+      (currentSnapshot.session.companionParticipantIds ?? []).forEach(
+        (participantId, index) => {
+          const companionConfig = normalizedConfig?.companionOverrides?.[index];
+          if (!companionConfig) {
+            return;
+          }
+
+          participantRoleConfigs[participantId] = {
+            modelProfileId: companionConfig.modelProfileId,
+            runtimeModelConfig: normalizeRuntimeConfig(companionConfig.runtimeModelConfig)
+          };
+        }
+      );
+    }
+
+    if (Object.keys(participantRoleConfigs).length > 0) {
+      roleModelConfigs.participants = participantRoleConfigs;
+    }
+
+    return {
+      modelProfileId: profileIdOverride ?? modelProfileId,
+      runtimeModelConfig: normalizeRuntimeConfig(runtimeModelConfig),
+      roleModelConfigs:
+        roleModelConfigs.narrator || roleModelConfigs.participants
+          ? roleModelConfigs
+          : undefined
+    };
+  }
+
+  function buildSnapshotFallbackRuntimeConfig(
+    currentSnapshot?: SessionSnapshot | null,
     profileIdOverride?: string
   ): SaveRuntimeConfig {
     return {
-      modelProfileId: profileIdOverride ?? modelProfileId,
-      runtimeModelConfig: normalizeRuntimeConfig(runtimeModelConfig)
+      modelProfileId:
+        profileIdOverride ??
+        currentSnapshot?.session.settings.modelProfileId ??
+        modelProfileId,
+      runtimeModelConfig: currentSnapshot
+        ? undefined
+        : normalizeRuntimeConfig(runtimeModelConfig)
     };
+  }
+
+  function getGraphRuntimeConfig(
+    currentSnapshot?: SessionSnapshot | null,
+    profileIdOverride?: string
+  ): SaveRuntimeConfig {
+    return (
+      activeSessionRuntimeConfig ??
+      buildSnapshotFallbackRuntimeConfig(currentSnapshot, profileIdOverride)
+    );
+  }
+
+  function updateAdvancedTextModelConfig(
+    updater: (current: AdvancedTextModelConfigInput | null) => AdvancedTextModelConfigInput | null
+  ): void {
+    setAdvancedTextModelConfig((current) => {
+      const next = updater(current);
+      return normalizeAdvancedTextModelConfigInput(next);
+    });
+  }
+
+  function handleAdvancedNarratorTextModelConfigChange(
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => ({
+      ...(current ?? {}),
+      narrator: value ? normalizeRoleTextModelConfigInput(value) : null,
+      companionOverrides: [...(current?.companionOverrides ?? [])]
+    }));
+  }
+
+  function handleAdvancedPrimaryPlayerTextModelConfigChange(
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => ({
+      ...(current ?? {}),
+      primaryPlayer: value ? normalizeRoleTextModelConfigInput(value) : null,
+      companionOverrides: [...(current?.companionOverrides ?? [])]
+    }));
+  }
+
+  function handleAdvancedCompanionTextModelConfigChange(
+    index: number,
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => {
+      const nextCompanionOverrides = [...(current?.companionOverrides ?? [])];
+      while (nextCompanionOverrides.length <= index) {
+        nextCompanionOverrides.push(null);
+      }
+
+      nextCompanionOverrides[index] = value ? normalizeRoleTextModelConfigInput(value) : null;
+
+      return {
+        ...(current ?? {}),
+        companionOverrides: nextCompanionOverrides
+      };
+    });
   }
 
   function saveDefaults(): void {
@@ -1010,7 +1412,7 @@ export function App() {
           logViewMode,
           debugEnabled,
           promptDebugEnabled: false,
-          modelProfileId
+          modelProfileId: effectiveNarratorSelection.modelProfileId
         },
         gameState: {
           phase: "playing",
@@ -1152,6 +1554,7 @@ export function App() {
     }
   ): Promise<SessionSnapshot | null> {
     setIsPreparingRound(true);
+    appendPrepareRoundLogs(currentSnapshot, playerInput);
     setStatus({
       message: options?.pendingMessage ?? uiText.app.status.preparingRoundDrafts,
       tone: "neutral"
@@ -1163,14 +1566,22 @@ export function App() {
       });
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? playerInput);
+      appendGameActivity(
+        uiText.app.status.prepareRoundLogDone(
+          nextSnapshot.session.gameState.roundInputState?.drafts.length ?? 0
+        )
+      );
       setStatus({
         message: options?.successMessage ?? uiText.app.status.roundDraftsReady,
         tone: "neutral"
       });
       return nextSnapshot;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      appendGameActivity(uiText.app.status.prepareRoundLogFailed(errorMessage), "error");
+      appendReasonerTimeoutHintIfNeeded(currentSnapshot, errorMessage);
       setStatus({
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage,
         tone: "error"
       });
       return null;
@@ -1189,13 +1600,17 @@ export function App() {
     }
   ): Promise<boolean> {
     setIsSubmittingTurn(true);
+    const primaryInputOverride = options?.primaryInputOverride ?? turnInput;
+    appendCommitRoundLogs(
+      currentSnapshot,
+      currentSnapshot.session.gameState.roundInputState?.drafts.length ?? 0
+    );
     setStatus({
       message: options?.pendingMessage ?? uiText.app.status.submitTurnPending,
       tone: "neutral"
     });
 
     try {
-      const primaryInputOverride = options?.primaryInputOverride ?? turnInput;
       const capturePreview = buildPreparedTurnCapturePreview(currentSnapshot, primaryInputOverride);
       const nextSnapshot = await commitPreparedRound(currentSnapshot.session.id, {
         playerInput: primaryInputOverride?.trim() || undefined
@@ -1203,10 +1618,11 @@ export function App() {
       commitSnapshot(nextSnapshot);
       captureTurn(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId),
         capturePreview
       );
       setTurnInput("");
+      appendGameActivity(uiText.app.status.commitRoundLogDone(nextSnapshot.session.currentRound));
       setStatus({
         message:
           nextSnapshot.session.status === "ended"
@@ -1216,8 +1632,11 @@ export function App() {
       });
       return true;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      appendGameActivity(uiText.app.status.commitRoundLogFailed(errorMessage), "error");
+      appendReasonerTimeoutHintIfNeeded(currentSnapshot, errorMessage);
       setStatus({
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage,
         tone: "error"
       });
       return false;
@@ -1250,7 +1669,7 @@ export function App() {
       commitSnapshot(nextSnapshot);
       captureTurn(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId),
         playerInput
       );
       setTurnInput("");
@@ -1420,6 +1839,7 @@ export function App() {
     setIsCreating(true);
     setIsBootstrappingSession(true);
     setIsOpeningRevealInProgress(false);
+    setActiveSessionRuntimeConfig(null);
     setStatus({
       message: uiText.app.status.createSessionPending,
       tone: "neutral"
@@ -1459,6 +1879,7 @@ export function App() {
           characterConcept,
           modelProfileId,
           runtimeModelConfig,
+          advancedTextModelConfig: normalizedAdvancedTextModelConfig ?? undefined,
           aiCompanions: normalizedAiCompanions,
           debugEnabled,
           promptDebugEnabled: false,
@@ -1483,9 +1904,14 @@ export function App() {
 
       clearStagedOpeningReveal();
       persistStoredSnapshot(nextSnapshot);
+      const createdRuntimeConfig = buildSaveRuntimeConfig(
+        nextSnapshot,
+        modelProfileId
+      );
+      setActiveSessionRuntimeConfig(createdRuntimeConfig);
       beginFromSnapshot(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+        createdRuntimeConfig
       );
       setSessionBootstrapState(null);
       setIsBootstrappingSession(false);
@@ -1510,6 +1936,7 @@ export function App() {
       setSessionBootstrapState(null);
       setIsOpeningRevealInProgress(false);
       setSnapshot(null);
+      setActiveSessionRuntimeConfig(null);
       setView("game_setup");
       setStatus({
         message: error instanceof Error ? error.message : String(error),
@@ -1640,7 +2067,7 @@ export function App() {
       commitSnapshot(nextSnapshot);
       captureTurn(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId),
+        getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId),
         uiText.gameScreen.manualNarrationTest
       );
       setStatus({
@@ -1737,6 +2164,7 @@ export function App() {
       commitSnapshot(result.snapshot);
       commitSaveRecord(result.saveRecord);
       syncSavedBundle(result.saveBundle);
+      setActiveSessionRuntimeConfig(result.saveBundle.runtimeConfig ?? activeSessionRuntimeConfig);
       setStatus({
         message: uiText.app.status.localSaveCreated,
         tone: "neutral"
@@ -1765,10 +2193,21 @@ export function App() {
       const nextSnapshot = await loadSaveBundle(saveBundle);
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(
+        saveBundle.runtimeConfig ??
+          buildSnapshotFallbackRuntimeConfig(
+            nextSnapshot,
+            nextSnapshot.session.settings.modelProfileId
+          )
+      );
       relinkSaveBundle(
         saveBundle,
         nextSnapshot,
-        saveBundle.runtimeConfig ?? buildSaveRuntimeConfig(saveBundle.session.settings.modelProfileId)
+        saveBundle.runtimeConfig ??
+          buildSnapshotFallbackRuntimeConfig(
+            nextSnapshot,
+            nextSnapshot.session.settings.modelProfileId
+          )
       );
       setView("game");
       setStatus({
@@ -1802,11 +2241,16 @@ export function App() {
 
     try {
       const nextSnapshot = await loadSavedGame(recentSave.saveId);
+      const restoredRuntimeConfig = buildSnapshotFallbackRuntimeConfig(
+        nextSnapshot,
+        nextSnapshot.session.settings.modelProfileId
+      );
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+        restoredRuntimeConfig
       );
       setView("game");
       setStatus({
@@ -1841,11 +2285,16 @@ export function App() {
 
     try {
       const nextSnapshot = await fetchSession(recentSnapshot.session.id);
+      const restoredRuntimeConfig = buildSnapshotFallbackRuntimeConfig(
+        nextSnapshot,
+        nextSnapshot.session.settings.modelProfileId
+      );
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+        restoredRuntimeConfig
       );
       setView("game");
       setStatus({
@@ -1853,11 +2302,16 @@ export function App() {
         tone: "neutral"
       });
     } catch {
+      const restoredRuntimeConfig = buildSnapshotFallbackRuntimeConfig(
+        recentSnapshot,
+        recentSnapshot.session.settings.modelProfileId
+      );
       commitSnapshot(recentSnapshot);
       setTurnInput(getPreparedPrimaryDraft(recentSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         recentSnapshot,
-        buildSaveRuntimeConfig(recentSnapshot.session.settings.modelProfileId)
+        restoredRuntimeConfig
       );
       setView("game");
       setStatus({
@@ -1878,11 +2332,16 @@ export function App() {
 
     try {
       const nextSnapshot = await loadSavedGame(record.saveId);
+      const restoredRuntimeConfig = buildSnapshotFallbackRuntimeConfig(
+        nextSnapshot,
+        nextSnapshot.session.settings.modelProfileId
+      );
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(restoredRuntimeConfig);
       relinkSnapshot(
         nextSnapshot,
-        buildSaveRuntimeConfig(nextSnapshot.session.settings.modelProfileId)
+        restoredRuntimeConfig
       );
       setView("game");
       setStatus({
@@ -1919,6 +2378,13 @@ export function App() {
       const nextSnapshot = await loadSaveBundle(prepared.saveBundle);
       commitSnapshot(nextSnapshot);
       setTurnInput(getPreparedPrimaryDraft(nextSnapshot)?.content ?? "");
+      setActiveSessionRuntimeConfig(
+        prepared.saveBundle.runtimeConfig ??
+          buildSnapshotFallbackRuntimeConfig(
+            nextSnapshot,
+            nextSnapshot.session.settings.modelProfileId
+          )
+      );
       setView("game");
       setStatus({
         message: uiText.app.status.switchedNode,
@@ -2078,6 +2544,7 @@ export function App() {
   function handleOpenStorySelect(): void {
     setCharacterConcept("");
     setAiCompanions([]);
+    setActiveSessionRuntimeConfig(null);
     setView("story_select");
   }
 
@@ -2117,8 +2584,8 @@ export function App() {
         playMode,
         gmArchitecture,
         modelAccessMode,
-        modelProfileId,
-        runtimeModelConfig,
+        modelProfileId: effectiveNarratorSelection.modelProfileId,
+        runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
         debugEnabled,
         promptDebugEnabled: false,
         logViewMode,
@@ -2191,6 +2658,8 @@ export function App() {
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
           runtimeModelConfig={runtimeModelConfig}
+          advancedTextModelEnabled={advancedTextModelEnabled}
+          advancedTextModelConfig={advancedTextModelConfig}
           imageProfileId={imageProfileId}
           runtimeImageModelConfig={runtimeImageModelConfig}
           debugEnabled={debugEnabled}
@@ -2216,6 +2685,16 @@ export function App() {
           onGmArchitectureChange={setGmArchitecture}
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
+          onAdvancedTextModelEnabledChange={setAdvancedTextModelEnabled}
+          onAdvancedNarratorTextModelConfigChange={
+            handleAdvancedNarratorTextModelConfigChange
+          }
+          onAdvancedPrimaryPlayerTextModelConfigChange={
+            handleAdvancedPrimaryPlayerTextModelConfigChange
+          }
+          onAdvancedCompanionTextModelConfigChange={
+            handleAdvancedCompanionTextModelConfigChange
+          }
           onImageProfileIdChange={setImageProfileId}
           onImageProfileRuntimeConfigChange={setImageProfileRuntimeConfig}
           onDebugEnabledChange={setDebugEnabled}
@@ -2318,6 +2797,8 @@ export function App() {
         <GamePage
           snapshot={snapshot}
           activeGraphBundle={activeGraphBundle}
+          status={status}
+          activityLog={gameActivityLog}
           turnInput={turnInput}
           isBootstrappingSession={isBootstrappingSession}
           isOpeningRevealInProgress={isOpeningRevealInProgress}
@@ -2402,7 +2883,7 @@ export function App() {
         style={{ "--ui-scale": String(getMenuFontScale(menuFontSize)) } as CSSProperties}
       >
         {content}
-        {status.message && view !== "game_bootstrap" ? (
+        {status.message && view !== "game_bootstrap" && view !== "game" ? (
           <p className={`status-line ${status.tone === "error" ? "status-error" : ""}`}>
             {status.message}
           </p>

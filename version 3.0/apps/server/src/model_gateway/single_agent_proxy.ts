@@ -34,6 +34,7 @@ type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
       content?: unknown;
+      reasoning_content?: unknown;
     };
   }>;
   usage?: {
@@ -125,6 +126,7 @@ type PromptFile = {
 
 type TextCompletionResult = {
   text: string;
+  reasoningContent?: string | null;
   durationMs: number;
   usage: AiGenerationUsage;
 };
@@ -155,10 +157,15 @@ function normalizeGatewayError(
   operationLabel: string
 ): Error {
   if (isAbortError(error)) {
+    const timeoutHint =
+      config.profileId === "deepseek-reasoner"
+        ? "You can raise TRPG_DEEPSEEK_REASONER_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS if needed."
+        : "You can raise TRPG_SERVER_PROXY_TIMEOUT_MS if needed.";
+
     return new Error(
       `${config.profileName} ${operationLabel} timed out after ${Math.round(
         config.timeoutMs / 1000
-      )}s. You can raise TRPG_SERVER_PROXY_TIMEOUT_MS if needed.`
+      )}s. ${timeoutHint}`
     );
   }
 
@@ -325,6 +332,7 @@ async function callChatCompletion(
 
     return {
       text,
+      reasoningContent: normalizeContent(data.choices?.[0]?.message?.reasoning_content),
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
@@ -347,7 +355,7 @@ function buildDefaultEndingJudgeDecision() {
 }
 
 function shouldAttemptStrictStructuredSchema(config: ServerProxyConfig): boolean {
-  return config.profileId !== "deepseek" && config.profileId !== "custom-openai-compatible";
+  return config.profileCode !== "deepseek" && config.profileId !== "custom-openai-compatible";
 }
 
 function buildInlineOpenAiFileData(content: string, mimeType: string = "text/plain"): string {
@@ -783,7 +791,8 @@ function buildNarratorMeta(
       model: config.model,
       usage: completion.usage
     }),
-    usage: completion.usage
+    usage: completion.usage,
+    reasoningContent: completion.reasoningContent ?? null
   };
 }
 
@@ -1035,7 +1044,8 @@ export async function judgeEndingViaServerProxy(
       model: config.model,
       durationMs: null,
       estimatedCost: null,
-      usage: null
+      usage: null,
+      reasoningContent: null
     }
   };
 }

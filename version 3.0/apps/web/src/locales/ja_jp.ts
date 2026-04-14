@@ -166,6 +166,17 @@ export const jaJp = {
       preparingRoundDrafts: "このラウンドのパーティ草稿を準備しています...",
       preparingAiLeaderDraft: "AI主人公が次の行動草稿を作成しています...",
       roundDraftsReady: "このラウンドの草稿がそろいました。確認してからまとめて送信できます。",
+      prepareRoundLogStart: (round: number) => `ラウンド ${round} の草稿準備を開始しました。`,
+      prepareRoundLogPrimaryAi: (name: string) =>
+        `段階 1: AI主役「${name}」の草稿を生成しています。`,
+      prepareRoundLogPrimaryHuman: "段階 1: 主プレイヤー入力を記録しました。",
+      prepareRoundLogCompanions: (count: number, names: string) =>
+        `段階 2: ${count} 名のAI仲間草稿を並列生成します${names ? `: ${names}` : ""}。`,
+      prepareRoundLogWait:
+        "サーバー側で草稿生成が完了するのを待っています。長くここで止まる場合、たいていモデルがまだ生成中です。",
+      prepareRoundLogDone: (count: number) =>
+        `草稿準備が完了しました。このラウンドの草稿は ${count} 件です。`,
+      prepareRoundLogFailed: (reason: string) => `草稿準備に失敗しました: ${reason}`,
       enterPrivateChat: "先に個別チャットの内容を入力してください。",
       sendingPrivateChat: "個別チャットを送信しています...",
       privateChatSent: "個別チャットを送信しました。",
@@ -175,7 +186,16 @@ export const jaJp = {
       storyControlInterveneEnabled:
         "プレイヤー介入に切り替えました。AI主人公の草稿を再び編集できます。",
       autoRoundSubmitting: "自動進行でこのラウンドをまとめて送信しています...",
+      commitRoundLogCountdown: (seconds: number) =>
+        `草稿の準備ができました。${seconds} 秒後に自動送信します。`,
+      commitRoundLogStart: (round: number, count: number) =>
+        `ラウンド ${round} を送信しています。パーティ入力は ${count} 件です。`,
+      commitRoundLogWait: "ナレーター応答とエンディング判定の返却を待っています。",
+      commitRoundLogDone: (round: number) => `ラウンド ${round} の送信が完了しました。`,
+      commitRoundLogFailed: (reason: string) => `ラウンド送信に失敗しました: ${reason}`,
       autoModeSubmitLocked: "自動進行中のため、手動送信はできません。",
+      reasonerTimeoutHint:
+        "このセッションは DeepSeek Reasoner を使っています。タイムアウトが続く場合は TRPG_DEEPSEEK_REASONER_TIMEOUT_MS または TRPG_SERVER_PROXY_TIMEOUT_MS を上げてください。",
       privateChatAutoModeUnavailable:
         "自動進行中は個別チャットを使えません。先にプレイヤー介入へ切り替えてください。",
       turnComplete: "このターンは完了しました。",
@@ -375,9 +395,13 @@ export const jaJp = {
     recentItems: (count: number) => `${count} ?`,
     historyTab: "履歴",
     roundRepliesTab: "このラウンド",
+    reasoningTab: "推理内容",
     worldlineTab: "世界線",
     judgeTab: "補助AI",
     endingJudgeSideLabel: "補助判定",
+    reasoningEyebrow: "推理内容",
+    reasoningTitle: "モデル推理ログ",
+    reasoningCount: (count: number) => `${count} 件`,
     worldlineEyebrow: "世界線検索",
     worldlineTitle: "分岐タイムライン",
     worldlineNodeCount: (count: number) => `${count} ノード`,
@@ -397,6 +421,12 @@ export const jaJp = {
     roundDraftCount: (count: number) => `${count} ?????????`,
     roundDraftsEmpty: "??????????",
     roundRepliesEmpty: "このラウンドの返信はまだありません。",
+    reasoningEmpty: "まだ確認できる推理内容はありません。",
+    reasoningOutputLabel: "Output",
+    reasoningContentLabel: "Reasoning content",
+    reasoningCommittedLabel: "送信済み",
+    reasoningPrimaryDraftLabel: "主プレイヤー草稿",
+    reasoningCompanionDraftLabel: "AI仲間草稿",
     roundDraftsDescription:
       "???????????????AI??????????????????????????",
     primaryDraftLabel: "????????",
@@ -406,6 +436,13 @@ export const jaJp = {
     editableDraftBadge: "???",
     yourAction: "??????",
     actionTitle: "????????????",
+    activityLogEyebrow: "実行ログ",
+    activityLogTitle: "自動進行と状態",
+    activityLogCount: (count: number) => `${count} 件`,
+    activityLogCurrentStatus: "現在の状態",
+    activityLogIdle: "新しい実行ログはまだありません。",
+    activityLogEmpty: "表示できる実行ログはまだありません。",
+    activityLogErrorLabel: "エラー",
     endingFollowupTitle: "結末後の追問や振り返り",
     storyControlLabel: "ストーリー制御",
     storyControlAuto: "自動進行",
@@ -718,6 +755,32 @@ export const jaJp = {
       notConfigured: "未設定",
       ready: "セッション作成可能",
       needsConfig: "追加設定が必要"
+    },
+    advancedModel: {
+      title: "詳細設定",
+      description:
+        "既定ではすべての AI が上の共通テキストモデルを使います。ここを有効にすると、ナレーター、AI 主人公、各 AI 仲間ごとに別のモデルプロファイルを指定できます。",
+      enabled: "有効",
+      disabled: "無効",
+      enabledSummary: (count: number) =>
+        count > 0
+          ? `${count} 役に個別モデルを設定しています。`
+          : "詳細設定は有効ですが、現在はすべての役が共通モデルを使っています。",
+      followDefaultBadge: "既定を使用",
+      inheritDefault: "共通の既定モデルを使う",
+      followingDefault: (value: string) => `現在は共通既定を使用中: ${value}`,
+      roleModelProfile: "役ごとのモデルプロファイル",
+      narratorTitle: "AI ナレーター",
+      narratorDescription:
+        "導入、各ターンの叙述、エンディング判定、記憶圧縮などナレーター側の処理に使います。",
+      primaryPlayerTitle: "AI 主人公",
+      primaryPlayerDescription:
+        "ストーリーモードでのみ有効で、AI 主役の行動草稿生成に使われます。",
+      companionsTitle: "AI 仲間",
+      companionTitle: (value: string) => `AI 仲間: ${value}`,
+      companionDescription: "この仲間の公開行動草稿と私聊返信に使われます。",
+      companionFallback: (index: number) => `AI 仲間 ${index}`,
+      noCompanions: "まだ AI 仲間がいません。仲間を追加すると、ここで個別モデルを指定できます。"
     },
     preview: {
       eyebrow: "開場プレビュー",

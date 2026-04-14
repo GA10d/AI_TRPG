@@ -1,12 +1,64 @@
 import type {
-  RuntimeModelConfigInput,
+  SaveRuntimeConfig,
+  Session,
   SessionSnapshot
 } from "../../../../packages/shared-types/src/index.ts";
 
-export type SessionRuntimeConfig = {
+export type SessionRuntimeConfig = SaveRuntimeConfig;
+
+export type ResolvedSessionRuntimeSelection = {
   modelProfileId?: string;
-  runtimeModelConfig?: RuntimeModelConfigInput;
+  runtimeModelConfig?: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  };
 };
+
+function resolveGlobalRuntimeSelection(
+  session: Session,
+  runtimeConfig: SessionRuntimeConfig | null
+): ResolvedSessionRuntimeSelection {
+  return {
+    modelProfileId: runtimeConfig?.modelProfileId ?? session.settings.modelProfileId,
+    runtimeModelConfig: runtimeConfig?.runtimeModelConfig
+  };
+}
+
+export function resolveNarratorRuntimeSelection(
+  session: Session,
+  runtimeConfig: SessionRuntimeConfig | null
+): ResolvedSessionRuntimeSelection {
+  const narratorConfig = runtimeConfig?.roleModelConfigs?.narrator;
+  return {
+    modelProfileId:
+      narratorConfig?.modelProfileId ??
+      session.settings.modelProfileId ??
+      runtimeConfig?.modelProfileId,
+    runtimeModelConfig:
+      narratorConfig?.runtimeModelConfig ?? runtimeConfig?.runtimeModelConfig
+  };
+}
+
+export function resolveParticipantRuntimeSelection(
+  session: Session,
+  runtimeConfig: SessionRuntimeConfig | null,
+  participantId: string
+): ResolvedSessionRuntimeSelection {
+  const participantConfig = runtimeConfig?.roleModelConfigs?.participants?.[participantId];
+  if (participantConfig) {
+    return {
+      modelProfileId:
+        participantConfig.modelProfileId ??
+        runtimeConfig?.modelProfileId ??
+        session.settings.modelProfileId,
+      runtimeModelConfig:
+        participantConfig.runtimeModelConfig ?? runtimeConfig?.runtimeModelConfig
+    };
+  }
+
+  return resolveGlobalRuntimeSelection(session, runtimeConfig);
+}
 
 export class InMemorySessionStore {
   private readonly snapshots = new Map<string, SessionSnapshot>();

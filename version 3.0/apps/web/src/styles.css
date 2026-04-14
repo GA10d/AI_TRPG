@@ -1261,6 +1261,92 @@ img {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.setup-advanced-model-section {
+  display: grid;
+  gap: 14px;
+}
+
+.setup-advanced-model-section-full {
+  grid-column: 1 / -1;
+}
+
+.setup-advanced-model-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.setup-advanced-model-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-advanced-model-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.setup-advanced-model-card-warning {
+  border-color: rgba(152, 92, 75, 0.28);
+  background: rgba(255, 247, 243, 0.92);
+}
+
+.setup-advanced-model-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setup-advanced-model-group {
+  display: grid;
+  gap: 12px;
+}
+
+.setup-advanced-model-group-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.summary-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 50, 32, 0.14);
+  background: rgba(122, 50, 32, 0.08);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.summary-chip-warning {
+  border-color: rgba(152, 92, 75, 0.28);
+  background: rgba(152, 92, 75, 0.12);
+  color: #8a3d2d;
+}
+
+@media (max-width: 720px) {
+  .setup-advanced-model-toggle,
+  .setup-advanced-model-card-head {
+    flex-direction: column;
+  }
+}
+
 .ghost-button-small {
   padding: 8px 12px;
   font-size: 13px;
@@ -2428,10 +2514,10 @@ pre {
   min-height: 0;
   display: grid;
   gap: 0;
-  grid-template-rows:
+  grid-template-columns:
     minmax(0, 1fr)
     12px
-    minmax(220px, var(--game-composer-height, 240px));
+    minmax(320px, var(--game-side-width, 420px));
   overflow: hidden;
 }
 
@@ -2444,16 +2530,18 @@ pre {
   min-height: 0;
   display: grid;
   gap: 0;
-  grid-template-columns:
+  grid-template-rows:
     minmax(0, 1fr)
     12px
-    minmax(320px, var(--game-side-width, 420px));
+    minmax(220px, var(--game-composer-height, 240px))
+    minmax(24px, auto);
   overflow: hidden;
 }
 
 .game-focus-panel,
 .game-draft-panel,
 .game-side-panel,
+.game-activity-panel,
 .game-composer,
 .game-npc-detail {
   display: grid;
@@ -2574,6 +2662,40 @@ pre {
 
 .game-judge-json {
   margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.game-reasoning-list {
+  min-height: 0;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.game-reasoning-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 251, 246, 0.94);
+}
+
+.game-reasoning-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-reasoning-text {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 63, 36, 0.08);
+  background: rgba(246, 238, 231, 0.78);
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -2732,6 +2854,94 @@ pre {
   min-height: 0;
   height: 100%;
   resize: none;
+}
+
+.game-activity-statusline {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.game-activity-statusline-label {
+  flex: 0 0 auto;
+  color: rgba(122, 50, 32, 0.72);
+}
+
+.game-activity-statusline-message {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.game-activity-statusline-error {
+  color: #8a3d2d;
+}
+
+.game-activity-panel {
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(122, 50, 32, 0.05), transparent 34%),
+    rgba(255, 255, 255, 0.76);
+}
+
+.game-activity-live {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 251, 246, 0.92);
+}
+
+.game-activity-live .meta-label {
+  margin-bottom: 0;
+}
+
+.game-activity-live-error {
+  border-color: rgba(145, 47, 35, 0.16);
+  background: rgba(255, 244, 242, 0.96);
+}
+
+.game-activity-list {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.game-activity-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 63, 36, 0.1);
+  background: rgba(255, 251, 246, 0.9);
+}
+
+.game-activity-item-error {
+  border-color: rgba(145, 47, 35, 0.16);
+  background: rgba(255, 246, 244, 0.96);
+}
+
+.game-activity-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .game-drawer-backdrop {
@@ -3242,7 +3452,7 @@ pre {
 
   .game-top-panels {
     gap: 16px;
-    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
   }
 
   .game-resizer {

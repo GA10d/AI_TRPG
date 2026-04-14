@@ -35,6 +35,7 @@ export type AiGenerationMetadata = {
   durationMs?: number | null;
   estimatedCost?: AiGenerationCost | null;
   usage?: AiGenerationUsage | null;
+  reasoningContent?: string | null;
 };
 
 export type Visibility =
@@ -142,6 +143,7 @@ export type RoundDraft = {
   content: string;
   editable: boolean;
   generatedAt?: string | null;
+  aiMetadata?: AiGenerationMetadata | null;
 };
 
 export type RoundInputState = {
@@ -377,6 +379,28 @@ export type SaveRuntimeConfig = {
     apiKey?: string;
     baseUrl?: string;
     model?: string;
+  };
+  roleModelConfigs?: {
+    narrator?: {
+      modelProfileId?: string;
+      runtimeModelConfig?: {
+        apiKey?: string;
+        baseUrl?: string;
+        model?: string;
+      };
+    };
+    participants?: Record<
+      string,
+      | {
+          modelProfileId?: string;
+          runtimeModelConfig?: {
+            apiKey?: string;
+            baseUrl?: string;
+            model?: string;
+          };
+        }
+      | undefined
+    >;
   };
 };
 

@@ -229,7 +229,8 @@ export async function generateAiRoundDraft(input: {
       result.text.trim() ||
       `${input.participant.displayName} pauses, studies the situation, and offers a cautious response.`,
     editable: false,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
+    aiMetadata: result.meta
   };
 }
 

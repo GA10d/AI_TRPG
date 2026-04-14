@@ -112,9 +112,9 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     }
   },
   {
-    id: "deepseek",
+    id: "deepseek-chat",
     order: 20,
-    name: "DeepSeek",
+    name: "DeepSeek Chat",
     code: "deepseek",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible",
@@ -126,7 +126,11 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     chargeUrl: "https://platform.deepseek.com/usage",
     docsUrl: "https://api-docs.deepseek.com/zh-cn/",
     envKeyCandidates: ["DEEPSEEK_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
-    modelEnvKeyCandidates: ["TRPG_DEEPSEEK_MODEL", "TRPG_SERVER_PROXY_MODEL"],
+    modelEnvKeyCandidates: [
+      "TRPG_DEEPSEEK_CHAT_MODEL",
+      "TRPG_DEEPSEEK_MODEL",
+      "TRPG_SERVER_PROXY_MODEL"
+    ],
     baseUrlEnvKeyCandidates: ["TRPG_DEEPSEEK_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
     allowsCustomApiKey: true,
     allowsCustomBaseUrl: true,
@@ -147,6 +151,46 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
         supported: true,
         model: "deepseek-chat",
         url: "https://api.deepseek.com"
+      },
+      file_upload: { supported: false, model: null, url: null }
+    }
+  },
+  {
+    id: "deepseek-reasoner",
+    order: 21,
+    name: "DeepSeek Reasoner",
+    code: "deepseek",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible",
+    dependence: "OpenAI",
+    description: "浣跨敤 DeepSeek Reasoner 鐨?OpenAI-compatible 鏂囨湰鎺ュ彛銆?",
+    urlRequirements: true,
+    baseUrl: "https://api.deepseek.com",
+    baseModel: "deepseek-reasoner",
+    chargeUrl: "https://platform.deepseek.com/usage",
+    docsUrl: "https://api-docs.deepseek.com/zh-cn/",
+    envKeyCandidates: ["DEEPSEEK_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
+    modelEnvKeyCandidates: ["TRPG_DEEPSEEK_REASONER_MODEL"],
+    baseUrlEnvKeyCandidates: ["TRPG_DEEPSEEK_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      mini_version: { supported: false, model: null, url: null },
+      deep_think: {
+        supported: true,
+        model: "deepseek-reasoner",
+        url: "https://api-docs.deepseek.com/guides/thinking_mode"
+      },
+      json_output: {
+        supported: true,
+        model: "deepseek-reasoner",
+        url: "https://api-docs.deepseek.com/guides/reasoning_model"
+      },
+      tool_calls: {
+        supported: false,
+        model: null,
+        url: "https://api-docs.deepseek.com/guides/reasoning_model"
       },
       file_upload: { supported: false, model: null, url: null }
     }
@@ -275,7 +319,8 @@ export function listModelProfiles(): ModelProfileDefinition[] {
 }
 
 export function getModelProfile(profileId: string): ModelProfileDefinition | null {
-  return MODEL_PROFILES.find((item) => item.id === profileId) ?? null;
+  const normalizedProfileId = profileId === "deepseek" ? "deepseek-chat" : profileId;
+  return MODEL_PROFILES.find((item) => item.id === normalizedProfileId) ?? null;
 }
 
 export function getDefaultModelProfileId(accessMode: ModelAccessMode): string {

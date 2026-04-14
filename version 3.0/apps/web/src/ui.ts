@@ -21,6 +21,13 @@ export type StatusState = {
   tone: "neutral" | "error";
 };
 
+export type GameActivityLogEntry = {
+  id: string;
+  createdAt: string;
+  message: string;
+  tone: StatusState["tone"];
+};
+
 export function getPlayModeOptions(
   text: UiText = zhCn
 ): Array<{

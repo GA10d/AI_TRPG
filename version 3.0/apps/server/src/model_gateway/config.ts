@@ -121,11 +121,27 @@ function parseOptionalNumber(rawValue: string | undefined): number | null {
 }
 
 function resolveDefaultTimeoutMs(profileId: string): number {
-  if (profileId === "doubao") {
+  if (profileId === "doubao" || profileId === "deepseek-reasoner") {
     return 180_000;
   }
 
   return 60_000;
+}
+
+function resolveTimeoutMs(profile: ModelProfileDefinition): number {
+  const defaultTimeoutMs = resolveDefaultTimeoutMs(profile.id);
+
+  if (profile.id === "deepseek-reasoner") {
+    return parseNumberOrDefault(
+      envFirst("TRPG_DEEPSEEK_REASONER_TIMEOUT_MS", "TRPG_SERVER_PROXY_TIMEOUT_MS"),
+      defaultTimeoutMs
+    );
+  }
+
+  return parseNumberOrDefault(
+    envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"),
+    defaultTimeoutMs
+  );
 }
 
 function normalizeDependence(profile: ModelProfileDefinition): ServerProxyDependence {
@@ -347,10 +363,7 @@ export function getServerProxyConfig(input: {
     model,
     temperature: parseNumberOrDefault(envFirst("TRPG_SERVER_PROXY_TEMPERATURE"), 0.7),
     maxTokens: parseOptionalNumber(envFirst("TRPG_SERVER_PROXY_MAX_TOKENS")),
-    timeoutMs: parseNumberOrDefault(
-      envFirst("TRPG_SERVER_PROXY_TIMEOUT_MS"),
-      resolveDefaultTimeoutMs(profile.id)
-    ),
+    timeoutMs: resolveTimeoutMs(profile),
     providerLabel: resolveProviderLabel(profile),
     features: profile.features
   };

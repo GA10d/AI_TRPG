@@ -1,0 +1,355 @@
+{
+  "saved_at": "20260414-015452",
+  "base_url": "https://api.deepseek.com",
+  "models": [
+    "deepseek-chat",
+    "deepseek-reasoner"
+  ],
+  "results": [
+    {
+      "case": {
+        "id": "gm_turn",
+        "label": "GM continuation",
+        "system_prompt": "你是一个中文文字TRPG主持人。延续场景，给出具体、可继续的结果，不要代替玩家做决定。",
+        "user_prompt": "故事标题：废弃医院夜巡\n\n最近上下文：\n- 玩家和两名队友进入三楼手术区。\n- 走廊尽头的广播间一直传来断续电流声。\n- 地上有新鲜拖痕，像有什么重物刚被拉进黑暗里。\n\n本轮玩家队伍行动：\n- 人类玩家：我用手电照向广播间门缝，同时示意大家先不要出声。\n- AI队友林雾：我蹲下检查拖痕，判断它是往里还是往外。\n- AI队友周沉：我守住楼梯口，防止后方有人靠近。\n\n任务：写出主持人的下一段推进，控制在 180 到 320 字。"
+      },
+      "results": [
+        {
+          "model": "deepseek-chat",
+          "duration_sec": 8.692,
+          "finish_reason": "stop",
+          "content": "你小心地将手电光对准广播间门缝，光束切开黑暗，照见门内地面散落着几截断裂的电缆。电流声正是从这里传出，但室内空无一人。\n\n林雾蹲在拖痕旁，指尖轻触地面。“痕迹很新，灰尘被抹开的方向……”她压低声音，“是往广播间里去的。但拖到门口就中断了，像是被抬了起来。”\n\n就在这时，广播里的电流声骤然停止。短暂的死寂后，一个失真的男声从喇叭里沙沙响起：“三楼的……客人……请到……院长室……”\n\n周沉在楼梯口猛地转身，手电扫向下方台阶。“下面有脚步声，正在上楼。”他握紧警棍，“不止一个。”\n\n广播声还在重复，而楼梯间的脚步声已逼近转角。你们被夹在中间，必须立刻决定：是进入广播间查看，还是转向应对楼梯间的来者？",
+          "reasoning_content": "",
+          "usage": {
+            "prompt_tokens": 163,
+            "completion_tokens": 194,
+            "total_tokens": 357,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 163
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "b80acd0d-c87f-4090-8ee7-c251541eb968",
+            "object": "chat.completion",
+            "created": 1776146028,
+            "model": "deepseek-chat",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "你小心地将手电光对准广播间门缝，光束切开黑暗，照见门内地面散落着几截断裂的电缆。电流声正是从这里传出，但室内空无一人。\n\n林雾蹲在拖痕旁，指尖轻触地面。“痕迹很新，灰尘被抹开的方向……”她压低声音，“是往广播间里去的。但拖到门口就中断了，像是被抬了起来。”\n\n就在这时，广播里的电流声骤然停止。短暂的死寂后，一个失真的男声从喇叭里沙沙响起：“三楼的……客人……请到……院长室……”\n\n周沉在楼梯口猛地转身，手电扫向下方台阶。“下面有脚步声，正在上楼。”他握紧警棍，“不止一个。”\n\n广播声还在重复，而楼梯间的脚步声已逼近转角。你们被夹在中间，必须立刻决定：是进入广播间查看，还是转向应对楼梯间的来者？"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 163,
+              "completion_tokens": 194,
+              "total_tokens": 357,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 163
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        },
+        {
+          "model": "deepseek-reasoner",
+          "duration_sec": 23.075,
+          "finish_reason": "stop",
+          "content": "你的手电光刺入广播间门缝——里面堆满废弃设备，但控制台上一台老式收音机的指示灯正在规律闪烁。电流杂音突然停止，取而代之的是微弱的、类似呼吸的起伏声。\n\n林雾的手指轻触拖痕边缘，低声道：“痕迹很新，方向是往里...而且有断续的滴落状印记，像是有液体渗出。”她的指尖抬起，在光线下泛着可疑的暗色反光。\n\n周沉在楼梯口朝你们打了个手势。楼下传来金属轻轻刮擦水泥地的声音，但持续两秒后又消失了。他无声地举起三根手指——来自三层楼梯以下的位置。\n\n就在此时，广播间里传来“咔哒”一声轻响，那扇虚掩的铁门缓缓向内滑开了几厘米。",
+          "reasoning_content": "好的，现在我需要处理玩家和他们的AI队友在废弃医院中的行动。首先，用户提供了当前的情境：他们在三楼手术区，走廊尽头的广播间有电流声，地上有新鲜拖痕。玩家的行动是检查门缝，林雾检查拖痕方向，周沉守住楼梯口。我的任务是以主持人的身份推进故事，保持紧张气氛，不替玩家做决定，同时给出具体结果。\n\n首先，我要回应玩家的每个行动。玩家用手电照向广播间门缝，这可能需要描述门缝里的情况，比如是否看到什么，或者门的状态。例如，门缝里可能有光线变化，或者门是虚掩的，等待玩家进一步决定。同时，林雾检查拖痕，需要判断方向，可能是朝广播间内部，暗示有东西被拖进去，增加悬疑。周沉守住楼梯口，可能需要描述楼梯口的情况，可能安全，或者有轻微声响，但暂时没有威胁。\n\n接下来，要平衡描述，不让任何队友的行动被忽略。例如，林雾的判断需要明确结果，拖痕朝向广播间，新鲜程度，可能有人刚经过。周沉那边可能有风声或远处的声响，保持警惕。同时，广播间的电流声可能有变化，比如突然停止或出现声音，激发玩家的好奇心或紧张感。\n\n还需要注意故事的氛围，保持恐怖和不确定感。使用细节如闪烁的灯光、阴影、气味等增强沉浸感。例如，手电光照到门缝时，可能看到里面有什么反光，或者地上的痕迹有液体。拖痕可能有拖曳物体的痕迹，比如血迹或碎片。楼梯口可能有冷风吹过，暗示其他入口或隐藏的危险。\n\n要确保推进情节，但不强制玩家行动。例如，广播间的门可能轻轻晃动，吸引玩家进入，或者拖痕指向的方向有新的发现。同时，避免给出太多信息，让玩家有选择余地，比如是否开门，是否跟随拖痕，或者让周沉继续守候。\n\n最后，检查字数是否在180到320字之间，保持流畅和连贯。确保每个队友的行动都有回应，并且环境描述丰富，让玩家有足够的线索做出下一步决定。",
+          "usage": {
+            "prompt_tokens": 163,
+            "completion_tokens": 613,
+            "total_tokens": 776,
+            "prompt_tokens_details": {
+              "cached_tokens": 128
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 445
+            },
+            "prompt_cache_hit_tokens": 128,
+            "prompt_cache_miss_tokens": 35
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "75b8bcce-4157-4c0a-b9d4-255a501ea9ef",
+            "object": "chat.completion",
+            "created": 1776146037,
+            "model": "deepseek-reasoner",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "你的手电光刺入广播间门缝——里面堆满废弃设备，但控制台上一台老式收音机的指示灯正在规律闪烁。电流杂音突然停止，取而代之的是微弱的、类似呼吸的起伏声。\n\n林雾的手指轻触拖痕边缘，低声道：“痕迹很新，方向是往里...而且有断续的滴落状印记，像是有液体渗出。”她的指尖抬起，在光线下泛着可疑的暗色反光。\n\n周沉在楼梯口朝你们打了个手势。楼下传来金属轻轻刮擦水泥地的声音，但持续两秒后又消失了。他无声地举起三根手指——来自三层楼梯以下的位置。\n\n就在此时，广播间里传来“咔哒”一声轻响，那扇虚掩的铁门缓缓向内滑开了几厘米。",
+                  "reasoning_content": "好的，现在我需要处理玩家和他们的AI队友在废弃医院中的行动。首先，用户提供了当前的情境：他们在三楼手术区，走廊尽头的广播间有电流声，地上有新鲜拖痕。玩家的行动是检查门缝，林雾检查拖痕方向，周沉守住楼梯口。我的任务是以主持人的身份推进故事，保持紧张气氛，不替玩家做决定，同时给出具体结果。\n\n首先，我要回应玩家的每个行动。玩家用手电照向广播间门缝，这可能需要描述门缝里的情况，比如是否看到什么，或者门的状态。例如，门缝里可能有光线变化，或者门是虚掩的，等待玩家进一步决定。同时，林雾检查拖痕，需要判断方向，可能是朝广播间内部，暗示有东西被拖进去，增加悬疑。周沉守住楼梯口，可能需要描述楼梯口的情况，可能安全，或者有轻微声响，但暂时没有威胁。\n\n接下来，要平衡描述，不让任何队友的行动被忽略。例如，林雾的判断需要明确结果，拖痕朝向广播间，新鲜程度，可能有人刚经过。周沉那边可能有风声或远处的声响，保持警惕。同时，广播间的电流声可能有变化，比如突然停止或出现声音，激发玩家的好奇心或紧张感。\n\n还需要注意故事的氛围，保持恐怖和不确定感。使用细节如闪烁的灯光、阴影、气味等增强沉浸感。例如，手电光照到门缝时，可能看到里面有什么反光，或者地上的痕迹有液体。拖痕可能有拖曳物体的痕迹，比如血迹或碎片。楼梯口可能有冷风吹过，暗示其他入口或隐藏的危险。\n\n要确保推进情节，但不强制玩家行动。例如，广播间的门可能轻轻晃动，吸引玩家进入，或者拖痕指向的方向有新的发现。同时，避免给出太多信息，让玩家有选择余地，比如是否开门，是否跟随拖痕，或者让周沉继续守候。\n\n最后，检查字数是否在180到320字之间，保持流畅和连贯。确保每个队友的行动都有回应，并且环境描述丰富，让玩家有足够的线索做出下一步决定。"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 163,
+              "completion_tokens": 613,
+              "total_tokens": 776,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 445
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 35
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        }
+      ]
+    },
+    {
+      "case": {
+        "id": "ai_teammate_turn",
+        "label": "AI teammate public reply",
+        "system_prompt": "你是队伍中的AI队友。只写你自己的公开回合发言，不要描写结果，不要替别人行动。",
+        "user_prompt": "故事标题：旧校舍搜查\n\n角色名：沈意\n性格标签：冷静、谨慎、观察力强\n\n最近公共剧情：\n- 队伍刚发现化学实验室的柜门被人从内部撬开。\n- 空气里有淡淡的酒精味，但地面脚印却是湿泥。\n- 远处传来一阵金属碰撞声。\n\n本轮已确定行动：\n- 主玩家：我先把实验室前后门都看住，再检查柜内有没有少东西。\n\n任务：以沈意的口吻写一段本轮公开发言，控制在 80 到 160 字。"
+      },
+      "results": [
+        {
+          "model": "deepseek-chat",
+          "duration_sec": 3.823,
+          "finish_reason": "stop",
+          "content": "（压低声音）脚印的湿泥和酒精味对不上。我建议先别碰柜子——如果是有人故意布置的现场，可能有二次机关。（侧耳听远处金属声）声音来自二楼东侧，但这里脚印是新的。你们守住门，我用镜子反射检查柜内情况。",
+          "reasoning_content": "",
+          "usage": {
+            "prompt_tokens": 145,
+            "completion_tokens": 64,
+            "total_tokens": 209,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 145
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "8c3fc13e-8c58-4b0e-9b67-7e53d40e02f0",
+            "object": "chat.completion",
+            "created": 1776146060,
+            "model": "deepseek-chat",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "（压低声音）脚印的湿泥和酒精味对不上。我建议先别碰柜子——如果是有人故意布置的现场，可能有二次机关。（侧耳听远处金属声）声音来自二楼东侧，但这里脚印是新的。你们守住门，我用镜子反射检查柜内情况。"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 145,
+              "completion_tokens": 64,
+              "total_tokens": 209,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 145
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        },
+        {
+          "model": "deepseek-reasoner",
+          "duration_sec": 7.201,
+          "finish_reason": "stop",
+          "content": "（用手电仔细照看地面脚印）酒精味和湿泥矛盾，说明有人特意制造了干扰。金属声来自二楼方向，与这里的痕迹形成时间差。我建议保持现有阵型——你守住出入口，我继续检查通风管道是否有异常连接。",
+          "reasoning_content": "（我们正在调查化学实验室的异常情况，队友刚说完要看守门和检查柜子。现在我是沈意，作为冷静谨慎的观察者，我必须考虑这些细节背后的逻辑矛盾。酒精味和湿泥脚印同时出现很不寻常，前者属于实验室内部，后者却来自室外环境。）\n\n（这种情况下，我的观察力让我立刻联想到两种可能性：要么有人故意制造混乱，要么存在我们没发现的连接点。至于金属声，虽然方向相反，但不能排除是调虎离山。好了，现在该提醒队友注意这些疑点，保持警戒的同时继续调查。）",
+          "usage": {
+            "prompt_tokens": 145,
+            "completion_tokens": 179,
+            "total_tokens": 324,
+            "prompt_tokens_details": {
+              "cached_tokens": 128
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 122
+            },
+            "prompt_cache_hit_tokens": 128,
+            "prompt_cache_miss_tokens": 17
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "83f302f7-fcea-4f92-ad79-83d3d486d71f",
+            "object": "chat.completion",
+            "created": 1776146064,
+            "model": "deepseek-reasoner",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "（用手电仔细照看地面脚印）酒精味和湿泥矛盾，说明有人特意制造了干扰。金属声来自二楼方向，与这里的痕迹形成时间差。我建议保持现有阵型——你守住出入口，我继续检查通风管道是否有异常连接。",
+                  "reasoning_content": "（我们正在调查化学实验室的异常情况，队友刚说完要看守门和检查柜子。现在我是沈意，作为冷静谨慎的观察者，我必须考虑这些细节背后的逻辑矛盾。酒精味和湿泥脚印同时出现很不寻常，前者属于实验室内部，后者却来自室外环境。）\n\n（这种情况下，我的观察力让我立刻联想到两种可能性：要么有人故意制造混乱，要么存在我们没发现的连接点。至于金属声，虽然方向相反，但不能排除是调虎离山。好了，现在该提醒队友注意这些疑点，保持警戒的同时继续调查。）"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 145,
+              "completion_tokens": 179,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 122
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 17
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        }
+      ]
+    },
+    {
+      "case": {
+        "id": "memory_compression",
+        "label": "Episode compression",
+        "system_prompt": "你是TRPG运行时记忆压缩助手。你的目标是提炼可复用、耐久的剧情摘要。",
+        "user_prompt": "请把下面的公共剧情压缩成 4 条 durable summary bullets，每条 1 句话，尽量保留人物关系、关键线索和未解决问题。\n\n原始剧情：\n1. 队伍在雨夜到达废弃纺织厂，发现值班室的日历停在三个月前。\n2. 主玩家在二楼办公室找到一封未寄出的举报信，内容提到厂长夜间偷偷转移机器。\n3. AI队友许河在锅炉房听到敲击管道的回声，判断地下层可能还有人活动。\n4. AI队友沈意在仓库里发现近期留下的矿泉水瓶和止痛药包装。\n5. 队伍准备下到地下层，但楼梯入口被新换的铁链锁住，说明这里最近被人刻意封闭。"
+      },
+      "results": [
+        {
+          "model": "deepseek-chat",
+          "duration_sec": 4.719,
+          "finish_reason": "stop",
+          "content": "1. 队伍在废弃纺织厂发现三个月前中断的运营迹象，包括未寄出的举报信，指控厂长夜间转移机器。\n2. 许河和沈意分别发现地下层可能有人活动的证据，以及近期有人逗留的痕迹。\n3. 通往地下层的入口被新锁链封锁，表明此地近期被刻意隔离。\n4. 关键未解问题包括：地下层隐藏着什么、厂长转移机器的目的，以及谁在封锁入口并可能仍留在厂内。",
+          "reasoning_content": "",
+          "usage": {
+            "prompt_tokens": 171,
+            "completion_tokens": 105,
+            "total_tokens": 276,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 171
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "76db98a4-bc63-4bf1-b0a4-47d3cd52445d",
+            "object": "chat.completion",
+            "created": 1776146071,
+            "model": "deepseek-chat",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "1. 队伍在废弃纺织厂发现三个月前中断的运营迹象，包括未寄出的举报信，指控厂长夜间转移机器。\n2. 许河和沈意分别发现地下层可能有人活动的证据，以及近期有人逗留的痕迹。\n3. 通往地下层的入口被新锁链封锁，表明此地近期被刻意隔离。\n4. 关键未解问题包括：地下层隐藏着什么、厂长转移机器的目的，以及谁在封锁入口并可能仍留在厂内。"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 171,
+              "completion_tokens": 105,
+              "total_tokens": 276,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 171
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        },
+        {
+          "model": "deepseek-reasoner",
+          "duration_sec": 16.096,
+          "finish_reason": "stop",
+          "content": "1. 废弃纺织厂看似已停产三个月，但多项证据表明近期存在秘密活动。  \n2. 一封针对厂长的未寄出举报信，指控其夜间转移机械。  \n3. AI队友许河与沈意通过声音与遗留物，推测地下层可能困有人员。  \n4. 地下入口被人新近用铁链刻意封锁，阻断了队伍的直接调查。",
+          "reasoning_content": "好的，用户让我把一段TRPG的公共剧情压缩成四条耐久的摘要，每条一句话，要保留人物关系、关键线索和未解决的问题。首先，我需要仔细看看提供的原始剧情，里面有几个关键点：雨夜、废弃纺织厂、日历停在三个月前、举报信提到厂长转移机器、锅炉房有地下活动迹象、仓库有近期物品、楼梯被新锁链锁住。\n\n接下来，我得提取出核心信息，确保每条摘要都包含必要的元素。先看人物关系，这里提到主玩家、AI队友许河和沈意，但可能还有其他没明确提到的角色，比如厂长。举报信涉及厂长，所以人物关系应该包括队伍、厂长，可能还有未露面的工人。\n\n关键线索方面：日历的时间点、举报信内容、敲击声、近期物品和新锁链。这些线索都指向了工厂近期有人活动，尤其是地下层。未解决的问题包括：谁在活动？为什么封锁楼梯？厂长是否涉及更严重的事情？\n\n然后，我需要把每个事件整合成简洁的句子。比如，第一条可以总结队伍发现工厂近期被遗弃，但还有活动迹象。第二条要提到举报信和厂长的可疑行为。第三条结合许河和沈意的发现，强调地下层有人。最后一条指出封锁楼梯的异常，暗示有人阻止调查。\n\n要确保每条摘要独立且信息完整，同时保持连贯性。比如，避免重复提到雨夜或具体细节，而是聚焦在关系和线索上。另外，时间顺序可能需要调整，让逻辑更清晰。比如，先整体发现，再具体线索，然后地下层的证据，最后面临的阻碍。\n\n最后检查是否每条都有一句话，涵盖人物、关键线索和未解问题。比如，第四条中提到新锁链和刻意封闭，直接引出了谁在做这件事的问题，符合未解决问题的要求。这样应该能满足用户的需求了。",
+          "usage": {
+            "prompt_tokens": 171,
+            "completion_tokens": 472,
+            "total_tokens": 643,
+            "prompt_tokens_details": {
+              "cached_tokens": 128
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 386
+            },
+            "prompt_cache_hit_tokens": 128,
+            "prompt_cache_miss_tokens": 43
+          },
+          "request": {
+            "temperature": 0.3,
+            "max_tokens": 1200
+          },
+          "raw_response": {
+            "id": "a823771a-326f-40d1-b0f8-11602c513410",
+            "object": "chat.completion",
+            "created": 1776146076,
+            "model": "deepseek-reasoner",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "1. 废弃纺织厂看似已停产三个月，但多项证据表明近期存在秘密活动。  \n2. 一封针对厂长的未寄出举报信，指控其夜间转移机械。  \n3. AI队友许河与沈意通过声音与遗留物，推测地下层可能困有人员。  \n4. 地下入口被人新近用铁链刻意封锁，阻断了队伍的直接调查。",
+                  "reasoning_content": "好的，用户让我把一段TRPG的公共剧情压缩成四条耐久的摘要，每条一句话，要保留人物关系、关键线索和未解决的问题。首先，我需要仔细看看提供的原始剧情，里面有几个关键点：雨夜、废弃纺织厂、日历停在三个月前、举报信提到厂长转移机器、锅炉房有地下活动迹象、仓库有近期物品、楼梯被新锁链锁住。\n\n接下来，我得提取出核心信息，确保每条摘要都包含必要的元素。先看人物关系，这里提到主玩家、AI队友许河和沈意，但可能还有其他没明确提到的角色，比如厂长。举报信涉及厂长，所以人物关系应该包括队伍、厂长，可能还有未露面的工人。\n\n关键线索方面：日历的时间点、举报信内容、敲击声、近期物品和新锁链。这些线索都指向了工厂近期有人活动，尤其是地下层。未解决的问题包括：谁在活动？为什么封锁楼梯？厂长是否涉及更严重的事情？\n\n然后，我需要把每个事件整合成简洁的句子。比如，第一条可以总结队伍发现工厂近期被遗弃，但还有活动迹象。第二条要提到举报信和厂长的可疑行为。第三条结合许河和沈意的发现，强调地下层有人。最后一条指出封锁楼梯的异常，暗示有人阻止调查。\n\n要确保每条摘要独立且信息完整，同时保持连贯性。比如，避免重复提到雨夜或具体细节，而是聚焦在关系和线索上。另外，时间顺序可能需要调整，让逻辑更清晰。比如，先整体发现，再具体线索，然后地下层的证据，最后面临的阻碍。\n\n最后检查是否每条都有一句话，涵盖人物、关键线索和未解问题。比如，第四条中提到新锁链和刻意封闭，直接引出了谁在做这件事的问题，符合未解决问题的要求。这样应该能满足用户的需求了。"
+                },
+                "logprobs": null,
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 171,
+              "completion_tokens": 472,
+              "total_tokens": 643,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 386
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 43
+            },
+            "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+          }
+        }
+      ]
+    }
+  ]
+}
