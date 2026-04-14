@@ -254,3 +254,14 @@ export function storeAiCompanionPreset(
   writeJson(AI_COMPANION_PRESETS_STORAGE_KEY, nextPresets);
   return nextPresets;
 }
+
+export function deleteAiCompanionPreset(presetId: string): StoredAiCompanionPreset[] {
+  const nextPresets = loadAiCompanionPresets().filter((item) => item.id !== presetId);
+  if (nextPresets.length > 0) {
+    writeJson(AI_COMPANION_PRESETS_STORAGE_KEY, nextPresets);
+  } else {
+    removeItem(AI_COMPANION_PRESETS_STORAGE_KEY);
+  }
+
+  return nextPresets;
+}

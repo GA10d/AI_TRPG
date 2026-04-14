@@ -1505,6 +1505,14 @@ img {
   gap: 6px;
 }
 
+.companion-preset-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .companion-preset-modal-empty {
   min-height: 140px;
 }
@@ -1674,6 +1682,12 @@ textarea {
   border: 1px solid rgba(95, 33, 18, 0.18);
   background: rgba(255, 255, 255, 0.66);
   color: var(--accent-strong);
+}
+
+.ghost-button-danger {
+  border-color: rgba(156, 47, 36, 0.22);
+  color: var(--danger);
+  background: rgba(255, 244, 242, 0.9);
 }
 
 .menu-button {

@@ -33,6 +33,7 @@ import {
 } from "../openingPreviewPreferences.ts";
 import { useUiText } from "../locales/index.tsx";
 import {
+  deleteAiCompanionPreset,
   loadAiCompanionPresets,
   storeAiCompanionPreset,
   type StoredAiCompanionPreset
@@ -543,6 +544,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       personalityTagIds: preset.personalityTagIds
     });
     setIsCompanionPresetPickerOpen(false);
+  }
+
+  function handleDeleteCompanionPreset(presetId: string): void {
+    setSavedCompanionPresets(deleteAiCompanionPreset(presetId));
   }
 
   function formatPresetTimestamp(value: string): string {
@@ -1293,14 +1298,23 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                           </div>
                         </div>
 
-                        <button
-                          className="ghost-button ghost-button-small"
-                          disabled={companionLimitReached}
-                          onClick={() => handleLoadCompanionPreset(preset)}
-                          type="button"
-                        >
-                          {setupText.companions.usePresetButton}
-                        </button>
+                        <div className="companion-preset-actions">
+                          <button
+                            className="ghost-button ghost-button-small"
+                            disabled={companionLimitReached}
+                            onClick={() => handleLoadCompanionPreset(preset)}
+                            type="button"
+                          >
+                            {setupText.companions.usePresetButton}
+                          </button>
+                          <button
+                            className="ghost-button ghost-button-small ghost-button-danger"
+                            onClick={() => handleDeleteCompanionPreset(preset.id)}
+                            type="button"
+                          >
+                            {text.common.delete}
+                          </button>
+                        </div>
                       </div>
 
                       {selectedTags.length ? (
