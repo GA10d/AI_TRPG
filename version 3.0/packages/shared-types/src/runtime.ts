@@ -136,8 +136,15 @@ export type SessionAiCompanion = {
   appearanceTags: AiAppearanceTag[];
 };
 
+export type SessionAiPrimaryPlayerConfig = {
+  displayName?: string | null;
+  personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
+};
+
 export type SessionPartySetup = {
   primaryPlayerMode: "human" | "ai";
+  primaryPlayerConfig?: SessionAiPrimaryPlayerConfig | null;
   aiCompanions: SessionAiCompanion[];
 };
 

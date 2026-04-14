@@ -227,6 +227,14 @@
       localSavesCleared: "本地存档列表已清空。",
       recentSaveDeleted: "最近存档已删除。",
       saveDeleted: "该存档已删除。",
+      exportingSaveAsText: "正在导出存档文本...",
+      exportedSaveAsText: "存档文本已导出。",
+      exportingComicHtml: "正在导出漫画网页...",
+      exportedComicHtml: "漫画网页已导出。",
+      exportingCombinedHtml: "正在导出文本 + 漫画网页...",
+      exportedCombinedHtml: "文本 + 漫画网页已导出。",
+      noWorldlineComicForSave: "这个存档还没有关联世界线漫画。",
+      noComicPagesToExport: "这条世界线还没有可导出的漫画页。",
       closeTabManually: "如果页面仍保持打开，请手动关闭浏览器标签页。",
       waitOpeningPreviewBeforeAssist:
         "请先等待开场预览生成完成，再使用角色概念 AI 辅助。",
@@ -348,8 +356,22 @@
   },
   recordsScreen: {
     title: "记录",
-    description: "这里后续会放正式的战绩、结局记录和统计内容。",
-    empty: "暂时还没有可展示的记录。"
+    description: "这里会列出本地存档，并支持导出文本、漫画网页，以及文本和漫画对照网页。",
+    empty: "当前还没有本地存档可供导出。",
+    clearAll: "清空全部存档",
+    loadSave: "读取存档",
+    loadingSave: "读取中...",
+    exportText: "导出文本",
+    exportingText: "导出文本中...",
+    exportComicHtml: "导出漫画网页",
+    exportingComicHtml: "导出漫画网页中...",
+    exportCombinedHtml: "导出文本+漫画网页",
+    exportingCombinedHtml: "导出文本+漫画网页中...",
+    savedAt: (value: string) => `存档时间：${value}`,
+    updatedAt: (value: string) => `更新时间：${value}`,
+    locale: (value: string) => `语言：${value}`,
+    worldline: (value: string) => `世界线：${value}`,
+    noComicWorldline: "这个存档还没有关联世界线漫画，所以暂时只能导出文本。"
   },
   gameScreen: {
     emptyTitle: "游戏中",
@@ -825,6 +847,37 @@
       appearanceLabel: "外貌",
       outfitLabel: "穿着",
       warningsTitle: "内容警告"
+    },
+    protagonist: {
+      eyebrow: "AI主角",
+      title: "AI 主角设置",
+      description:
+        "故事模式下，可以单独为 AI 主角配置性格和形象，并读取与 AI 队友共用的本地配置。",
+      nameLabel: "主角名字",
+      namePlaceholder: "例如：周倚 / 林深 / 顾言",
+      nameSummary: (value: string) => `当前主角名：${value}`,
+      selectionSummary: (personalityCount: number, appearanceCount: number) =>
+        `已选性格 ${personalityCount} 个 / 形象 ${appearanceCount} 个`,
+      personalitySelectionLabel: (value: number) => `性格标签：${value} 个`,
+      appearanceSelectionLabel: (value: number) => `形象标签：${value} 个`,
+      selectedPreviewEmpty: "还没有选择人格标签。",
+      appearancePreviewEmpty: "还没有选择形象标签。",
+      savedPresetCount: (value: number) => `可读取本地配置：${value} 个`,
+      configurePersonalityButton: "配置主角性格",
+      configureAppearanceButton: "配置主角形象",
+      configurePersonalityDescription: "为故事模式中的 AI 主角挑选或调整人格标签。",
+      configureAppearanceDescription:
+        "为故事模式中的 AI 主角挑选外貌和穿着参考。",
+      loadPresetButton: "读取本地配置",
+      loadPresetTitle: "读取 AI 主角配置",
+      loadPresetDescription:
+        "这里会读取与 AI 队友共用的本地配置；应用后会同时覆盖主角的性格和形象标签。",
+      usePresetButton: "应用到主角",
+      presetNameFallback: "未命名 AI 配置",
+      tagHint: "点击下方人格标签即可多选；悬停时可以查看描述。",
+      appearanceTagHint: "点击下方形象标签即可多选；会按外貌和穿着分组显示。",
+      noTags: "人格标签尚未加载完成。",
+      noAppearanceTags: "形象标签尚未加载完成。"
     },
     layout: {
       collapsedConfigLabel: "配置",

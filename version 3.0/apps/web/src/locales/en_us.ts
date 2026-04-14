@@ -236,6 +236,14 @@ export const enUs = {
       localSavesCleared: "Local saves cleared.",
       recentSaveDeleted: "Recent save deleted.",
       saveDeleted: "Save deleted.",
+      exportingSaveAsText: "Exporting save text...",
+      exportedSaveAsText: "Save text exported.",
+      exportingComicHtml: "Exporting comic HTML...",
+      exportedComicHtml: "Comic HTML exported.",
+      exportingCombinedHtml: "Exporting story + comic HTML...",
+      exportedCombinedHtml: "Story + comic HTML exported.",
+      noWorldlineComicForSave: "This save is not linked to a worldline comic yet.",
+      noComicPagesToExport: "There are no comic pages available to export yet.",
       closeTabManually: "If the page is still open, close the browser tab manually.",
       waitOpeningPreviewBeforeAssist:
         "Wait until the opening preview finishes before using AI character assistance.",
@@ -359,8 +367,22 @@ export const enUs = {
   recordsScreen: {
     title: "Records",
     description:
-      "Formal reports, ending history, and long-term statistics will live here in a later pass.",
-    empty: "No record view is available yet."
+      "Browse local saves here, then export plain text, comic HTML, or a combined story-and-comic HTML file.",
+    empty: "There are no local saves available for export yet.",
+    clearAll: "Clear all saves",
+    loadSave: "Load save",
+    loadingSave: "Loading...",
+    exportText: "Export text",
+    exportingText: "Exporting text...",
+    exportComicHtml: "Export comic HTML",
+    exportingComicHtml: "Exporting comic HTML...",
+    exportCombinedHtml: "Export story + comic HTML",
+    exportingCombinedHtml: "Exporting story + comic HTML...",
+    savedAt: (value: string) => `Saved at: ${value}`,
+    updatedAt: (value: string) => `Updated at: ${value}`,
+    locale: (value: string) => `Locale: ${value}`,
+    worldline: (value: string) => `Worldline: ${value}`,
+    noComicWorldline: "This save has no linked worldline comic yet, so only text export is available."
   },
   gameScreen: {
     emptyTitle: "In Game",
@@ -870,6 +892,39 @@ export const enUs = {
       appearanceLabel: "Appearance",
       outfitLabel: "Outfit",
       warningsTitle: "Content Warnings"
+    },
+    protagonist: {
+      eyebrow: "AI Protagonist",
+      title: "AI Protagonist Settings",
+      description:
+        "In story mode, you can configure the AI protagonist's personality and appearance separately, and load the same local presets used by AI teammates.",
+      nameLabel: "Protagonist Name",
+      namePlaceholder: "Example: Mina / Rowan / Yan",
+      nameSummary: (value: string) => `Current protagonist name: ${value}`,
+      selectionSummary: (personalityCount: number, appearanceCount: number) =>
+        `Personality ${personalityCount} / Appearance ${appearanceCount}`,
+      personalitySelectionLabel: (value: number) => `Personality tags: ${value}`,
+      appearanceSelectionLabel: (value: number) => `Appearance tags: ${value}`,
+      selectedPreviewEmpty: "No personality tags selected yet.",
+      appearancePreviewEmpty: "No appearance tags selected yet.",
+      savedPresetCount: (value: number) => `Available local presets: ${value}`,
+      configurePersonalityButton: "Configure Personality",
+      configureAppearanceButton: "Configure Appearance",
+      configurePersonalityDescription:
+        "Choose or adjust the personality tags used by the AI protagonist in story mode.",
+      configureAppearanceDescription:
+        "Choose visual appearance and outfit cues used by the AI protagonist in story mode.",
+      loadPresetButton: "Load Local Preset",
+      loadPresetTitle: "Load AI Protagonist Preset",
+      loadPresetDescription:
+        "These presets are shared with AI teammates. Applying one will replace both the protagonist's personality and appearance tags.",
+      usePresetButton: "Apply to Protagonist",
+      presetNameFallback: "Unnamed AI Preset",
+      tagHint: "Click the personality tags below to multi-select them. Hover to read the description.",
+      appearanceTagHint:
+        "Click the appearance tags below to multi-select them. They are grouped into looks and outfits.",
+      noTags: "Personality tags have not finished loading yet.",
+      noAppearanceTags: "Appearance tags have not finished loading yet."
     },
     layout: {
       collapsedConfigLabel: "CONFIG",

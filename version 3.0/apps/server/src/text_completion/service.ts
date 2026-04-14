@@ -11,6 +11,7 @@ import type {
   CharacterConceptAssistResponse,
   RuntimeModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
+import { resolveAiPersonalityTagsByIds } from "../ai_players/personality.ts";
 import { getModelGateway } from "../model_gateway/index.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,8 @@ export type GenerateCharacterConceptInput = {
   runtimeModelConfig?: RuntimeModelConfigInput;
   openingText: string;
   currentText?: string;
+  primaryPlayerDisplayName?: string;
+  primaryPlayerPersonalityTagIds?: string[];
 };
 
 async function loadPrompt(mode: CharacterConceptAssistMode): Promise<string> {
@@ -93,6 +96,37 @@ function buildUserPrompt(input: GenerateCharacterConceptInput): string {
   ].join("\n");
 }
 
+async function buildPrimaryPlayerReferenceBlock(
+  input: GenerateCharacterConceptInput
+): Promise<string | null> {
+  const displayName = input.primaryPlayerDisplayName?.trim() ?? "";
+  const personalityTags = await resolveAiPersonalityTagsByIds(
+    input.primaryPlayerPersonalityTagIds ?? []
+  );
+  if (!displayName && personalityTags.length === 0) {
+    return null;
+  }
+
+  const lines = ["AI protagonist setup reference:"];
+  if (displayName) {
+    lines.push(`- Name: ${displayName}`);
+  }
+
+  if (personalityTags.length > 0) {
+    lines.push(
+      `- Personality cues: ${personalityTags
+        .map((tag) => `${tag.keyword} (${tag.description})`)
+        .join("; ")}`
+    );
+  }
+
+  lines.push(
+    "- Treat these cues as guidance while drafting the protagonist's identity, voice, and motivation.",
+    "- Keep the result in first person, natural, and directly editable."
+  );
+  return lines.join("\n");
+}
+
 export async function generateCharacterConcept(
   input: GenerateCharacterConceptInput
 ): Promise<CharacterConceptAssistResponse> {
@@ -107,13 +141,17 @@ export async function generateCharacterConcept(
 
   const modelGateway = getModelGateway(input.modelAccessMode);
   const basePrompt = await loadPrompt(input.mode);
+  const primaryPlayerReferenceBlock = await buildPrimaryPlayerReferenceBlock(input);
+  const userPrompt = buildUserPrompt(input);
   const result = await modelGateway.generatePromptedText({
     accessMode: input.modelAccessMode,
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig,
     locale: input.locale,
     systemPrompt: buildSystemPrompt(basePrompt, input.locale),
-    userPrompt: buildUserPrompt(input)
+    userPrompt: primaryPlayerReferenceBlock
+      ? `${primaryPlayerReferenceBlock}\n\n${userPrompt}`
+      : userPrompt
   });
 
   return {

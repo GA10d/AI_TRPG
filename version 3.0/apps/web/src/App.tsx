@@ -24,6 +24,7 @@ import type {
 import {
   assistCharacterConcept,
   createSave,
+  fetchSaveBundle,
   fetchLocalSaveSettings,
   fetchSession,
   generateOpeningPreview,
@@ -42,6 +43,11 @@ import {
   updateLocalSaveSettings,
   updateStoryControlMode
 } from "./lib/trpgApiClient.ts";
+import {
+  exportComicHtml,
+  exportCombinedStoryComicHtml,
+  exportSaveBundleText
+} from "./lib/saveExportPdf.ts";
 import { useBootstrapState } from "./hooks/useBootstrapState.ts";
 import { usePlaythroughGraph } from "./hooks/usePlaythroughGraph.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
@@ -299,6 +305,22 @@ function buildEmptyAiCompanion(): CreateSessionAiCompanionInput {
   };
 }
 
+function normalizeTagIdList(tagIds: string[] | undefined): string[] {
+  return Array.from(
+    new Set((tagIds ?? []).map((tagId) => tagId.trim()).filter((tagId) => tagId.length > 0))
+  );
+}
+
+function normalizeAiCompanionInput(
+  companion: CreateSessionAiCompanionInput
+): CreateSessionAiCompanionInput {
+  return {
+    displayName: companion.displayName.trim(),
+    personalityTagIds: normalizeTagIdList(companion.personalityTagIds),
+    appearanceTagIds: normalizeTagIdList(companion.appearanceTagIds)
+  };
+}
+
 function sessionNeedsPreparedRound(snapshot: SessionSnapshot | null): boolean {
   if (!snapshot) {
     return false;
@@ -366,6 +388,12 @@ type PendingComicGenerationTask = {
   startedAt: number;
 };
 
+type RecordExportKind = "text" | "comic_html" | "combined_html";
+
+function buildComicGenerationTaskKey(worldlineId: string, pageNumber: number): string {
+  return `${worldlineId}:${pageNumber}`;
+}
+
 function inferMessageChannel(message: Message): Message["channel"] {
   if (message.channel) {
     return message.channel;
@@ -412,8 +440,9 @@ function buildWorldlineComicMemorySummary(snapshot: SessionSnapshot): string | u
   return summary || undefined;
 }
 
-function buildCompanionAppearanceSummary(companion: SessionAiCompanion): string | undefined {
-  const appearanceTags = companion.appearanceTags ?? [];
+function buildAppearanceSummaryFromTags(
+  appearanceTags: Array<{ category: string; description: string }>
+): string | undefined {
   const appearanceDetails = appearanceTags
     .filter((tag) => tag.category === "appearance")
     .map((tag) => tag.description.trim())
@@ -435,24 +464,47 @@ function buildCompanionAppearanceSummary(companion: SessionAiCompanion): string 
   return sections.length > 0 ? sections.join("; ") : undefined;
 }
 
+function buildCompanionAppearanceSummary(companion: SessionAiCompanion): string | undefined {
+  return buildAppearanceSummaryFromTags(companion.appearanceTags ?? []);
+}
+
 function buildWorldlineComicCharacterReferences(
   snapshot: SessionSnapshot
 ): ComicCharacterReferenceInput[] | undefined {
-  const references = (snapshot.session.partySetup?.aiCompanions ?? [])
-    .map((companion) => {
-      const appearance = buildCompanionAppearanceSummary(companion);
-      if (!appearance) {
-        return null;
-      }
+  const references: ComicCharacterReferenceInput[] = [];
+  const primaryPlayerConfig = snapshot.session.partySetup?.primaryPlayerConfig;
+  const primaryPlayerAppearance = buildAppearanceSummaryFromTags(
+    primaryPlayerConfig?.appearanceTags ?? []
+  );
 
-      const name = companion.displayName.trim();
-      return {
-        name: name || undefined,
-        appearance
-      };
-    })
-    .filter((item): item is ComicCharacterReferenceInput => item !== null)
-    .slice(0, 3);
+  if (snapshot.session.partySetup?.primaryPlayerMode === "ai" && primaryPlayerAppearance) {
+    const primaryPlayerName =
+      snapshot.session.participants.find(
+        (participant) => participant.id === snapshot.session.playerParticipantId
+      )?.displayName ?? "";
+
+    references.push({
+      name: primaryPlayerName.trim() || undefined,
+      appearance: primaryPlayerAppearance
+    });
+  }
+
+  references.push(
+    ...(snapshot.session.partySetup?.aiCompanions ?? [])
+      .map((companion) => {
+        const appearance = buildCompanionAppearanceSummary(companion);
+        if (!appearance) {
+          return null;
+        }
+
+        const name = companion.displayName.trim();
+        return {
+          name: name || undefined,
+          appearance
+        };
+      })
+      .filter((item): item is ComicCharacterReferenceInput => item !== null)
+  );
 
   return references.length > 0 ? references : undefined;
 }
@@ -580,6 +632,10 @@ export function App() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResumingBranch, setIsResumingBranch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeRecordExport, setActiveRecordExport] = useState<{
+    saveId: string;
+    kind: RecordExportKind;
+  } | null>(null);
   const [worldlineComicProject, setWorldlineComicProject] = useState<PersistedComicProject | null>(
     null
   );
@@ -589,6 +645,8 @@ export function App() {
   >([]);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
+  const [storyModePrimaryPlayerConfig, setStoryModePrimaryPlayerConfig] =
+    useState<CreateSessionAiCompanionInput>(buildEmptyAiCompanion());
   const [aiCompanions, setAiCompanions] = useState<CreateSessionAiCompanionInput[]>([]);
   const [advancedTextModelEnabled, setAdvancedTextModelEnabled] = useState(false);
   const [advancedTextModelConfig, setAdvancedTextModelConfig] =
@@ -611,6 +669,7 @@ export function App() {
   const stagedSessionBootTokenRef = useRef(0);
   const autoPreparedRoundKeyRef = useRef<string | null>(null);
   const autoCommittedRoundKeyRef = useRef<string | null>(null);
+  const pendingComicGenerationKeysRef = useRef<Set<string>>(new Set());
   const comicGenerationTaskCount = pendingComicGenerationTasks.length;
   const isComicGenerating = comicGenerationTaskCount > 0;
 
@@ -691,6 +750,9 @@ export function App() {
   const normalizedAdvancedTextModelConfig = advancedTextModelEnabled
     ? normalizeAdvancedTextModelConfigInput(advancedTextModelConfig)
     : null;
+  const normalizedStoryModePrimaryPlayerConfig = normalizeAiCompanionInput(
+    storyModePrimaryPlayerConfig
+  );
   const normalizedGlobalRuntimeModelConfig =
     normalizeEditableRuntimeModelConfig(runtimeModelConfig);
   const effectiveNarratorSelection = {
@@ -976,6 +1038,7 @@ export function App() {
   ]);
 
   useEffect(() => {
+    pendingComicGenerationKeysRef.current.clear();
     setPendingComicGenerationTasks([]);
   }, [activeGraphBundle?.graph.id, view]);
 
@@ -1085,6 +1148,18 @@ export function App() {
           modelAccessMode,
           modelProfileId: effectiveNarratorSelection.modelProfileId,
           runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
+          primaryPlayerDisplayName:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.displayName || undefined
+              : undefined,
+          primaryPlayerPersonalityTagIds:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.personalityTagIds
+              : undefined,
+          primaryPlayerAppearanceTagIds:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.appearanceTagIds
+              : undefined,
           debugEnabled,
           promptDebugEnabled: false,
           logViewMode,
@@ -1150,6 +1225,9 @@ export function App() {
     effectiveNarratorSelection.runtimeModelConfig.apiKey,
     effectiveNarratorSelection.runtimeModelConfig.baseUrl,
     effectiveNarratorSelection.runtimeModelConfig.model,
+    normalizedStoryModePrimaryPlayerConfig.displayName,
+    normalizedStoryModePrimaryPlayerConfig.personalityTagIds.join("|"),
+    normalizedStoryModePrimaryPlayerConfig.appearanceTagIds.join("|"),
     storyDirectoryName,
     view
   ]);
@@ -1408,7 +1486,13 @@ export function App() {
     return loadWorldlineComicProject(normalizedWorldlineId);
   }
 
-  function beginComicGenerationTask(pageNumber: number): void {
+  function beginComicGenerationTask(worldlineId: string, pageNumber: number): boolean {
+    const taskKey = buildComicGenerationTaskKey(worldlineId, pageNumber);
+    if (pendingComicGenerationKeysRef.current.has(taskKey)) {
+      return false;
+    }
+
+    pendingComicGenerationKeysRef.current.add(taskKey);
     setPendingComicGenerationTasks((current) => [
       ...current,
       {
@@ -1416,9 +1500,13 @@ export function App() {
         startedAt: Date.now()
       }
     ]);
+    return true;
   }
 
-  function finishComicGenerationTask(pageNumber: number): void {
+  function finishComicGenerationTask(worldlineId: string, pageNumber: number): void {
+    pendingComicGenerationKeysRef.current.delete(
+      buildComicGenerationTaskKey(worldlineId, pageNumber)
+    );
     setPendingComicGenerationTasks((current) => {
       const next = [...current];
       const index = next.findIndex((task) => task.pageNumber === pageNumber);
@@ -1441,7 +1529,17 @@ export function App() {
     }
 
     const pageNumber = plan.pageIndex + 1;
-    beginComicGenerationTask(pageNumber);
+    if (
+      worldlineComicProject?.comicId === plan.worldlineId &&
+      worldlineComicProject.pages.some((page) => page.pageNumber === pageNumber)
+    ) {
+      return;
+    }
+
+    if (!beginComicGenerationTask(plan.worldlineId, pageNumber)) {
+      return;
+    }
+
     appendGameActivity(uiText.gameScreen.comicGenerationStart(pageNumber));
 
     try {
@@ -1471,7 +1569,7 @@ export function App() {
         "error"
       );
     } finally {
-      finishComicGenerationTask(pageNumber);
+      finishComicGenerationTask(plan.worldlineId, pageNumber);
     }
   }
 
@@ -1579,22 +1677,36 @@ export function App() {
   }
 
   function handleAddAiCompanionFromPreset(companion: CreateSessionAiCompanionInput): void {
+    const normalizedCompanion = normalizeAiCompanionInput(companion);
+
     setAiCompanions((current) =>
       current.length >= 3
         ? current
-        : [
-            ...current,
-            {
-              displayName: companion.displayName,
-              personalityTagIds: Array.from(
-                new Set(companion.personalityTagIds.filter((tagId) => tagId.trim().length > 0))
-              ),
-              appearanceTagIds: Array.from(
-                new Set((companion.appearanceTagIds ?? []).filter((tagId) => tagId.trim().length > 0))
-              )
-            }
-          ]
+        : [...current, normalizedCompanion]
     );
+  }
+
+  function handleApplyStoryModePrimaryPlayerPreset(
+    companion: CreateSessionAiCompanionInput
+  ): void {
+    const normalizedCompanion = normalizeAiCompanionInput(companion);
+
+    setStoryModePrimaryPlayerConfig((current) => ({
+      ...current,
+      displayName:
+        current.displayName.trim().length > 0
+          ? current.displayName
+          : normalizedCompanion.displayName,
+      personalityTagIds: normalizedCompanion.personalityTagIds,
+      appearanceTagIds: normalizedCompanion.appearanceTagIds
+    }));
+  }
+
+  function handleUpdateStoryModePrimaryPlayerName(displayName: string): void {
+    setStoryModePrimaryPlayerConfig((current) => ({
+      ...current,
+      displayName
+    }));
   }
 
   function handleRemoveAiCompanion(index: number): void {
@@ -1655,6 +1767,35 @@ export function App() {
         };
       })
     );
+  }
+
+  function handleToggleStoryModePrimaryPlayerPersonalityTag(
+    personalityTagId: string
+  ): void {
+    setStoryModePrimaryPlayerConfig((current) => {
+      const hasTag = current.personalityTagIds.includes(personalityTagId);
+      return {
+        ...current,
+        personalityTagIds: hasTag
+          ? current.personalityTagIds.filter((tagId) => tagId !== personalityTagId)
+          : [...current.personalityTagIds, personalityTagId]
+      };
+    });
+  }
+
+  function handleToggleStoryModePrimaryPlayerAppearanceTag(
+    appearanceTagId: string
+  ): void {
+    setStoryModePrimaryPlayerConfig((current) => {
+      const currentAppearanceTagIds = current.appearanceTagIds ?? [];
+      const hasTag = currentAppearanceTagIds.includes(appearanceTagId);
+      return {
+        ...current,
+        appearanceTagIds: hasTag
+          ? currentAppearanceTagIds.filter((tagId) => tagId !== appearanceTagId)
+          : [...currentAppearanceTagIds, appearanceTagId]
+      };
+    });
   }
 
   function commitSnapshot(nextSnapshot: SessionSnapshot): void {
@@ -2233,11 +2374,7 @@ export function App() {
       selectedStory.intro?.trim() ||
       uiText.gameBootstrapScreen.defaultLoadingHint(selectedStory.title);
     const normalizedAiCompanions = aiCompanions
-      .map((companion) => ({
-        displayName: companion.displayName.trim(),
-        personalityTagIds: companion.personalityTagIds,
-        appearanceTagIds: companion.appearanceTagIds ?? []
-      }))
+      .map(normalizeAiCompanionInput)
       .filter(
         (companion) =>
           companion.displayName.length > 0 ||
@@ -2289,6 +2426,18 @@ export function App() {
           modelProfileId,
           runtimeModelConfig,
           advancedTextModelConfig: normalizedAdvancedTextModelConfig ?? undefined,
+          primaryPlayerDisplayName:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.displayName || undefined
+              : undefined,
+          primaryPlayerPersonalityTagIds:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.personalityTagIds
+              : undefined,
+          primaryPlayerAppearanceTagIds:
+            playMode === "story_mode"
+              ? normalizedStoryModePrimaryPlayerConfig.appearanceTagIds
+              : undefined,
           aiCompanions: normalizedAiCompanions,
           debugEnabled,
           promptDebugEnabled: false,
@@ -2946,6 +3095,95 @@ export function App() {
     }
   }
 
+  async function withRecordExport(
+    record: SavedGameRecord,
+    kind: RecordExportKind,
+    work: (saveBundle: SaveBundle, comicProject: PersistedComicProject | null) => Promise<void>
+  ): Promise<void> {
+    setActiveRecordExport({
+      saveId: record.saveId,
+      kind
+    });
+
+    const pendingStatus =
+      kind === "text"
+        ? uiText.app.status.exportingSaveAsText
+        : kind === "comic_html"
+          ? uiText.app.status.exportingComicHtml
+          : uiText.app.status.exportingCombinedHtml;
+    const successStatus =
+      kind === "text"
+        ? uiText.app.status.exportedSaveAsText
+        : kind === "comic_html"
+          ? uiText.app.status.exportedComicHtml
+          : uiText.app.status.exportedCombinedHtml;
+
+    setStatus({
+      message: pendingStatus,
+      tone: "neutral"
+    });
+
+    try {
+      const saveBundle = await fetchSaveBundle(record.saveId);
+      const worldlineId = record.worldlineId?.trim() ?? "";
+      const comicProject = worldlineId ? await loadWorldlineComicProject(worldlineId) : null;
+      await work(saveBundle, comicProject);
+      setStatus({
+        message: successStatus,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setActiveRecordExport(null);
+    }
+  }
+
+  async function handleExportSaveText(record: SavedGameRecord): Promise<void> {
+    await withRecordExport(record, "text", async (saveBundle) => {
+      exportSaveBundleText(record, saveBundle);
+    });
+  }
+
+  async function handleExportComicHtml(record: SavedGameRecord): Promise<void> {
+    if (!record.worldlineId?.trim()) {
+      setStatus({
+        message: uiText.app.status.noWorldlineComicForSave,
+        tone: "error"
+      });
+      return;
+    }
+
+    await withRecordExport(record, "comic_html", async (saveBundle, comicProject) => {
+      if (!comicProject || comicProject.pages.length === 0) {
+        throw new Error(uiText.app.status.noComicPagesToExport);
+      }
+
+      await exportComicHtml(record, saveBundle, comicProject);
+    });
+  }
+
+  async function handleExportCombinedHtml(record: SavedGameRecord): Promise<void> {
+    if (!record.worldlineId?.trim()) {
+      setStatus({
+        message: uiText.app.status.noWorldlineComicForSave,
+        tone: "error"
+      });
+      return;
+    }
+
+    await withRecordExport(record, "combined_html", async (saveBundle, comicProject) => {
+      if (!comicProject || comicProject.pages.length === 0) {
+        throw new Error(uiText.app.status.noComicPagesToExport);
+      }
+
+      await exportCombinedStoryComicHtml(record, saveBundle, comicProject);
+    });
+  }
+
   function handleExit(): void {
     window.close();
     setStatus({
@@ -2956,6 +3194,7 @@ export function App() {
 
   function handleOpenStorySelect(): void {
     setCharacterConcept("");
+    setStoryModePrimaryPlayerConfig(buildEmptyAiCompanion());
     setAiCompanions([]);
     setActiveSessionRuntimeConfig(null);
     setView("story_select");
@@ -2999,6 +3238,18 @@ export function App() {
         modelAccessMode,
         modelProfileId: effectiveNarratorSelection.modelProfileId,
         runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
+        primaryPlayerDisplayName:
+          playMode === "story_mode"
+            ? normalizedStoryModePrimaryPlayerConfig.displayName || undefined
+            : undefined,
+        primaryPlayerPersonalityTagIds:
+          playMode === "story_mode"
+            ? normalizedStoryModePrimaryPlayerConfig.personalityTagIds
+            : undefined,
+        primaryPlayerAppearanceTagIds:
+          playMode === "story_mode"
+            ? normalizedStoryModePrimaryPlayerConfig.appearanceTagIds
+            : undefined,
         debugEnabled,
         promptDebugEnabled: false,
         logViewMode,
@@ -3117,6 +3368,21 @@ export function App() {
           onOpeningPreviewDeliveryModeChange={setOpeningPreviewDeliveryMode}
           onMarkdownFontSizeChange={setMarkdownFontSize}
           onCharacterConceptChange={setCharacterConcept}
+          primaryPlayerDisplayName={storyModePrimaryPlayerConfig.displayName}
+          primaryPlayerPersonalityTagIds={
+            normalizedStoryModePrimaryPlayerConfig.personalityTagIds
+          }
+          primaryPlayerAppearanceTagIds={
+            normalizedStoryModePrimaryPlayerConfig.appearanceTagIds
+          }
+          onUpdatePrimaryPlayerName={handleUpdateStoryModePrimaryPlayerName}
+          onApplyPrimaryPlayerFromPreset={handleApplyStoryModePrimaryPlayerPreset}
+          onTogglePrimaryPlayerPersonalityTag={
+            handleToggleStoryModePrimaryPlayerPersonalityTag
+          }
+          onTogglePrimaryPlayerAppearanceTag={
+            handleToggleStoryModePrimaryPlayerAppearanceTag
+          }
           onAddAiCompanion={handleAddAiCompanion}
           onAddAiCompanionFromPreset={handleAddAiCompanionFromPreset}
           onRemoveAiCompanion={handleRemoveAiCompanion}
@@ -3145,9 +3411,13 @@ export function App() {
         <RecordsPage
           savedGames={savedGames}
           isRestoring={isRestoring}
+          activeExport={activeRecordExport}
           onBack={() => setView("menu")}
           onClearSavedGames={handleClearSavedGames}
           onDeleteSavedGame={handleDeleteSavedGame}
+          onExportComicHtml={handleExportComicHtml}
+          onExportCombinedHtml={handleExportCombinedHtml}
+          onExportSaveText={handleExportSaveText}
           onLoadSavedGame={handleLoadSavedGame}
         />
       );

@@ -1454,6 +1454,26 @@ img {
   align-content: start;
 }
 
+.story-mode-protagonist-card {
+  grid-column: 1 / -1;
+}
+
+.story-mode-protagonist-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.story-mode-protagonist-actions .ghost-button {
+  width: 100%;
+}
+
+.companion-personality-modal-header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .companion-tag-sections {
   display: grid;
   gap: 12px;
@@ -1839,6 +1859,52 @@ textarea {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
   border: 1px solid rgba(99, 63, 36, 0.1);
+}
+
+.records-toolbar {
+  margin-bottom: 16px;
+}
+
+.records-list {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.records-card {
+  display: grid;
+  gap: 14px;
+}
+
+.records-meta-grid {
+  display: grid;
+  gap: 8px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.record-tag {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(122, 50, 32, 0.1);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.record-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.record-actions .primary-button,
+.record-actions .ghost-button {
+  min-height: 40px;
+  padding: 10px 14px;
+}
+
+.records-card-hint {
+  margin-top: -4px;
 }
 
 .info-banner {
@@ -3610,6 +3676,10 @@ pre {
   .game-drawer-panel {
     width: 100vw;
     padding: 18px;
+  }
+
+  .records-meta-grid {
+    grid-template-columns: 1fr;
   }
 
   .game-comic-grid {

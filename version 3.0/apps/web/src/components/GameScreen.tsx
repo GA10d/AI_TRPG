@@ -413,8 +413,7 @@ export function GameScreen(props: GameScreenProps) {
   });
   const supportsReasoningPanel =
     snapshot?.session.settings.modelProfileId === "deepseek-reasoner";
-  const storyControlLocked =
-    actionLocked || isSubmittingTurn || isUpdatingStoryControl;
+  const storyControlLocked = isUpdatingStoryControl;
   const privateChatLocked =
     actionLocked ||
     isSessionEnded ||

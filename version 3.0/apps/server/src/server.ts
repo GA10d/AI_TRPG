@@ -117,7 +117,8 @@ const mimeTypes: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
-  ".webp": "image/webp"
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml"
 };
 
 type OpeningPreviewStreamEvent =
@@ -470,7 +471,9 @@ async function handleApiRequest(
       modelProfileId: payload.modelProfileId,
       runtimeModelConfig: payload.runtimeModelConfig,
       openingText: payload.openingText,
-      currentText: payload.currentText
+      currentText: payload.currentText,
+      primaryPlayerDisplayName: payload.primaryPlayerDisplayName,
+      primaryPlayerPersonalityTagIds: payload.primaryPlayerPersonalityTagIds
     });
     sendJson(response, 200, result);
     return true;
@@ -607,7 +610,22 @@ async function handleApiRequest(
 
   if (url.pathname === "/api/comics/generate-page" && request.method === "POST") {
     const payload = await readJsonBody<ComicPageGenerationRequest>(request);
-    const result = await generateComicPage(payload);
+    const pageNumber =
+      typeof payload.pageNumber === "number" && Number.isFinite(payload.pageNumber)
+        ? Math.max(1, Math.floor(payload.pageNumber))
+        : 1;
+    const result = await generateComicPage({
+      ...payload,
+      __logContext: {
+        comicRoot: defaultComicRoot,
+        source: "api.comics.generate_page",
+        operationId: `api_generate_page_${Date.now().toString(36)}_${Math.random()
+          .toString(36)
+          .slice(2, 8)}`,
+        pageNumber,
+        pageIndex: pageNumber - 1
+      }
+    });
     sendJson(response, 200, result);
     return true;
   }
@@ -669,6 +687,18 @@ async function handleApiRequest(
     sendJson(response, 200, {
       ok: true
     });
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/saves/") &&
+    url.pathname.endsWith("/bundle") &&
+    request.method === "GET"
+  ) {
+    const saveId = decodeURIComponent(url.pathname.replace("/api/saves/", "").replace("/bundle", ""));
+    const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
+    const saveBundle = await loadSaveBundleFromDisk(localSettings.effectiveSaveDirectory, saveId);
+    sendJson(response, 200, saveBundle);
     return true;
   }
 

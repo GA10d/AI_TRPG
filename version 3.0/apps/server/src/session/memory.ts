@@ -1124,7 +1124,14 @@ function formatPreparedInputs(preparedInputs: RoundDraft[]): string[] {
     ];
   }
 
-  return preparedInputs.map((draft) => `${draft.displayName}: ${draft.content}`);
+  return preparedInputs.map((draft) => {
+    const roleLabel = draft.isPrimary
+      ? draft.source === "ai"
+        ? "AI Protagonist"
+        : "Primary Player"
+      : "AI Teammate";
+    return `${roleLabel} - ${draft.displayName}: ${draft.content}`;
+  });
 }
 
 function renderContextPack(sections: SessionContextPackSection[]): string {

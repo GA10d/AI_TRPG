@@ -1,4 +1,5 @@
 import type {
+  AiAppearanceTag,
   AiGenerationMetadata,
   AiPersonalityTag,
   LocaleCode,
@@ -98,6 +99,38 @@ function buildParticipantRoleLabel(participant: Participant, isPrimary: boolean)
   return participant.role === "ai_player" ? "AI teammate" : participant.role;
 }
 
+function buildRoundDraftGuidance(input: {
+  isPrimary: boolean;
+  preparedInputs: RoundDraft[];
+}): string[] {
+  if (input.isPrimary) {
+    return [
+      "You are setting the party's first concrete move for this round.",
+      "Stay proactive, but leave room for teammates to respond with their own distinct actions."
+    ];
+  }
+
+  const hasPrimaryDraft = input.preparedInputs.some((draft) => draft.isPrimary);
+  const guidance = [
+    "You are reacting as a teammate, not replacing the primary protagonist.",
+    "Do not repeat, restate, or lightly paraphrase another party member's prepared action.",
+    "Add a distinct, complementary action, observation, concern, or question from your own perspective.",
+    "Do not claim another character's family history, memories, possessions, or private motives as your own unless the story explicitly established that they are shared."
+  ];
+
+  if (hasPrimaryDraft) {
+    guidance.push(
+      "If the prepared actions already include something from the primary protagonist, treat that as another character's move and build on it instead of mirroring it."
+    );
+  }
+
+  guidance.push(
+    "If the public narration contains second-person wording tied to another character's personal hook, treat it as scene context rather than your own backstory."
+  );
+
+  return guidance;
+}
+
 function buildAiRoundUserPrompt(input: {
   storyTitle: string;
   locale: LocaleCode;
@@ -134,6 +167,12 @@ function buildAiRoundUserPrompt(input: {
     "Already prepared party actions for this round:",
     buildPreparedInputSummary(input.preparedInputs),
     "",
+    "Coordination guidance:",
+    ...buildRoundDraftGuidance({
+      isPrimary: input.isPrimary,
+      preparedInputs: input.preparedInputs
+    }),
+    "",
     "Task:",
     "Write exactly one in-character public turn reply for this character.",
     "Keep it grounded, actionable, and easy for the narrator to continue from.",
@@ -169,6 +208,7 @@ function buildAiPrivateChatUserPrompt(input: {
     "Task:",
     "Reply as this character in a private side conversation.",
     "Stay in character and respond directly to the latest message.",
+    "Do not adopt another character's backstory, family history, or personal hooks as your own.",
     "Do not narrate outcomes, do not declare public actions, and do not speak for the user.",
     "A concise reply or two short paragraphs is enough."
   ].join("\n");
@@ -184,6 +224,7 @@ export async function generateAiRoundDraft(input: {
   participant: Participant;
   isPrimary: boolean;
   personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
   participants: Participant[];
   messages: Message[];
   publicStoryContext?: string;
@@ -193,7 +234,8 @@ export async function generateAiRoundDraft(input: {
   const modelGateway = getModelGateway(input.accessMode);
   const systemPrompt = await buildAiPlayerSystemPrompt({
     locale: input.locale,
-    personalityTags: input.personalityTags
+    personalityTags: input.personalityTags,
+    appearanceTags: input.appearanceTags
   });
   const publicStoryContext =
     input.publicStoryContext ??
@@ -243,6 +285,7 @@ export async function generateAiPrivateChatReply(input: {
   participant: Participant;
   localHumanName: string;
   personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
   participants: Participant[];
   messages: Message[];
   publicStoryContext?: string;
@@ -257,7 +300,8 @@ export async function generateAiPrivateChatReply(input: {
   const modelGateway = getModelGateway(input.accessMode);
   const systemPrompt = await buildAiPlayerSystemPrompt({
     locale: input.locale,
-    personalityTags: input.personalityTags
+    personalityTags: input.personalityTags,
+    appearanceTags: input.appearanceTags
   });
   const publicStoryContext =
     input.publicStoryContext ??

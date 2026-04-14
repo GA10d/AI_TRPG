@@ -625,6 +625,15 @@ export async function loadSavedGame(saveId: string): Promise<SessionSnapshot> {
   }
 }
 
+export async function fetchSaveBundle(saveId: string): Promise<SaveBundle> {
+  try {
+    const response = await fetch(`/api/saves/${encodeURIComponent(saveId)}/bundle`);
+    return parseJson<SaveBundle>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
 export async function deleteSavedGame(saveId: string): Promise<void> {
   try {
     const response = await fetch(`/api/saves/${encodeURIComponent(saveId)}`, {

@@ -244,6 +244,14 @@ export const jaJp = {
       localSavesCleared: "ローカルセーブ一覧をクリアしました。",
       recentSaveDeleted: "最近のセーブを削除しました。",
       saveDeleted: "セーブを削除しました。",
+      exportingSaveAsText: "セーブ本文を書き出しています...",
+      exportedSaveAsText: "セーブ本文を書き出しました。",
+      exportingComicHtml: "漫画 HTML を書き出しています...",
+      exportedComicHtml: "漫画 HTML を書き出しました。",
+      exportingCombinedHtml: "本文 + 漫画 HTML を書き出しています...",
+      exportedCombinedHtml: "本文 + 漫画 HTML を書き出しました。",
+      noWorldlineComicForSave: "このセーブには世界線漫画がまだ紐付いていません。",
+      noComicPagesToExport: "書き出せる漫画ページがまだありません。",
       closeTabManually:
         "ページがまだ開いている場合は、ブラウザのタブを手動で閉じてください。",
       waitOpeningPreviewBeforeAssist:
@@ -370,8 +378,22 @@ export const jaJp = {
   recordsScreen: {
     title: "記録",
     description:
-      "正式なレポート、エンディング履歴、長期統計は後続フェーズでここに実装されます。",
-    empty: "まだ表示できる記録ビューはありません。"
+      "ローカルセーブを一覧し、テキスト、漫画 HTML、本文と漫画を対応づけた HTML を書き出せます。",
+    empty: "書き出し可能なローカルセーブはまだありません。",
+    clearAll: "全セーブをクリア",
+    loadSave: "セーブを読み込む",
+    loadingSave: "読み込み中...",
+    exportText: "テキストを書き出す",
+    exportingText: "テキストを書き出し中...",
+    exportComicHtml: "漫画 HTML を書き出す",
+    exportingComicHtml: "漫画 HTML を書き出し中...",
+    exportCombinedHtml: "本文+漫画 HTML を書き出す",
+    exportingCombinedHtml: "本文+漫画 HTML を書き出し中...",
+    savedAt: (value: string) => `保存日時: ${value}`,
+    updatedAt: (value: string) => `更新日時: ${value}`,
+    locale: (value: string) => `言語: ${value}`,
+    worldline: (value: string) => `世界線: ${value}`,
+    noComicWorldline: "このセーブには世界線漫画が紐付いていないため、テキストのみ書き出せます。"
   },
   gameScreen: {
     emptyTitle: "????",
@@ -883,6 +905,39 @@ export const jaJp = {
       appearanceLabel: "外見",
       outfitLabel: "服装",
       warningsTitle: "コンテンツ警告"
+    },
+    protagonist: {
+      eyebrow: "AI主人公",
+      title: "AI 主人公設定",
+      description:
+        "ストーリーモードでは、AI 主人公の性格と見た目を個別に設定でき、AI 仲間と共通のローカル保存設定も読み込めます。",
+      nameLabel: "主人公の名前",
+      namePlaceholder: "例: 周倚 / 林深 / 顧言",
+      nameSummary: (value: string) => `現在の主人公名: ${value}`,
+      selectionSummary: (personalityCount: number, appearanceCount: number) =>
+        `性格 ${personalityCount} / 見た目 ${appearanceCount}`,
+      personalitySelectionLabel: (value: number) => `人格タグ: ${value}`,
+      appearanceSelectionLabel: (value: number) => `見た目タグ: ${value}`,
+      selectedPreviewEmpty: "まだ人格タグは選択されていません。",
+      appearancePreviewEmpty: "まだ見た目タグは選択されていません。",
+      savedPresetCount: (value: number) => `読み込めるローカル設定: ${value} 件`,
+      configurePersonalityButton: "主人公の性格を設定",
+      configureAppearanceButton: "主人公の見た目を設定",
+      configurePersonalityDescription:
+        "ストーリーモードの AI 主人公に使う人格タグを選択または調整します。",
+      configureAppearanceDescription:
+        "ストーリーモードの AI 主人公に使う外見と服装の手掛かりを選択または調整します。",
+      loadPresetButton: "ローカル設定を読み込む",
+      loadPresetTitle: "AI 主人公設定を読み込む",
+      loadPresetDescription:
+        "ここで読み込む設定は AI 仲間と共通です。適用すると主人公の性格タグと見た目タグがまとめて置き換わります。",
+      usePresetButton: "主人公に適用",
+      presetNameFallback: "無名の AI 設定",
+      tagHint: "下の人格タグをクリックして複数選択できます。ホバーで説明を確認できます。",
+      appearanceTagHint:
+        "下の形象タグをクリックして複数選択できます。外貌と服装に分かれています。",
+      noTags: "人格タグはまだ読み込み中です。",
+      noAppearanceTags: "形象タグはまだ読み込み中です。"
     },
     layout: {
       collapsedConfigLabel: "CONFIG",

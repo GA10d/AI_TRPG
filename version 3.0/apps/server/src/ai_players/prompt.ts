@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { fromLocaleCode } from "../../../../packages/shared-config/src/index.ts";
 import type {
+  AiAppearanceTag,
   AiPersonalityTag,
   LocaleCode
 } from "../../../../packages/shared-types/src/index.ts";
@@ -35,12 +36,53 @@ function formatPersonalityTags(personalityTags: AiPersonalityTag[]): string {
     .join("\n");
 }
 
+function formatAppearanceTagLines(appearanceTags: AiAppearanceTag[]): string[] {
+  return appearanceTags
+    .map((tag) => `- ${tag.keyword}: ${tag.description}`)
+    .filter((line) => line.trim().length > 0);
+}
+
+function formatAppearanceTags(appearanceTags: AiAppearanceTag[]): string {
+  if (!appearanceTags.length) {
+    return "- No explicit appearance tags were selected for this AI player.";
+  }
+
+  const visibleAppearanceTags = formatAppearanceTagLines(
+    appearanceTags.filter((tag) => tag.category === "appearance")
+  );
+  const outfitTags = formatAppearanceTagLines(
+    appearanceTags.filter((tag) => tag.category === "outfit")
+  );
+  const otherTags = formatAppearanceTagLines(
+    appearanceTags.filter(
+      (tag) => tag.category !== "appearance" && tag.category !== "outfit"
+    )
+  );
+  const sections: string[] = [];
+
+  if (visibleAppearanceTags.length) {
+    sections.push(["Appearance:", ...visibleAppearanceTags].join("\n"));
+  }
+
+  if (outfitTags.length) {
+    sections.push(["Outfit:", ...outfitTags].join("\n"));
+  }
+
+  if (otherTags.length) {
+    sections.push(["Other visual cues:", ...otherTags].join("\n"));
+  }
+
+  return sections.join("\n\n").trim();
+}
+
 export async function buildAiPlayerSystemPrompt(input: {
   locale: LocaleCode;
   personalityTags: AiPersonalityTag[];
+  appearanceTags: AiAppearanceTag[];
 }): Promise<string> {
-  const [personalityPrompt, rulePrompt, languagePrompt] = await Promise.all([
+  const [personalityPrompt, appearancePrompt, rulePrompt, languagePrompt] = await Promise.all([
     loadPromptFragment("personality.txt"),
+    loadPromptFragment("appearance.txt"),
     loadPromptFragment("rule.txt"),
     loadPromptFragment("language.txt")
   ]);
@@ -49,6 +91,9 @@ export async function buildAiPlayerSystemPrompt(input: {
   return [
     personalityPrompt,
     formatPersonalityTags(input.personalityTags),
+    "",
+    appearancePrompt,
+    formatAppearanceTags(input.appearanceTags),
     "",
     rulePrompt,
     "",

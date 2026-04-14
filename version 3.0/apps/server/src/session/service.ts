@@ -7,6 +7,7 @@ import {
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
   AdvancedTextModelConfigInput,
+  AiAppearanceTag,
   AiGenerationMetadata,
   AiPersonalityTag,
   CommitRoundRequest,
@@ -23,6 +24,7 @@ import type {
   SessionMemory,
   Session,
   SessionAiCompanion,
+  SessionAiPrimaryPlayerConfig,
   SessionContentSummary,
   SessionRuntimeContextPack,
   SessionSnapshot,
@@ -261,6 +263,15 @@ function getCompanionTagMap(session: Session): Map<string, AiPersonalityTag[]> {
   );
 }
 
+function getCompanionAppearanceTagMap(session: Session): Map<string, AiAppearanceTag[]> {
+  return new Map(
+    (session.partySetup?.aiCompanions ?? []).map((companion) => [
+      companion.participantId,
+      companion.appearanceTags
+    ])
+  );
+}
+
 function buildStoryRecipientIds(session: Session): string[] {
   return [
     session.localHumanParticipantId ?? session.playerParticipantId,
@@ -381,6 +392,26 @@ async function resolveSessionAiCompanions(
       };
     })
   );
+}
+
+async function resolvePrimaryPlayerAiConfig(
+  request: CreateSessionRequest,
+  primaryPlayerMode: "human" | "ai"
+): Promise<SessionAiPrimaryPlayerConfig | undefined> {
+  if (primaryPlayerMode !== "ai") {
+    return undefined;
+  }
+
+  const [personalityTags, appearanceTags] = await Promise.all([
+    resolveAiPersonalityTagsByIds(request.primaryPlayerPersonalityTagIds ?? []),
+    resolveAiAppearanceTagsByIds(request.primaryPlayerAppearanceTagIds ?? [])
+  ]);
+
+  return {
+    displayName: request.primaryPlayerDisplayName?.trim() || "AI主角",
+    personalityTags,
+    appearanceTags
+  };
 }
 
 function normalizeRuntimeModelConfig(
@@ -506,6 +537,11 @@ async function createSessionSnapshotInternal(
   const primaryPlayerMode = request.playMode === "story_mode" ? "ai" : "human";
   const localHumanParticipantId =
     primaryPlayerMode === "ai" ? `local_${randomUUID()}` : playerParticipantId;
+  const primaryPlayerConfig = await resolvePrimaryPlayerAiConfig(request, primaryPlayerMode);
+  const primaryPlayerDisplayName =
+    primaryPlayerMode === "ai"
+      ? primaryPlayerConfig?.displayName?.trim() || "AI主角"
+      : "玩家";
   const aiCompanions = await resolveSessionAiCompanions(request.aiCompanions);
   const ruleTitle =
     bundle.rule.manifest.title[bundle.rule.manifest.defaultLocale] ?? bundle.rule.manifest.id;
@@ -601,7 +637,7 @@ async function createSessionSnapshotInternal(
       {
         id: playerParticipantId,
         role: primaryPlayerMode === "ai" ? "ai_player" : "human_player",
-        displayName: primaryPlayerMode === "ai" ? "AI主角" : "玩家",
+        displayName: primaryPlayerDisplayName,
         isAiControlled: primaryPlayerMode === "ai",
         isLocalUser: primaryPlayerMode !== "ai",
         locale: bundle.resolvedLocale
@@ -634,6 +670,7 @@ async function createSessionSnapshotInternal(
     },
     partySetup: {
       primaryPlayerMode,
+      primaryPlayerConfig,
       aiCompanions
     },
     gameState: {
@@ -824,6 +861,7 @@ export async function prepareRound(
   const primaryParticipant = findPrimaryPlayerParticipant(current.session);
   const companionParticipants = getCompanionParticipants(current.session);
   const companionTagMap = getCompanionTagMap(current.session);
+  const companionAppearanceTagMap = getCompanionAppearanceTagMap(current.session);
   const runtimeConfig = store.getRuntimeConfig(sessionId);
   const preparedDrafts: RoundDraft[] = [];
 
@@ -863,7 +901,8 @@ export async function prepareRound(
       round: targetRound,
       participant: primaryParticipant,
       isPrimary: true,
-      personalityTags: [],
+      personalityTags: current.session.partySetup?.primaryPlayerConfig?.personalityTags ?? [],
+      appearanceTags: current.session.partySetup?.primaryPlayerConfig?.appearanceTags ?? [],
       participants: current.session.participants,
       messages: current.messages,
       publicStoryContext: primaryContextPack.assembledText,
@@ -901,6 +940,7 @@ export async function prepareRound(
         participant,
         isPrimary: false,
         personalityTags: companionTagMap.get(participant.id) ?? [],
+        appearanceTags: companionAppearanceTagMap.get(participant.id) ?? [],
         participants: current.session.participants,
         messages: current.messages,
         publicStoryContext: companionContextPack.assembledText,
@@ -1457,6 +1497,8 @@ export async function sendPrivateChat(
     participant: targetParticipant,
     localHumanName: localHumanParticipant.displayName,
     personalityTags: getCompanionTagMap(current.session).get(targetParticipant.id) ?? [],
+    appearanceTags:
+      getCompanionAppearanceTagMap(current.session).get(targetParticipant.id) ?? [],
     participants: current.session.participants,
     messages: interimMessages,
     publicStoryContext: privateChatContextPack.assembledText,

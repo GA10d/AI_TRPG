@@ -63,6 +63,9 @@ type GameSetupScreenProps = {
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
   markdownFontSize: MarkdownFontSizePreset;
   characterConcept: string;
+  primaryPlayerDisplayName: string;
+  primaryPlayerPersonalityTagIds: string[];
+  primaryPlayerAppearanceTagIds: string[];
   aiCompanions: CreateSessionAiCompanionInput[];
   characterConceptAssistLoading: boolean;
   characterConceptAssistMode: CharacterConceptAssistMode;
@@ -102,6 +105,10 @@ type GameSetupScreenProps = {
   onOpeningPreviewDeliveryModeChange: (value: OpeningPreviewDeliveryMode) => void;
   onMarkdownFontSizeChange: (value: MarkdownFontSizePreset) => void;
   onCharacterConceptChange: (value: string) => void;
+  onUpdatePrimaryPlayerName: (value: string) => void;
+  onApplyPrimaryPlayerFromPreset: (value: CreateSessionAiCompanionInput) => void;
+  onTogglePrimaryPlayerPersonalityTag: (personalityTagId: string) => void;
+  onTogglePrimaryPlayerAppearanceTag: (appearanceTagId: string) => void;
   onAddAiCompanion: () => void;
   onAddAiCompanionFromPreset: (value: CreateSessionAiCompanionInput) => void;
   onRemoveAiCompanion: (index: number) => void;
@@ -112,6 +119,11 @@ type GameSetupScreenProps = {
 
 type DragTarget = "left" | "right" | null;
 type SetupDetailTab = "game" | "model" | "companions";
+type PresetPickerTarget =
+  | "companion"
+  | "primary_player_personality"
+  | "primary_player_appearance"
+  | null;
 
 type SetupLayoutState = {
   leftWidth: number;
@@ -374,6 +386,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     openingPreviewDeliveryMode,
     markdownFontSize,
     characterConcept,
+    primaryPlayerDisplayName,
     aiCompanions,
     characterConceptAssistLoading,
     characterConceptAssistMode,
@@ -405,6 +418,12 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onOpeningPreviewDeliveryModeChange,
     onMarkdownFontSizeChange,
     onCharacterConceptChange,
+    onUpdatePrimaryPlayerName,
+    primaryPlayerPersonalityTagIds,
+    primaryPlayerAppearanceTagIds,
+    onApplyPrimaryPlayerFromPreset,
+    onTogglePrimaryPlayerPersonalityTag,
+    onTogglePrimaryPlayerAppearanceTag,
     onAddAiCompanion,
     onAddAiCompanionFromPreset,
     onRemoveAiCompanion,
@@ -421,10 +440,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const [activeDetailTab, setActiveDetailTab] = useState<SetupDetailTab>("game");
   const [personalityEditorIndex, setPersonalityEditorIndex] = useState<number | null>(null);
   const [appearanceEditorIndex, setAppearanceEditorIndex] = useState<number | null>(null);
+  const [isPrimaryPlayerPersonalityEditorOpen, setIsPrimaryPlayerPersonalityEditorOpen] =
+    useState(false);
+  const [isPrimaryPlayerAppearanceEditorOpen, setIsPrimaryPlayerAppearanceEditorOpen] =
+    useState(false);
   const [savedCompanionPresets, setSavedCompanionPresets] = useState<StoredAiCompanionPreset[]>(
     () => loadAiCompanionPresets()
   );
-  const [isCompanionPresetPickerOpen, setIsCompanionPresetPickerOpen] = useState(false);
+  const [presetPickerTarget, setPresetPickerTarget] = useState<PresetPickerTarget>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -543,6 +566,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     setAppearanceEditorIndex(aiCompanions.length ? aiCompanions.length - 1 : null);
   }, [aiCompanions.length, appearanceEditorIndex]);
 
+  useEffect(() => {
+    if (playMode === "story_mode") {
+      return;
+    }
+
+    setIsPrimaryPlayerPersonalityEditorOpen(false);
+    setIsPrimaryPlayerAppearanceEditorOpen(false);
+    setPresetPickerTarget((current) =>
+      current === "companion" ? current : null
+    );
+  }, [playMode]);
+
   function handleSplitterPointerDown(
     target: DragTarget,
     event: ReactPointerEvent<HTMLButtonElement>
@@ -575,6 +610,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function handleOpenPersonalityEditor(index: number): void {
+    setIsPrimaryPlayerPersonalityEditorOpen(false);
+    setIsPrimaryPlayerAppearanceEditorOpen(false);
+    setPresetPickerTarget(null);
     setAppearanceEditorIndex(null);
     setPersonalityEditorIndex(index);
   }
@@ -584,6 +622,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function handleOpenAppearanceEditor(index: number): void {
+    setIsPrimaryPlayerPersonalityEditorOpen(false);
+    setIsPrimaryPlayerAppearanceEditorOpen(false);
+    setPresetPickerTarget(null);
     setPersonalityEditorIndex(null);
     setAppearanceEditorIndex(index);
   }
@@ -593,28 +634,68 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function handleOpenCompanionPresetPicker(): void {
-    setIsCompanionPresetPickerOpen(true);
+    setPresetPickerTarget("companion");
   }
 
-  function handleCloseCompanionPresetPicker(): void {
-    setIsCompanionPresetPickerOpen(false);
+  function handleOpenPrimaryPlayerPersonalityEditor(): void {
+    setPersonalityEditorIndex(null);
+    setAppearanceEditorIndex(null);
+    setPresetPickerTarget(null);
+    setIsPrimaryPlayerAppearanceEditorOpen(false);
+    setIsPrimaryPlayerPersonalityEditorOpen(true);
+  }
+
+  function handleClosePrimaryPlayerPersonalityEditor(): void {
+    setIsPrimaryPlayerPersonalityEditorOpen(false);
+  }
+
+  function handleOpenPrimaryPlayerAppearanceEditor(): void {
+    setPersonalityEditorIndex(null);
+    setAppearanceEditorIndex(null);
+    setPresetPickerTarget(null);
+    setIsPrimaryPlayerPersonalityEditorOpen(false);
+    setIsPrimaryPlayerAppearanceEditorOpen(true);
+  }
+
+  function handleClosePrimaryPlayerAppearanceEditor(): void {
+    setIsPrimaryPlayerAppearanceEditorOpen(false);
+  }
+
+  function handleOpenPrimaryPlayerPresetPicker(mode: "personality" | "appearance"): void {
+    setPresetPickerTarget(
+      mode === "personality" ? "primary_player_personality" : "primary_player_appearance"
+    );
+  }
+
+  function handleClosePresetPicker(): void {
+    setPresetPickerTarget(null);
   }
 
   function handleSaveCompanionPreset(companion: CreateSessionAiCompanionInput): void {
     setSavedCompanionPresets(storeAiCompanionPreset(companion));
   }
 
-  function handleLoadCompanionPreset(preset: StoredAiCompanionPreset): void {
-    if (companionLimitReached) {
+  function handleUseSavedPreset(preset: StoredAiCompanionPreset): void {
+    if (presetPickerTarget === "companion") {
+      if (companionLimitReached) {
+        return;
+      }
+
+      onAddAiCompanionFromPreset({
+        displayName: preset.displayName,
+        personalityTagIds: preset.personalityTagIds,
+        appearanceTagIds: preset.appearanceTagIds
+      });
+      setPresetPickerTarget(null);
       return;
     }
 
-    onAddAiCompanionFromPreset({
+    onApplyPrimaryPlayerFromPreset({
       displayName: preset.displayName,
       personalityTagIds: preset.personalityTagIds,
       appearanceTagIds: preset.appearanceTagIds
     });
-    setIsCompanionPresetPickerOpen(false);
+    setPresetPickerTarget(null);
   }
 
   function handleDeleteCompanionPreset(presetId: string): void {
@@ -708,6 +789,12 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       .filter(Boolean).length;
   const companionLimitReached = aiCompanions.length >= 3;
   const hasSavedCompanionPresets = savedCompanionPresets.length > 0;
+  const primaryPlayerSelectedPersonalityTags = personalityTags.filter((tag) =>
+    primaryPlayerPersonalityTagIds.includes(tag.id)
+  );
+  const primaryPlayerSelectedAppearanceTags = appearanceTags.filter((tag) =>
+    primaryPlayerAppearanceTagIds.includes(tag.id)
+  );
   const editingCompanion =
     personalityEditorIndex !== null ? aiCompanions[personalityEditorIndex] ?? null : null;
   const editingCompanionSelectedTags = editingCompanion
@@ -803,6 +890,116 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     }
   ];
 
+  function renderPrimaryPlayerConfiguratorCard(): React.ReactNode {
+    if (!isStoryMode) {
+      return null;
+    }
+
+    const previewPersonalityTags = primaryPlayerSelectedPersonalityTags.slice(0, 6);
+    const hiddenPersonalityTagCount =
+      primaryPlayerSelectedPersonalityTags.length - previewPersonalityTags.length;
+    const previewAppearanceTags = primaryPlayerSelectedAppearanceTags.slice(0, 6);
+    const hiddenAppearanceTagCount =
+      primaryPlayerSelectedAppearanceTags.length - previewAppearanceTags.length;
+    const protagonistNamePreview =
+      primaryPlayerDisplayName.trim() || setupText.protagonist.namePlaceholder;
+
+    return (
+      <div className="companion-card story-mode-protagonist-card">
+        <div className="selection-card-title">{setupText.protagonist.title}</div>
+        <div className="summary-text">{setupText.protagonist.description}</div>
+        <label className="companion-editor-field">
+          <span>{setupText.protagonist.nameLabel}</span>
+          <input
+            type="text"
+            value={primaryPlayerDisplayName}
+            placeholder={setupText.protagonist.namePlaceholder}
+            onChange={(event) => onUpdatePrimaryPlayerName(event.target.value)}
+          />
+        </label>
+        <div className="summary-text">
+          {setupText.protagonist.nameSummary(protagonistNamePreview)}
+        </div>
+        <div className="summary-text">
+          {setupText.protagonist.selectionSummary(
+            primaryPlayerSelectedPersonalityTags.length,
+            primaryPlayerSelectedAppearanceTags.length
+          )}
+        </div>
+        <div className="summary-text">
+          {setupText.protagonist.savedPresetCount(savedCompanionPresets.length)}
+        </div>
+
+        <div className="companion-editor-selection">
+          <div className="companion-selection-group">
+            <div className="companion-selection-label">
+              {setupText.protagonist.personalitySelectionLabel(
+                primaryPlayerSelectedPersonalityTags.length
+              )}
+            </div>
+            {primaryPlayerSelectedPersonalityTags.length ? (
+              <div className="companion-selected-tags">
+                {previewPersonalityTags.map((tag) => (
+                  <span className="badge" key={tag.id}>
+                    {tag.keyword}
+                  </span>
+                ))}
+                {hiddenPersonalityTagCount > 0 ? (
+                  <span className="badge">+{hiddenPersonalityTagCount}</span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="companion-selected-placeholder">
+                {setupText.protagonist.selectedPreviewEmpty}
+              </div>
+            )}
+          </div>
+
+          <div className="companion-selection-group">
+            <div className="companion-selection-label">
+              {setupText.protagonist.appearanceSelectionLabel(
+                primaryPlayerSelectedAppearanceTags.length
+              )}
+            </div>
+            {primaryPlayerSelectedAppearanceTags.length ? (
+              <div className="companion-selected-tags">
+                {previewAppearanceTags.map((tag) => (
+                  <span className="badge" key={tag.id}>
+                    {tag.keyword}
+                  </span>
+                ))}
+                {hiddenAppearanceTagCount > 0 ? (
+                  <span className="badge">+{hiddenAppearanceTagCount}</span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="companion-selected-placeholder">
+                {setupText.protagonist.appearancePreviewEmpty}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="companion-editor-actions story-mode-protagonist-actions">
+          <button
+            className="ghost-button"
+            onClick={handleOpenPrimaryPlayerPersonalityEditor}
+            type="button"
+          >
+            {setupText.protagonist.configurePersonalityButton}
+          </button>
+          <button
+            className="ghost-button"
+            onClick={handleOpenPrimaryPlayerAppearanceEditor}
+            type="button"
+          >
+            {setupText.protagonist.configureAppearanceButton}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderGameSettingsFields(layoutMode: "sidebar" | "detail"): React.ReactNode {
     const containerClassName =
       layoutMode === "detail" ? "setup-detail-fields-grid" : "setup-section-field-stack";
@@ -873,6 +1070,8 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             ))}
           </select>
         </SettingField>
+
+        {renderPrimaryPlayerConfiguratorCard()}
       </div>
     );
   }
@@ -1382,15 +1581,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function renderPersonalityTagSection(
-    companionIndex: number,
     section: {
       key: string;
       title: string;
       tags: AiPersonalityTag[];
-    }
+    },
+    selectedTagIds: string[],
+    onToggleTag: (personalityTagId: string) => void
   ): React.ReactNode {
-    const selectedTagIds = aiCompanions[companionIndex]?.personalityTagIds ?? [];
-
     return (
       <div className="companion-tag-section" key={section.key}>
         <div className="companion-tag-section-title">{section.title}</div>
@@ -1402,7 +1600,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               <button
                 className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
                 key={tag.id}
-                onClick={() => onToggleAiCompanionPersonalityTag(companionIndex, tag.id)}
+                onClick={() => onToggleTag(tag.id)}
                 title={tag.description}
                 type="button"
               >
@@ -1416,15 +1614,14 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function renderAppearanceTagSection(
-    companionIndex: number,
     section: {
       key: string;
       title: string;
       tags: AiAppearanceTag[];
-    }
+    },
+    selectedTagIds: string[],
+    onToggleTag: (appearanceTagId: string) => void
   ): React.ReactNode {
-    const selectedTagIds = aiCompanions[companionIndex]?.appearanceTagIds ?? [];
-
     return (
       <div className="companion-tag-section" key={section.key}>
         <div className="companion-tag-section-title">{section.title}</div>
@@ -1436,7 +1633,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               <button
                 className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
                 key={tag.id}
-                onClick={() => onToggleAiCompanionAppearanceTag(companionIndex, tag.id)}
+                onClick={() => onToggleTag(tag.id)}
                 title={tag.description}
                 type="button"
               >
@@ -1642,7 +1839,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             {personalityTagSections.length ? (
               <div className="companion-tag-sections">
                 {personalityTagSections.map((section) =>
-                  renderPersonalityTagSection(personalityEditorIndex, section)
+                  renderPersonalityTagSection(
+                    section,
+                    aiCompanions[personalityEditorIndex]?.personalityTagIds ?? [],
+                    (tagId) => onToggleAiCompanionPersonalityTag(personalityEditorIndex, tagId)
+                  )
                 )}
               </div>
             ) : (
@@ -1657,15 +1858,23 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function renderCompanionPresetPickerModal(): React.ReactNode {
-    if (!isCompanionPresetPickerOpen) {
+    if (!presetPickerTarget) {
       return null;
     }
 
+    const isPrimaryPlayerPresetPicker =
+      presetPickerTarget === "primary_player_personality" ||
+      presetPickerTarget === "primary_player_appearance";
+    const pickerText = isPrimaryPlayerPresetPicker
+      ? setupText.protagonist
+      : setupText.companions;
+    const presetUseDisabled = presetPickerTarget === "companion" && companionLimitReached;
+
     return (
       <div
-        aria-label={setupText.companions.loadPresetTitle}
+        aria-label={pickerText.loadPresetTitle}
         className="companion-personality-modal-backdrop"
-        onClick={handleCloseCompanionPresetPicker}
+        onClick={handleClosePresetPicker}
         role="dialog"
       >
         <div
@@ -1674,15 +1883,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         >
           <div className="companion-personality-modal-header">
             <div>
-              <div className="eyebrow">{setupText.companions.eyebrow}</div>
-              <h2>{setupText.companions.loadPresetTitle}</h2>
-              <div className="summary-text">
-                {setupText.companions.loadPresetDescription}
-              </div>
+              <div className="eyebrow">{pickerText.eyebrow}</div>
+              <h2>{pickerText.loadPresetTitle}</h2>
+              <div className="summary-text">{pickerText.loadPresetDescription}</div>
             </div>
             <button
               className="ghost-button ghost-button-small"
-              onClick={handleCloseCompanionPresetPicker}
+              onClick={handleClosePresetPicker}
               type="button"
             >
               {setupText.modal.close}
@@ -1706,7 +1913,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   const hiddenAppearanceTagCount =
                     selectedAppearanceTags.length - previewAppearanceTags.length;
                   const presetDisplayName =
-                    preset.displayName.trim() || setupText.companions.presetNameFallback;
+                    preset.displayName.trim() || pickerText.presetNameFallback;
 
                   return (
                     <article className="companion-preset-item" key={preset.id}>
@@ -1714,26 +1921,24 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                         <div className="companion-preset-meta">
                           <div className="selection-card-title">{presetDisplayName}</div>
                           <div className="summary-text">
-                            {setupText.companions.selectionSummary(
+                            {pickerText.selectionSummary(
                               preset.personalityTagIds.length,
                               preset.appearanceTagIds.length
                             )}
                           </div>
                           <div className="summary-text">
-                            {setupText.companions.presetSavedAt(
-                              formatPresetTimestamp(preset.updatedAt)
-                            )}
+                            {setupText.companions.presetSavedAt(formatPresetTimestamp(preset.updatedAt))}
                           </div>
                         </div>
 
                         <div className="companion-preset-actions">
                           <button
                             className="ghost-button ghost-button-small"
-                            disabled={companionLimitReached}
-                            onClick={() => handleLoadCompanionPreset(preset)}
+                            disabled={presetUseDisabled}
+                            onClick={() => handleUseSavedPreset(preset)}
                             type="button"
                           >
-                            {setupText.companions.usePresetButton}
+                            {pickerText.usePresetButton}
                           </button>
                           <button
                             className="ghost-button ghost-button-small ghost-button-danger"
@@ -1747,9 +1952,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
                       <div className="companion-selection-group">
                         <div className="companion-selection-label">
-                          {setupText.companions.personalitySelectionLabel(
-                            selectedPersonalityTags.length
-                          )}
+                          {pickerText.personalitySelectionLabel(selectedPersonalityTags.length)}
                         </div>
                         {selectedPersonalityTags.length ? (
                           <div className="companion-selected-tags">
@@ -1764,15 +1967,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                           </div>
                         ) : (
                           <div className="companion-selected-placeholder">
-                            {setupText.companions.selectedPreviewEmpty}
+                            {pickerText.selectedPreviewEmpty}
                           </div>
                         )}
                       </div>
                       <div className="companion-selection-group">
                         <div className="companion-selection-label">
-                          {setupText.companions.appearanceSelectionLabel(
-                            selectedAppearanceTags.length
-                          )}
+                          {pickerText.appearanceSelectionLabel(selectedAppearanceTags.length)}
                         </div>
                         {selectedAppearanceTags.length ? (
                           <div className="companion-selected-tags">
@@ -1787,7 +1988,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                           </div>
                         ) : (
                           <div className="companion-selected-placeholder">
-                            {setupText.companions.appearancePreviewEmpty}
+                            {pickerText.appearancePreviewEmpty}
                           </div>
                         )}
                       </div>
@@ -1798,6 +1999,184 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             ) : (
               <div className="empty-state companion-preset-modal-empty">
                 {setupText.companions.noSavedPresets}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPrimaryPlayerPersonalityEditorModal(): React.ReactNode {
+    if (!isPrimaryPlayerPersonalityEditorOpen) {
+      return null;
+    }
+
+    return (
+      <div
+        aria-label={setupText.protagonist.configurePersonalityButton}
+        className="companion-personality-modal-backdrop"
+        onClick={handleClosePrimaryPlayerPersonalityEditor}
+        role="dialog"
+      >
+        <div
+          className="companion-personality-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="companion-personality-modal-header">
+            <div>
+              <div className="eyebrow">{setupText.protagonist.eyebrow}</div>
+              <h2>{setupText.protagonist.title}</h2>
+              <div className="summary-text">
+                {setupText.protagonist.configurePersonalityDescription}
+              </div>
+            </div>
+            <div className="companion-personality-modal-header-actions">
+              <button
+                className="ghost-button ghost-button-small"
+                disabled={!hasSavedCompanionPresets}
+                onClick={() => handleOpenPrimaryPlayerPresetPicker("personality")}
+                type="button"
+              >
+                {setupText.protagonist.loadPresetButton}
+              </button>
+              <button
+                className="ghost-button ghost-button-small"
+                onClick={handleClosePrimaryPlayerPersonalityEditor}
+                type="button"
+              >
+                {setupText.modal.close}
+              </button>
+            </div>
+          </div>
+
+          <div className="companion-personality-modal-summary">
+            <div className="companion-personality-modal-selection">
+              <div className="companion-personality-modal-selection-head">
+                <div className="companion-personality-modal-selection-title">
+                  {setupText.protagonist.personalitySelectionLabel(
+                    primaryPlayerSelectedPersonalityTags.length
+                  )}
+                </div>
+                <div className="summary-text">{setupText.protagonist.tagHint}</div>
+              </div>
+              {primaryPlayerSelectedPersonalityTags.length ? (
+                <div className="companion-selected-tags">
+                  {primaryPlayerSelectedPersonalityTags.map((tag) => (
+                    <span className="badge" key={tag.id}>
+                      {tag.keyword}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="companion-selected-placeholder">
+                  {setupText.protagonist.selectedPreviewEmpty}
+                </div>
+              )}
+            </div>
+
+            {personalityTagSections.length ? (
+              <div className="companion-tag-sections">
+                {personalityTagSections.map((section) =>
+                  renderPersonalityTagSection(
+                    section,
+                    primaryPlayerPersonalityTagIds,
+                    onTogglePrimaryPlayerPersonalityTag
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="empty-state companion-personality-modal-empty">
+                {setupText.protagonist.noTags}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPrimaryPlayerAppearanceEditorModal(): React.ReactNode {
+    if (!isPrimaryPlayerAppearanceEditorOpen) {
+      return null;
+    }
+
+    return (
+      <div
+        aria-label={setupText.protagonist.configureAppearanceButton}
+        className="companion-personality-modal-backdrop"
+        onClick={handleClosePrimaryPlayerAppearanceEditor}
+        role="dialog"
+      >
+        <div
+          className="companion-personality-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="companion-personality-modal-header">
+            <div>
+              <div className="eyebrow">{setupText.protagonist.eyebrow}</div>
+              <h2>{setupText.protagonist.title}</h2>
+              <div className="summary-text">
+                {setupText.protagonist.configureAppearanceDescription}
+              </div>
+            </div>
+            <div className="companion-personality-modal-header-actions">
+              <button
+                className="ghost-button ghost-button-small"
+                disabled={!hasSavedCompanionPresets}
+                onClick={() => handleOpenPrimaryPlayerPresetPicker("appearance")}
+                type="button"
+              >
+                {setupText.protagonist.loadPresetButton}
+              </button>
+              <button
+                className="ghost-button ghost-button-small"
+                onClick={handleClosePrimaryPlayerAppearanceEditor}
+                type="button"
+              >
+                {setupText.modal.close}
+              </button>
+            </div>
+          </div>
+
+          <div className="companion-personality-modal-summary">
+            <div className="companion-personality-modal-selection">
+              <div className="companion-personality-modal-selection-head">
+                <div className="companion-personality-modal-selection-title">
+                  {setupText.protagonist.appearanceSelectionLabel(
+                    primaryPlayerSelectedAppearanceTags.length
+                  )}
+                </div>
+                <div className="summary-text">{setupText.protagonist.appearanceTagHint}</div>
+              </div>
+              {primaryPlayerSelectedAppearanceTags.length ? (
+                <div className="companion-selected-tags">
+                  {primaryPlayerSelectedAppearanceTags.map((tag) => (
+                    <span className="badge" key={tag.id}>
+                      {tag.keyword}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="companion-selected-placeholder">
+                  {setupText.protagonist.appearancePreviewEmpty}
+                </div>
+              )}
+            </div>
+
+            {appearanceTagSections.length ? (
+              <div className="companion-tag-sections">
+                {appearanceTagSections.map((section) =>
+                  renderAppearanceTagSection(
+                    section,
+                    primaryPlayerAppearanceTagIds,
+                    onTogglePrimaryPlayerAppearanceTag
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="empty-state companion-personality-modal-empty">
+                {setupText.protagonist.noAppearanceTags}
               </div>
             )}
           </div>
@@ -1871,7 +2250,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             {appearanceTagSections.length ? (
               <div className="companion-tag-sections">
                 {appearanceTagSections.map((section) =>
-                  renderAppearanceTagSection(appearanceEditorIndex, section)
+                  renderAppearanceTagSection(
+                    section,
+                    aiCompanions[appearanceEditorIndex]?.appearanceTagIds ?? [],
+                    (tagId) => onToggleAiCompanionAppearanceTag(appearanceEditorIndex, tagId)
+                  )
                 )}
               </div>
             ) : (
@@ -2693,7 +3076,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       ) : null}
 
       {renderPersonalityEditorModal()}
+      {renderPrimaryPlayerPersonalityEditorModal()}
       {renderAppearanceEditorModal()}
+      {renderPrimaryPlayerAppearanceEditorModal()}
       {renderCompanionPresetPickerModal()}
 
       {coverAsset && isCoverExpanded ? (

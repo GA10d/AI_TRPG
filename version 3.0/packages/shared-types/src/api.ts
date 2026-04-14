@@ -90,6 +90,9 @@ export type CreateSessionRequest = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   advancedTextModelConfig?: AdvancedTextModelConfigInput;
+  primaryPlayerDisplayName?: string;
+  primaryPlayerPersonalityTagIds?: string[];
+  primaryPlayerAppearanceTagIds?: string[];
   aiCompanions?: CreateSessionAiCompanionInput[];
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
