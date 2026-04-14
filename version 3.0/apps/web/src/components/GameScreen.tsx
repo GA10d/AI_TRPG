@@ -57,6 +57,11 @@ type SessionBootstrapPanelState = {
   }>;
 };
 
+type PendingComicGenerationTask = {
+  pageNumber: number;
+  startedAt: number;
+};
+
 type GameScreenProps = {
   snapshot: SessionSnapshot | null;
   activeGraphBundle: PlaythroughGraphBundle | null;
@@ -78,7 +83,8 @@ type GameScreenProps = {
   savedGames: SavedGameRecord[];
   comicProject: PersistedComicProject | null;
   isComicLoading: boolean;
-  isComicGenerating: boolean;
+  comicGenerationTaskCount: number;
+  pendingComicGenerationTasks: PendingComicGenerationTask[];
   showAiMetadata: boolean;
   markdownFontSize: MarkdownFontSizePreset;
   storyControlMode: StoryControlMode | null;
@@ -208,7 +214,8 @@ export function GameScreen(props: GameScreenProps) {
     savedGames,
     comicProject,
     isComicLoading,
-    isComicGenerating,
+    comicGenerationTaskCount,
+    pendingComicGenerationTasks,
     showAiMetadata,
     markdownFontSize,
     storyControlMode,
@@ -292,9 +299,12 @@ export function GameScreen(props: GameScreenProps) {
     ? publicStoryMessages.filter((message) => message.id !== latestNarration.id)
     : publicStoryMessages;
   const comicPages = comicProject?.pages ?? [];
-  const pendingComicPageNumber = (comicPages.at(-1)?.pageNumber ?? 0) + 1;
-  const shouldShowComicGeneratingPlaceholder = isComicGenerating;
-  const hasComicEntries = comicPages.length > 0 || shouldShowComicGeneratingPlaceholder;
+  const isComicGenerating = comicGenerationTaskCount > 0;
+  const existingComicPageNumbers = new Set(comicPages.map((page) => page.pageNumber));
+  const visiblePendingComicGenerationTasks = [...pendingComicGenerationTasks]
+    .sort((left, right) => left.pageNumber - right.pageNumber)
+    .filter((task) => !existingComicPageNumbers.has(task.pageNumber));
+  const hasComicEntries = comicPages.length > 0 || visiblePendingComicGenerationTasks.length > 0;
   const comicLightboxPage =
     comicPages.find((page) => page.pageNumber === comicLightboxPageNumber) ?? null;
   const comicLightboxIndex = comicLightboxPage
@@ -543,7 +553,7 @@ export function GameScreen(props: GameScreenProps) {
           : comicPages.length
             ? text.gameScreen.comicCount(comicPages.length)
             : isComicGenerating
-              ? text.common.creating
+              ? `${text.common.generating} (${comicGenerationTaskCount})`
               : text.common.none
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningCount(reasoningRecords.length)
@@ -1352,19 +1362,21 @@ export function GameScreen(props: GameScreenProps) {
                       />
                     </article>
                   ))}
-                  {shouldShowComicGeneratingPlaceholder ? (
+                  {visiblePendingComicGenerationTasks.map((task, index) => (
                     <article
                       aria-busy="true"
                       className="summary-card game-comic-card game-comic-card-pending"
-                      key={`pending-comic-${pendingComicPageNumber}`}
+                      key={`pending-comic-${task.pageNumber}-${task.startedAt}-${index}`}
                     >
                       <div className="game-comic-card-head">
                         <div>
                           <div className="meta-label">
-                            {text.gameScreen.comicPageLabel(pendingComicPageNumber)}
+                            {text.gameScreen.comicPageLabel(task.pageNumber)}
                           </div>
                           <div className="summary-text">
-                            {text.gameScreen.comicGenerationStart(pendingComicPageNumber)}
+                            {`${text.gameScreen.comicGenerationStart(task.pageNumber)} (${formatElapsedDuration(
+                              activityStageNow - task.startedAt
+                            )})`}
                           </div>
                         </div>
                         <span className="badge">{text.common.generating}</span>
@@ -1379,7 +1391,7 @@ export function GameScreen(props: GameScreenProps) {
                         </div>
                       </div>
                     </article>
-                  ) : null}
+                  ))}
                 </div>
               ) : isComicLoading ? (
                 <div className="empty-state">{text.common.loading}</div>

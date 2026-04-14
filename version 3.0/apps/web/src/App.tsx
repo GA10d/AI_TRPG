@@ -358,6 +358,11 @@ type WorldlineComicPlan = {
   storyMemorySummary?: string;
 };
 
+type PendingComicGenerationTask = {
+  pageNumber: number;
+  startedAt: number;
+};
+
 function inferMessageChannel(message: Message): Message["channel"] {
   if (message.channel) {
     return message.channel;
@@ -531,7 +536,9 @@ export function App() {
     null
   );
   const [isComicLoading, setIsComicLoading] = useState(false);
-  const [isComicGenerating, setIsComicGenerating] = useState(false);
+  const [pendingComicGenerationTasks, setPendingComicGenerationTasks] = useState<
+    PendingComicGenerationTask[]
+  >([]);
   const [turnInput, setTurnInput] = useState("");
   const [characterConcept, setCharacterConcept] = useState("");
   const [aiCompanions, setAiCompanions] = useState<CreateSessionAiCompanionInput[]>([]);
@@ -556,6 +563,8 @@ export function App() {
   const stagedSessionBootTokenRef = useRef(0);
   const autoPreparedRoundKeyRef = useRef<string | null>(null);
   const autoCommittedRoundKeyRef = useRef<string | null>(null);
+  const comicGenerationTaskCount = pendingComicGenerationTasks.length;
+  const isComicGenerating = comicGenerationTaskCount > 0;
 
   const {
     bootstrap,
@@ -917,6 +926,10 @@ export function App() {
     snapshot,
     view
   ]);
+
+  useEffect(() => {
+    setPendingComicGenerationTasks([]);
+  }, [activeGraphBundle?.graph.id, view]);
 
   useEffect(() => {
     const worldlineId = activeGraphBundle?.graph.id ?? null;
@@ -1347,6 +1360,29 @@ export function App() {
     return loadWorldlineComicProject(normalizedWorldlineId);
   }
 
+  function beginComicGenerationTask(pageNumber: number): void {
+    setPendingComicGenerationTasks((current) => [
+      ...current,
+      {
+        pageNumber,
+        startedAt: Date.now()
+      }
+    ]);
+  }
+
+  function finishComicGenerationTask(pageNumber: number): void {
+    setPendingComicGenerationTasks((current) => {
+      const next = [...current];
+      const index = next.findIndex((task) => task.pageNumber === pageNumber);
+      if (index < 0) {
+        return current;
+      }
+
+      next.splice(index, 1);
+      return next;
+    });
+  }
+
   async function maybeGenerateWorldlineComic(
     nextSnapshot: SessionSnapshot,
     worldlineId: string | null | undefined
@@ -1356,8 +1392,9 @@ export function App() {
       return;
     }
 
-    setIsComicGenerating(true);
-    appendGameActivity(uiText.gameScreen.comicGenerationStart(plan.pageIndex + 1));
+    const pageNumber = plan.pageIndex + 1;
+    beginComicGenerationTask(pageNumber);
+    appendGameActivity(uiText.gameScreen.comicGenerationStart(pageNumber));
 
     try {
       const result = await upsertWorldlineComicPage(plan.worldlineId, {
@@ -1374,8 +1411,8 @@ export function App() {
       setWorldlineComicProject(result.project);
       appendGameActivity(
         result.created
-          ? uiText.gameScreen.comicGenerationDone(plan.pageIndex + 1)
-          : uiText.gameScreen.comicAlreadyExists(plan.pageIndex + 1)
+          ? uiText.gameScreen.comicGenerationDone(pageNumber)
+          : uiText.gameScreen.comicAlreadyExists(pageNumber)
       );
     } catch (error) {
       appendGameActivity(
@@ -1385,7 +1422,7 @@ export function App() {
         "error"
       );
     } finally {
-      setIsComicGenerating(false);
+      finishComicGenerationTask(pageNumber);
     }
   }
 
@@ -3112,7 +3149,8 @@ export function App() {
           savedGames={savedGames}
           comicProject={worldlineComicProject}
           isComicLoading={isComicLoading}
-          isComicGenerating={isComicGenerating}
+          comicGenerationTaskCount={comicGenerationTaskCount}
+          pendingComicGenerationTasks={pendingComicGenerationTasks}
           isRestoring={isRestoring}
           isResumingBranch={isResumingBranch}
           showAiMetadata={showAiMetadata}
