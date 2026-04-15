@@ -9,9 +9,9 @@ import {
 
 import type {
   AiGenerationMetadata,
-  ImageGenerationResponse,
   ImagePromptTemplateConfig,
   Message,
+  NpcPortraitVariant,
   NpcRosterEntry,
   PersistedComicProject,
   PlaythroughGraphBundle,
@@ -26,8 +26,10 @@ import {
   fetchNpcRoster,
   fetchSessionContextPack,
   fetchSessionMemory,
-  generateSceneImage,
-  rebuildSessionMemory
+  prepareNpcPortraits,
+  regenerateNpcPortrait,
+  rebuildSessionMemory,
+  selectNpcPortrait
 } from "../lib/trpgApiClient.ts";
 import { useUiText } from "../locales/index.tsx";
 import type { SavedGameRecord } from "../storage.ts";
@@ -91,6 +93,7 @@ type GameScreenProps = {
   storyControlMode: StoryControlMode | null;
   imageProfileId: string;
   runtimeImageModelConfig: RuntimeImageModelConfigInput;
+  comicStyleId?: string | null;
   imagePromptTemplateConfig: ImagePromptTemplateConfig | null;
   onBack: () => void;
   onContinueFromNode: (nodeId: string) => Promise<void>;
@@ -194,6 +197,23 @@ function buildReasoningDraftRecord(
   };
 }
 
+function resolveSelectedNpcPortrait(npc: NpcRosterEntry | null): NpcPortraitVariant | null {
+  if (!npc) {
+    return null;
+  }
+
+  const portraits = npc.portraitVariants ?? [];
+  if (portraits.length === 0) {
+    return null;
+  }
+
+  return (
+    portraits.find((portrait) => portrait.portraitId === npc.selectedPortraitId) ??
+    portraits[0] ??
+    null
+  );
+}
+
 export function GameScreen(props: GameScreenProps) {
   const {
     snapshot,
@@ -224,6 +244,7 @@ export function GameScreen(props: GameScreenProps) {
     storyControlMode,
     imageProfileId,
     runtimeImageModelConfig,
+    comicStyleId,
     imagePromptTemplateConfig,
     onBack,
     onContinueFromNode,
@@ -241,6 +262,7 @@ export function GameScreen(props: GameScreenProps) {
   const text = useUiText();
 
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const npcAutoPrepareKeysRef = useRef<Set<string>>(new Set());
   const [activeDrawer, setActiveDrawer] = useState<GameDrawer>("none");
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("history");
   const [sidePanelWidth, setSidePanelWidth] = useState(420);
@@ -254,10 +276,8 @@ export function GameScreen(props: GameScreenProps) {
   const [privateChatDrafts, setPrivateChatDrafts] = useState<Record<string, string>>({});
   const [manualNarrationDraft, setManualNarrationDraft] = useState("");
   const [comicLightboxPageNumber, setComicLightboxPageNumber] = useState<number | null>(null);
-  const [generatedPortraits, setGeneratedPortraits] = useState<
-    Record<string, ImageGenerationResponse>
-  >({});
   const [generatingNpcId, setGeneratingNpcId] = useState<string | null>(null);
+  const [isPreparingNpcPortraits, setIsPreparingNpcPortraits] = useState(false);
   const [debugMemory, setDebugMemory] = useState<SessionMemory | null>(null);
   const [debugNarratorContextPack, setDebugNarratorContextPack] = useState<SessionRuntimeContextPack | null>(null);
   const [debugCompanionContextPack, setDebugCompanionContextPack] = useState<SessionRuntimeContextPack | null>(null);
@@ -353,6 +373,19 @@ export function GameScreen(props: GameScreenProps) {
   const endingJudgeStatusCopy = endingJudgeDecision?.Reason || text.gameScreen.noEndingJudge;
   const selectedNpc =
     npcRoster.find((npc) => npc.id === selectedNpcId) ?? npcRoster[0] ?? null;
+  const selectedNpcPortrait = resolveSelectedNpcPortrait(selectedNpc);
+  const selectedNpcPortraits = selectedNpc?.portraitVariants ?? [];
+  const selectedNpcPortraitIndex = selectedNpcPortrait
+    ? selectedNpcPortraits.findIndex(
+        (portrait) => portrait.portraitId === selectedNpcPortrait.portraitId
+      )
+    : -1;
+  const previousNpcPortrait =
+    selectedNpcPortraitIndex > 0 ? selectedNpcPortraits[selectedNpcPortraitIndex - 1] : null;
+  const nextNpcPortrait =
+    selectedNpcPortraitIndex >= 0 && selectedNpcPortraitIndex < selectedNpcPortraits.length - 1
+      ? selectedNpcPortraits[selectedNpcPortraitIndex + 1]
+      : null;
   const canUseQuickEndingTest =
     snapshot?.session.modelAccessMode === "mock" &&
     snapshot.session.status !== "ended" &&
@@ -595,8 +628,9 @@ export function GameScreen(props: GameScreenProps) {
     setSidePanelMode("history");
     setSidePanelWidth(420);
     setComposerHeight(240);
-    setGeneratedPortraits({});
     setGeneratingNpcId(null);
+    setIsPreparingNpcPortraits(false);
+    npcAutoPrepareKeysRef.current.clear();
     setActiveDrawer("none");
     setDebugMemory(null);
     setDebugNarratorContextPack(null);
@@ -694,7 +728,7 @@ export function GameScreen(props: GameScreenProps) {
   }, [activeDrawer, companionParticipants, storyAutoMode]);
 
   useEffect(() => {
-    if (activeDrawer !== "npcs" || !snapshot || actionLocked) {
+    if (!snapshot) {
       return;
     }
 
@@ -712,7 +746,7 @@ export function GameScreen(props: GameScreenProps) {
     setNpcLoading(true);
     setNpcError(null);
 
-    void fetchNpcRoster(ruleDirectoryName, storyDirectoryName)
+    void fetchNpcRoster(ruleDirectoryName, storyDirectoryName, comicStyleId ?? undefined)
       .then((roster) => {
         if (cancelled) {
           return;
@@ -741,7 +775,81 @@ export function GameScreen(props: GameScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeDrawer, actionLocked, snapshot]);
+  }, [
+    comicStyleId,
+    snapshot?.contentSummary.ruleDirectoryName,
+    snapshot?.contentSummary.storyDirectoryName,
+    snapshot?.session.id
+  ]);
+
+  useEffect(() => {
+    if (!snapshot || npcLoading) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+    const styleId = comicStyleId?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName || !styleId) {
+      return;
+    }
+
+    const autoPrepareKey = [snapshot.session.id, ruleDirectoryName, storyDirectoryName, styleId].join(
+      "::"
+    );
+    if (npcAutoPrepareKeysRef.current.has(autoPrepareKey)) {
+      return;
+    }
+
+    npcAutoPrepareKeysRef.current.add(autoPrepareKey);
+    let cancelled = false;
+    setIsPreparingNpcPortraits(true);
+
+    void prepareNpcPortraits({
+      ruleDirectoryName,
+      storyDirectoryName,
+      styleId,
+      imageProfileId,
+      runtimeImageModelConfig,
+      promptTemplateConfig: imagePromptTemplateConfig ?? undefined
+    })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        setNpcRoster(result.roster);
+        setSelectedNpcId((current) =>
+          current && result.roster.some((item) => item.id === current)
+            ? current
+            : result.roster[0]?.id ?? null
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setNpcError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsPreparingNpcPortraits(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    comicStyleId,
+    imageProfileId,
+    imagePromptTemplateConfig,
+    npcLoading,
+    runtimeImageModelConfig,
+    snapshot?.contentSummary.ruleDirectoryName,
+    snapshot?.contentSummary.storyDirectoryName,
+    snapshot?.session.id
+  ]);
 
   useEffect(() => {
     if (
@@ -890,8 +998,23 @@ export function GameScreen(props: GameScreenProps) {
     }
   }
 
+  function replaceNpcRosterEntry(nextNpc: NpcRosterEntry): void {
+    setNpcRoster((current) =>
+      current.map((item) => (item.id === nextNpc.id ? nextNpc : item))
+    );
+  }
+
   async function handleGenerateNpcPortrait(npc: NpcRosterEntry): Promise<void> {
     if (!snapshot) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+    const styleId = comicStyleId?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName || !styleId) {
+      setNpcError(text.gameScreen.missingNpcContentInfo);
       return;
     }
 
@@ -899,27 +1022,51 @@ export function GameScreen(props: GameScreenProps) {
     setNpcError(null);
 
     try {
-      const result = await generateSceneImage({
-        prompt: npc.promptText.trim() || npc.summary.trim() || npc.name,
-        trigger: "character_portrait",
-        theme: imagePromptTemplateConfig?.defaultTheme,
-        sceneId: `${snapshot.session.id}:${npc.id}`,
+      const result = await regenerateNpcPortrait({
+        ruleDirectoryName,
+        storyDirectoryName,
+        styleId,
+        npcId: npc.id,
         imageProfileId,
         runtimeImageModelConfig,
-        promptTemplateConfig: imagePromptTemplateConfig ?? undefined,
-        allowFallback: true,
-        characters: [
-          {
-            name: npc.name,
-            appearance: npc.summary.trim() || npc.promptText.trim() || npc.name
-          }
-        ]
+        promptTemplateConfig: imagePromptTemplateConfig ?? undefined
       });
+      replaceNpcRosterEntry(result.npc);
+    } catch (error) {
+      setNpcError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGeneratingNpcId(null);
+    }
+  }
 
-      setGeneratedPortraits((current) => ({
-        ...current,
-        [npc.id]: result
-      }));
+  async function handleSelectNpcPortrait(
+    npc: NpcRosterEntry,
+    portraitId: string
+  ): Promise<void> {
+    if (!snapshot) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+    const styleId = comicStyleId?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName || !styleId) {
+      setNpcError(text.gameScreen.missingNpcContentInfo);
+      return;
+    }
+
+    setGeneratingNpcId(npc.id);
+    setNpcError(null);
+    try {
+      const result = await selectNpcPortrait({
+        ruleDirectoryName,
+        storyDirectoryName,
+        styleId,
+        npcId: npc.id,
+        portraitId
+      });
+      replaceNpcRosterEntry(result.npc);
     } catch (error) {
       setNpcError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1728,6 +1875,9 @@ export function GameScreen(props: GameScreenProps) {
 
                 {npcLoading ? <div className="empty-state">{text.gameScreen.loadingNpcFiles}</div> : null}
                 {npcError ? <div className="info-banner info-banner-warning">{npcError}</div> : null}
+                {!npcLoading && !npcError && isPreparingNpcPortraits ? (
+                  <div className="summary-text">{text.gameScreen.portraitPreparingHint}</div>
+                ) : null}
 
                 {!npcLoading && !npcError ? (
                   <div className="game-npc-layout">
@@ -1761,23 +1911,24 @@ export function GameScreen(props: GameScreenProps) {
                             </div>
                             <button
                               className="ghost-button"
-                              disabled={generatingNpcId === selectedNpc.id}
+                              disabled={generatingNpcId === selectedNpc.id || isPreparingNpcPortraits}
                               onClick={() => void handleGenerateNpcPortrait(selectedNpc)}
                               type="button"
                             >
                               {generatingNpcId === selectedNpc.id
                                 ? text.gameScreen.generatingPortrait
-                                : text.gameScreen.generatePortrait}
+                                : selectedNpcPortraits.length > 0
+                                  ? text.gameScreen.redrawPortrait
+                                  : text.gameScreen.generatePortrait}
                             </button>
                           </div>
 
                           <div className="game-npc-portrait">
-                            {generatedPortraits[selectedNpc.id]?.imageUrl ||
-                            selectedNpc.portraitAssetUrl ? (
+                            {selectedNpcPortrait?.image.apiPath || selectedNpc.portraitAssetUrl ? (
                               <img
                                 alt={selectedNpc.name}
                                 src={
-                                  generatedPortraits[selectedNpc.id]?.imageUrl ??
+                                  selectedNpcPortrait?.image.apiPath ??
                                   selectedNpc.portraitAssetUrl ??
                                   undefined
                                 }
@@ -1787,13 +1938,58 @@ export function GameScreen(props: GameScreenProps) {
                             )}
                           </div>
 
+                          {selectedNpcPortraits.length > 1 ? (
+                            <div className="button-row">
+                              <button
+                                className="ghost-button"
+                                disabled={
+                                  !previousNpcPortrait ||
+                                  generatingNpcId === selectedNpc.id ||
+                                  isPreparingNpcPortraits
+                                }
+                                onClick={() =>
+                                  void handleSelectNpcPortrait(
+                                    selectedNpc,
+                                    previousNpcPortrait?.portraitId ?? ""
+                                  )
+                                }
+                                type="button"
+                              >
+                                {text.gameScreen.portraitPrev}
+                              </button>
+                              <span className="summary-text">
+                                {text.gameScreen.portraitCounter(
+                                  selectedNpcPortraitIndex + 1,
+                                  selectedNpcPortraits.length
+                                )}
+                              </span>
+                              <button
+                                className="ghost-button"
+                                disabled={
+                                  !nextNpcPortrait ||
+                                  generatingNpcId === selectedNpc.id ||
+                                  isPreparingNpcPortraits
+                                }
+                                onClick={() =>
+                                  void handleSelectNpcPortrait(
+                                    selectedNpc,
+                                    nextNpcPortrait?.portraitId ?? ""
+                                  )
+                                }
+                                type="button"
+                              >
+                                {text.gameScreen.portraitNext}
+                              </button>
+                            </div>
+                          ) : null}
+
                           <div className="summary-text">{selectedNpc.summary}</div>
                           <pre>{selectedNpc.promptText}</pre>
-                          {generatedPortraits[selectedNpc.id] ? (
+                          {selectedNpcPortrait ? (
                             <div className="hint-text">
-                              {text.common.provider}: {generatedPortraits[selectedNpc.id]?.provider}
+                              {text.common.provider}: {selectedNpcPortrait.provider}
                               {"\n"}
-                              {text.common.prompt}: {generatedPortraits[selectedNpc.id]?.revisedPrompt}
+                              {text.common.prompt}: {selectedNpcPortrait.revisedPrompt}
                             </div>
                           ) : null}
                         </>

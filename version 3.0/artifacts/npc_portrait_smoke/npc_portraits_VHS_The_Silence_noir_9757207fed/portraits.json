@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "collectionId": "npc_portraits_VHS_The_Silence_noir_9757207fed",
+  "ruleDirectoryName": "VHS",
+  "storyDirectoryName": "The_Silence",
+  "styleId": "noir",
+  "styleName": "Noir",
+  "createdAt": "2026-04-15T22:39:58.998Z",
+  "updatedAt": "2026-04-15T22:39:59.017Z",
+  "npcs": [
+    {
+      "npcId": "哈罗德·贝恩",
+      "selectedPortraitId": "portrait_17007a31-f4f4-47ed-a98d-fc06017c0a90",
+      "portraits": [
+        {
+          "portraitId": "portrait_c4e9144a-1ff1-4624-b69e-8e0b17d49b58",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-15T22:39:59.001Z",
+          "prompt": "TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., realistic travel-journal illustration, earthy tone, cinematic natural light, no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_26f683241a/id_26f683241a_portrait_c4e9144a-1ff1-4624-b69e-8e0b17d.svg",
+            "storagePath": "F:\\Documents\\GitHub\\AI_TRPG_616\\version 3.0\\artifacts\\npc_portrait_smoke\\npc_portraits_VHS_The_Silence_noir_9757207fed\\portraits\\id_26f683241a\\id_26f683241a_portrait_c4e9144a-1ff1-4624-b69e-8e0b17d.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_VHS_The_Silence_noir_9757207fed/portraits/id_26f683241a/id_26f683241a_portrait_c4e9144a-1ff1-4624-b69e-8e0b17d.svg",
+            "mimeType": "image/svg+xml"
+          }
+        },
+        {
+          "portraitId": "portrait_17007a31-f4f4-47ed-a98d-fc06017c0a90",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-15T22:39:59.016Z",
+          "prompt": "TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., realistic travel-journal illustration, earthy tone, cinematic natural light, no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_26f683241a/id_26f683241a_portrait_17007a31-f4f4-47ed-a98d-fc06017.svg",
+            "storagePath": "F:\\Documents\\GitHub\\AI_TRPG_616\\version 3.0\\artifacts\\npc_portrait_smoke\\npc_portraits_VHS_The_Silence_noir_9757207fed\\portraits\\id_26f683241a\\id_26f683241a_portrait_17007a31-f4f4-47ed-a98d-fc06017.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_VHS_The_Silence_noir_9757207fed/portraits/id_26f683241a/id_26f683241a_portrait_17007a31-f4f4-47ed-a98d-fc06017.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "简·卡特",
+      "selectedPortraitId": "portrait_88e6fb80-8be5-40ff-9b9c-f2d38d114a0c",
+      "portraits": [
+        {
+          "portraitId": "portrait_88e6fb80-8be5-40ff-9b9c-f2d38d114a0c",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-15T22:39:59.006Z",
+          "prompt": "TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 简·卡特. a young woman with long dark hair partially covering her face,dark skin, soft expression with slight delay in focus, wearing a long dark trench coat over a simple shirt her body slightly transparent with subtle VHS glitch distortion, scanlines and analog noise around edges, holding a worn notebook and broken headphones Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 简·卡特. a young woman with long dark hair partially covering her face,dark skin, soft expression with slight delay in focus, wearing a long dark trench coat over a simple shirt her body slightly transparent with subtle VHS glitch distortion, scanlines and analog noise around edges, holding a worn notebook and broken headphones Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., realistic travel-journal illustration, earthy tone, cinematic natural light, no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_f23136a308/id_f23136a308_portrait_88e6fb80-8be5-40ff-9b9c-f2d38d1.svg",
+            "storagePath": "F:\\Documents\\GitHub\\AI_TRPG_616\\version 3.0\\artifacts\\npc_portrait_smoke\\npc_portraits_VHS_The_Silence_noir_9757207fed\\portraits\\id_f23136a308\\id_f23136a308_portrait_88e6fb80-8be5-40ff-9b9c-f2d38d1.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_VHS_The_Silence_noir_9757207fed/portraits/id_f23136a308/id_f23136a308_portrait_88e6fb80-8be5-40ff-9b9c-f2d38d1.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "莉莉·卡特",
+      "selectedPortraitId": "portrait_7536f172-e0ef-48ab-bd40-cc10cc2f10bd",
+      "portraits": [
+        {
+          "portraitId": "portrait_7536f172-e0ef-48ab-bd40-cc10cc2f10bd",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-15T22:39:59.008Z",
+          "prompt": "TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 莉莉·卡特. a young american sweetheart girl, blonde hair in a slightly messy high ponytail, soft freckles on nose and cheeks, pale skin, light blue eyes with subtle dark circles, exhausted but determined expression, wearing a light blue oversized hoodie layered under a faded denim jacket, slim dark jeans, dirty white sneakers, holding a polaroid camera hanging around her neck, gripping a flashlight Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 莉莉·卡特. a young american sweetheart girl, blonde hair in a slightly messy high ponytail, soft freckles on nose and cheeks, pale skin, light blue eyes with subtle dark circles, exhausted but determined expression, wearing a light blue oversized hoodie layered under a faded denim jacket, slim dark jeans, dirty white sneakers, holding a polaroid camera hanging around her neck, gripping a flashlight Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., realistic travel-journal illustration, earthy tone, cinematic natural light, no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_1eceb112fd/id_1eceb112fd_portrait_7536f172-e0ef-48ab-bd40-cc10cc2.svg",
+            "storagePath": "F:\\Documents\\GitHub\\AI_TRPG_616\\version 3.0\\artifacts\\npc_portrait_smoke\\npc_portraits_VHS_The_Silence_noir_9757207fed\\portraits\\id_1eceb112fd\\id_1eceb112fd_portrait_7536f172-e0ef-48ab-bd40-cc10cc2.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_VHS_The_Silence_noir_9757207fed/portraits/id_1eceb112fd/id_1eceb112fd_portrait_7536f172-e0ef-48ab-bd40-cc10cc2.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "塔克·沃克",
+      "selectedPortraitId": "portrait_e8e85f45-b65b-4bb6-86ee-477d924516f6",
+      "portraits": [
+        {
+          "portraitId": "portrait_e8e85f45-b65b-4bb6-86ee-477d924516f6",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-15T22:39:59.011Z",
+          "prompt": "TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 塔克·沃克. 塔克·沃克 Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction for 湖岸录像谜灵. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Opening atmosphere: 1987 年 7 月 15 日，常青湖营地的夏令营闭营夜，一场大火吞掉了活动中心后方的储物间。官方结论是线路短路引发事故，一名年轻辅导员死于逃生不及。营地次年关闭，此后再也没有重开。 但这件事从未真正结束。 三十多年后，你收到一盘没有寄件人的旧 VHS 和一句手写留言： **“她不是死于火。她死于没人开门。去常青湖，别让他们再关掉声音。”** 傍晚，你抵达这片被雾气和腐木味包住的废弃营地。入口处站着一个叫莉莉的年轻女孩，她在找失踪的姐姐. Keep costumes, props, and visual mood aligned with this story setting. NPC name: 塔克·沃克. 塔克·沃克 Comic style reference: film noir style, high contrast black and white, deep dramatic shadows, 1940s detective aesthetic, heavy bold inking, moody atmospheric lighting. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., realistic travel-journal illustration, earthy tone, cinematic natural light, no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_29053dbaac/id_29053dbaac_portrait_e8e85f45-b65b-4bb6-86ee-477d924.svg",
+            "storagePath": "F:\\Documents\\GitHub\\AI_TRPG_616\\version 3.0\\artifacts\\npc_portrait_smoke\\npc_portraits_VHS_The_Silence_noir_9757207fed\\portraits\\id_29053dbaac\\id_29053dbaac_portrait_e8e85f45-b65b-4bb6-86ee-477d924.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_VHS_The_Silence_noir_9757207fed/portraits/id_29053dbaac/id_29053dbaac_portrait_e8e85f45-b65b-4bb6-86ee-477d924.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    }
+  ]
+}

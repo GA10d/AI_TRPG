@@ -451,6 +451,13 @@ export type ComicPromptPresetResponse = {
   pageLayout: string;
 };
 
+export type PersistedImageAsset = {
+  relativePath: string;
+  storagePath: string;
+  apiPath: string;
+  mimeType: string | null;
+};
+
 export type PersistedComicAsset = {
   relativePath: string;
   storagePath: string;
@@ -535,12 +542,64 @@ export type PersistedComicMutationResponse = {
   page: PersistedComicPage;
 };
 
+export type NpcPortraitVariant = {
+  portraitId: string;
+  source: "generated" | "story_asset";
+  provider: string;
+  createdAt: string | null;
+  prompt: string | null;
+  revisedPrompt: string;
+  image: PersistedImageAsset;
+};
+
 export type NpcRosterEntry = {
   id: string;
   name: string;
   summary: string;
   promptText: string;
   portraitAssetUrl?: string | null;
+  portraitStyleId?: string | null;
+  selectedPortraitId?: string | null;
+  portraitVariants?: NpcPortraitVariant[];
+};
+
+export type PrepareNpcPortraitsRequest = {
+  ruleDirectoryName: string;
+  storyDirectoryName: string;
+  styleId?: string;
+  imageProfileId?: string;
+  runtimeImageModelConfig?: RuntimeImageModelConfigInput;
+  promptTemplateConfig?: ImagePromptTemplateConfig;
+};
+
+export type PrepareNpcPortraitsResponse = {
+  roster: NpcRosterEntry[];
+  style: ComicStylePreset;
+  generatedNpcIds: string[];
+  reusedNpcIds: string[];
+};
+
+export type RegenerateNpcPortraitRequest = PrepareNpcPortraitsRequest & {
+  npcId: string;
+};
+
+export type RegenerateNpcPortraitResponse = {
+  npc: NpcRosterEntry;
+  portrait: NpcPortraitVariant;
+  style: ComicStylePreset;
+};
+
+export type SelectNpcPortraitRequest = {
+  ruleDirectoryName: string;
+  storyDirectoryName: string;
+  styleId?: string;
+  npcId: string;
+  portraitId: string;
+};
+
+export type SelectNpcPortraitResponse = {
+  npc: NpcRosterEntry;
+  style: ComicStylePreset;
 };
 
 export type BootstrapResponse = {

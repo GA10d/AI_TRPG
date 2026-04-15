@@ -3640,6 +3640,7 @@ export function App() {
           storyControlMode={storyControlMode}
           imageProfileId={imageProfileId}
           runtimeImageModelConfig={runtimeImageModelConfig}
+          comicStyleId={resolvedComicStyleId ?? comicStyleId}
           imagePromptTemplateConfig={
             imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig ?? null
           }

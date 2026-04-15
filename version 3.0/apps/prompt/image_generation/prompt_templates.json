@@ -10,7 +10,7 @@
   },
   "triggerTemplates": {
     "manual": "{basePrompt}, {castClause} TRPG illustration, {themeStyle}, no text, no watermark",
-    "character_portrait": "TRPG character portrait sheet, vertical composition, portrait orientation 2:3, full body, clean silhouette, {basePrompt}, {themeStyle}, no text, no watermark",
+    "character_portrait": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, {basePrompt}, {themeStyle}, no text, no watermark",
     "npc_intro": "TRPG NPC portrait card, half body, {basePrompt}, {castClause} {themeStyle}, no text, no watermark",
     "scene_shift": "TRPG exploration environment wide shot, {basePrompt}, {castClause} {themeStyle}, no text, no watermark"
   },

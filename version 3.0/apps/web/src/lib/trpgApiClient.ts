@@ -13,9 +13,13 @@ import type {
   ImageGenerationResponse,
   LocalSaveSettings,
   NpcRosterEntry,
+  PrepareNpcPortraitsRequest,
+  PrepareNpcPortraitsResponse,
   PickLocalSaveDirectoryRequest,
   PickLocalSaveDirectoryResponse,
   PrepareRoundRequest,
+  RegenerateNpcPortraitRequest,
+  RegenerateNpcPortraitResponse,
   SavedGameRecord,
   SaveBundle,
   SendPrivateChatRequest,
@@ -24,6 +28,8 @@ import type {
   SessionMemoryDebugResponse,
   SessionMemoryRebuildResponse,
   SessionSnapshot,
+  SelectNpcPortraitRequest,
+  SelectNpcPortraitResponse,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
   TurnResolutionStreamEvent,
@@ -484,15 +490,70 @@ export async function assistCharacterConcept(
 
 export async function fetchNpcRoster(
   ruleDirectoryName: string,
-  storyDirectoryName: string
+  storyDirectoryName: string,
+  styleId?: string
 ): Promise<NpcRosterEntry[]> {
   try {
     const searchParams = new URLSearchParams({
       ruleDirectoryName,
       storyDirectoryName
     });
+    if (styleId?.trim()) {
+      searchParams.set("styleId", styleId.trim());
+    }
     const response = await fetch(`/api/npcs?${searchParams.toString()}`);
     return parseJson<NpcRosterEntry[]>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function prepareNpcPortraits(
+  payload: PrepareNpcPortraitsRequest
+): Promise<PrepareNpcPortraitsResponse> {
+  try {
+    const response = await fetch("/api/npcs/portraits/prepare", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    return parseJson<PrepareNpcPortraitsResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function regenerateNpcPortrait(
+  payload: RegenerateNpcPortraitRequest
+): Promise<RegenerateNpcPortraitResponse> {
+  try {
+    const response = await fetch("/api/npcs/portraits/regenerate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    return parseJson<RegenerateNpcPortraitResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function selectNpcPortrait(
+  payload: SelectNpcPortraitRequest
+): Promise<SelectNpcPortraitResponse> {
+  try {
+    const response = await fetch("/api/npcs/portraits/select", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    return parseJson<SelectNpcPortraitResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

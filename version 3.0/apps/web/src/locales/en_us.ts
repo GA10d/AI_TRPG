@@ -556,8 +556,14 @@ export const enUs = {
       "This save is missing content directory information, so NPC files cannot be loaded.",
     npcSelectHint: "Select an NPC from the left side first.",
     generatePortrait: "Generate Portrait",
+    redrawPortrait: "Redraw Portrait",
     generatingPortrait: "Generating...",
     noPortraitYet: "This NPC does not have a portrait yet.",
+    portraitPreparingHint:
+      "You are already in the game. NPC portraits are being prepared in the background, and cached portraits will be reused when available.",
+    portraitPrev: "Previous",
+    portraitNext: "Next",
+    portraitCounter: (current: number, total: number) => `${current} / ${total}`,
     detailsEyebrow: "Details",
     detailsTitle: "Session Details",
     detailsDescription:

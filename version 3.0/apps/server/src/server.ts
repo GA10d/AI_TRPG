@@ -23,7 +23,9 @@ import type {
   GenerateOpeningPreviewResponse,
   ImageGenerationRequest,
   LoadSaveRequest,
+  PrepareNpcPortraitsRequest,
   PickLocalSaveDirectoryRequest,
+  RegenerateNpcPortraitRequest,
   UpdateLocalSaveSettingsRequest,
   PrepareRoundRequest,
   SessionContextPackDebugResponse,
@@ -31,6 +33,7 @@ import type {
   SessionCreateStreamEvent,
   SessionMemoryDebugResponse,
   SessionMemoryRebuildResponse,
+  SelectNpcPortraitRequest,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
   TurnResolutionStreamEvent,
@@ -39,8 +42,7 @@ import type {
 } from "../../../packages/shared-types/src/index.ts";
 import {
   loadContentCatalog,
-  loadPlayableContentBundle,
-  loadStoryNpcRoster
+  loadPlayableContentBundle
 } from "./content/index.ts";
 import { loadAiAppearanceTags, loadAiPersonalityTags } from "./ai_players/index.ts";
 import {
@@ -63,6 +65,13 @@ import {
   upsertWorldlineComicPage
 } from "./comic_generation/index.ts";
 import { resolveComicAssetAbsolutePath } from "./comic_generation/storage.ts";
+import {
+  loadNpcRosterWithPortraits,
+  prepareNpcPortraits,
+  regenerateNpcPortrait,
+  resolveNpcPortraitAssetAbsolutePath,
+  selectNpcPortrait
+} from "./npc_portraits/index.ts";
 import {
   buildDefaultCreateSessionRequest,
   commitPreparedRound,
@@ -106,6 +115,7 @@ const contentRoot = join(projectRoot, "content");
 const webDistRoot = join(projectRoot, "apps", "web", "dist");
 const defaultLocalSaveRoot = join(projectRoot, "local_data", "saves");
 const defaultComicRoot = join(projectRoot, "local_data", "comics");
+const defaultNpcPortraitRoot = join(projectRoot, "local_data", "npc_portraits");
 const localSettingsPath = join(projectRoot, "local_data", "settings.json");
 const store = new InMemorySessionStore();
 const port = Number(process.env.PORT ?? 4316);
@@ -315,6 +325,31 @@ async function handleApiRequest(
     return true;
   }
 
+  if (url.pathname.startsWith("/api/npc-portrait-assets/") && request.method === "GET") {
+    const relativeSegments = url.pathname
+      .replace("/api/npc-portrait-assets/", "")
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+
+    if (relativeSegments.length < 2) {
+      sendJson(response, 400, {
+        error: "INVALID_NPC_PORTRAIT_ASSET_REQUEST",
+        message: "collectionId and asset path are required."
+      });
+      return true;
+    }
+
+    const [collectionId, ...assetSegments] = relativeSegments;
+    const absolutePath = resolveNpcPortraitAssetAbsolutePath({
+      portraitRoot: defaultNpcPortraitRoot,
+      collectionId,
+      relativePath: assetSegments.join("/")
+    });
+    await serveAbsoluteFile(response, absolutePath, join(defaultNpcPortraitRoot, collectionId));
+    return true;
+  }
+
   if (url.pathname === "/api/default-session-request" && request.method === "GET") {
     sendJson(response, 200, buildDefaultCreateSessionRequest());
     return true;
@@ -483,6 +518,7 @@ async function handleApiRequest(
   if (url.pathname === "/api/npcs" && request.method === "GET") {
     const ruleDirectoryName = url.searchParams.get("ruleDirectoryName")?.trim() ?? "";
     const storyDirectoryName = url.searchParams.get("storyDirectoryName")?.trim() ?? "";
+    const styleId = url.searchParams.get("styleId")?.trim() ?? undefined;
 
     if (!ruleDirectoryName || !storyDirectoryName) {
       sendJson(response, 400, {
@@ -492,12 +528,47 @@ async function handleApiRequest(
       return true;
     }
 
-    const roster = await loadStoryNpcRoster(
+    const roster = await loadNpcRosterWithPortraits({
       contentRoot,
+      portraitRoot: defaultNpcPortraitRoot,
       ruleDirectoryName,
-      storyDirectoryName
-    );
+      storyDirectoryName,
+      styleId
+    });
     sendJson(response, 200, roster);
+    return true;
+  }
+
+  if (url.pathname === "/api/npcs/portraits/prepare" && request.method === "POST") {
+    const payload = await readJsonBody<PrepareNpcPortraitsRequest>(request);
+    const result = await prepareNpcPortraits({
+      contentRoot,
+      portraitRoot: defaultNpcPortraitRoot,
+      request: payload
+    });
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/npcs/portraits/regenerate" && request.method === "POST") {
+    const payload = await readJsonBody<RegenerateNpcPortraitRequest>(request);
+    const result = await regenerateNpcPortrait({
+      contentRoot,
+      portraitRoot: defaultNpcPortraitRoot,
+      request: payload
+    });
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/npcs/portraits/select" && request.method === "POST") {
+    const payload = await readJsonBody<SelectNpcPortraitRequest>(request);
+    const result = await selectNpcPortrait({
+      contentRoot,
+      portraitRoot: defaultNpcPortraitRoot,
+      request: payload
+    });
+    sendJson(response, 200, result);
     return true;
   }
 

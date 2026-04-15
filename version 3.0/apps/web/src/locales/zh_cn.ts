@@ -529,8 +529,13 @@
     missingNpcContentInfo: "这个存档缺少内容目录信息，因此无法加载 NPC 档案。",
     npcSelectHint: "请先从左侧选择一位 NPC。",
     generatePortrait: "生成立绘",
+    redrawPortrait: "重新绘制",
     generatingPortrait: "生成中...",
     noPortraitYet: "这个 NPC 暂时还没有立绘。",
+    portraitPreparingHint: "已经进入游戏，NPC 立绘正在后台准备中；已有缓存会直接复用。",
+    portraitPrev: "上一张",
+    portraitNext: "下一张",
+    portraitCounter: (current: number, total: number) => `第 ${current} / ${total} 张`,
     detailsEyebrow: "详情",
     detailsTitle: "会话详情",
     detailsDescription:
