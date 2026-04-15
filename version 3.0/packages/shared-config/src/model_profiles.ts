@@ -285,6 +285,56 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
     }
   },
   {
+    id: "qwen",
+    order: 36,
+    name: "Qwen",
+    code: "qwen",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible",
+    dependence: "OpenAI",
+    description: "Use Alibaba Cloud Model Studio Qwen models through the OpenAI-compatible interface.",
+    urlRequirements: true,
+    baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    baseModel: "qwen-plus",
+    chargeUrl: "https://www.alibabacloud.com/help/en/model-studio/models",
+    docsUrl: "https://www.alibabacloud.com/help/en/model-studio/first-api-call-to-qwen",
+    envKeyCandidates: [
+      "QWEN_API_KEY",
+      "TRPG_QWEN_API_KEY",
+      "DASHSCOPE_API_KEY",
+      "BAILIAN_API_KEY",
+      "TRPG_SERVER_PROXY_API_KEY"
+    ],
+    modelEnvKeyCandidates: ["TRPG_QWEN_MODEL", "TRPG_SERVER_PROXY_MODEL"],
+    baseUrlEnvKeyCandidates: ["TRPG_QWEN_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      mini_version: {
+        supported: true,
+        model: "qwen-flash",
+        url: "https://www.alibabacloud.com/help/en/model-studio/models"
+      },
+      deep_think: {
+        supported: true,
+        model: "qwen-plus",
+        url: "https://www.alibabacloud.com/help/en/model-studio/models"
+      },
+      json_output: {
+        supported: true,
+        model: "qwen-plus",
+        url: "https://www.alibabacloud.com/help/en/model-studio/qwen-api-reference"
+      },
+      tool_calls: {
+        supported: false,
+        model: null,
+        url: "https://www.alibabacloud.com/help/en/model-studio/qwen-api-reference"
+      },
+      file_upload: { supported: false, model: null, url: null }
+    }
+  },
+  {
     id: "custom-openai-compatible",
     order: 40,
     name: "Custom OpenAI-Compatible",

@@ -844,3 +844,15 @@ export async function updateStoryControlMode(
     throw normalizeNetworkError(error);
   }
 }
+
+export async function dismissEnding(sessionId: string): Promise<SessionSnapshot> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/ending/dismiss`, {
+      method: "POST"
+    });
+
+    return parseJson<SessionSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}

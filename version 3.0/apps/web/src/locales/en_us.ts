@@ -216,6 +216,9 @@ export const enUs = {
       manualNarrationPending: "Testing the manual narrator reply against the ending judge...",
       manualNarrationSuccess: "The manual narrator reply was recorded and judged successfully.",
       manualNarrationEnded: "The manual narrator reply triggered an ending and the session is now closed.",
+      dismissEndingUnavailable: "There is no ending state to dismiss right now.",
+      dismissEndingPending: "Reopening the session and dismissing the false ending...",
+      dismissEndingSuccess: "The ending state was cleared. You can continue the run now.",
       noActiveSessionToSave: "There is no active session to save.",
       creatingLocalSave: "Creating a local save...",
       localSaveCreated: "Local save created.",
@@ -493,6 +496,8 @@ export const enUs = {
     commitRound: "Commit Round",
     submitTurn: "Submit Turn",
     endingFollowupSubmit: "Send Follow-up",
+    dismissEndingFalsePositive: "False Ending",
+    dismissEndingFalsePositiveSubmitting: "Reopening...",
     openSettlementPage: "Settlement Page",
     settlementPageTitle: "Settlement Page",
     settlementPageDescription:

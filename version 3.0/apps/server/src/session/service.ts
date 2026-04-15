@@ -1271,6 +1271,69 @@ export async function updateStoryControlMode(
   }));
 }
 
+export async function dismissEndingState(
+  sessionId: string,
+  store: InMemorySessionStore
+): Promise<SessionSnapshot | null> {
+  const current = store.get(sessionId);
+  if (!current) {
+    return null;
+  }
+
+  const currentEndingState = current.session.gameState.endingState;
+  if (!currentEndingState) {
+    throw new Error("The current session is not locked in an ending.");
+  }
+
+  const timestamp = nowIso();
+  const replayEvent: ReplayEvent = {
+    id: `evt_${randomUUID()}`,
+    round: current.session.currentRound,
+    createdAt: timestamp,
+    actorId: current.session.localHumanParticipantId ?? current.session.playerParticipantId,
+    type: "ending_dismissed",
+    displayLevel: "core",
+    summary: `Ending dismissed: ${currentEndingState.title}`,
+    payload: {
+      endingId: currentEndingState.endingId,
+      endingType: currentEndingState.endingType,
+      endingTitle: currentEndingState.title,
+      dismissedAs: "false_positive",
+      previousJudgeReason:
+        current.session.gameState.lastEndingJudgeDecision?.Reason ??
+        current.session.gameState.lastEndingJudgeResult?.endingState?.summary ??
+        null
+    }
+  };
+
+  const updatedSnapshot = store.update(sessionId, (latest) => ({
+    ...latest,
+    session: {
+      ...latest.session,
+      status: "active",
+      updatedAt: timestamp,
+      gameState: {
+        ...latest.session.gameState,
+        phase: "playing",
+        endingState: null,
+        lastEndingJudgeResult: null,
+        lastEndingJudgeDecision: null
+      }
+    },
+    replay: [
+      ...latest.replay,
+      replayEvent
+    ]
+  }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  store.save(updatedSnapshot);
+  return updatedSnapshot;
+}
+
 export async function submitManualNarration(
   sessionId: string,
   request: SubmitManualNarrationRequest,

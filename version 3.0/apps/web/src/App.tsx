@@ -26,6 +26,7 @@ import type {
 import {
   assistCharacterConcept,
   createSave,
+  dismissEnding,
   fetchComicPromptPresets,
   fetchSaveBundle,
   fetchLocalSaveSettings,
@@ -644,6 +645,7 @@ export function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [isPreparingRound, setIsPreparingRound] = useState(false);
   const [isSubmittingTurn, setIsSubmittingTurn] = useState(false);
+  const [isDismissingEnding, setIsDismissingEnding] = useState(false);
   const [isInjectingManualNarration, setIsInjectingManualNarration] = useState(false);
   const [isSendingPrivateChat, setIsSendingPrivateChat] = useState(false);
   const [isUpdatingStoryControl, setIsUpdatingStoryControl] = useState(false);
@@ -765,6 +767,7 @@ export function App() {
     activeGraphBundle,
     beginFromSnapshot,
     captureTurn,
+    refreshCurrentSnapshot,
     syncSavedBundle,
     relinkSnapshot,
     relinkSaveBundle,
@@ -2428,6 +2431,50 @@ export function App() {
     }
   }
 
+  async function handleDismissEnding(): Promise<void> {
+    if (!snapshot) {
+      setStatus({
+        message: uiText.app.status.startGameFirst,
+        tone: "error"
+      });
+      return;
+    }
+
+    if (!snapshot.session.gameState.endingState) {
+      setStatus({
+        message: uiText.app.status.dismissEndingUnavailable,
+        tone: "error"
+      });
+      return;
+    }
+
+    setIsDismissingEnding(true);
+    setStatus({
+      message: uiText.app.status.dismissEndingPending,
+      tone: "neutral"
+    });
+
+    try {
+      const nextSnapshot = await dismissEnding(snapshot.session.id);
+      commitSnapshot(nextSnapshot);
+      refreshCurrentSnapshot(
+        nextSnapshot,
+        getGraphRuntimeConfig(nextSnapshot, nextSnapshot.session.settings.modelProfileId)
+      );
+      setStatus({
+        message: uiText.app.status.dismissEndingSuccess,
+        tone: "neutral"
+      });
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    } finally {
+      setIsDismissingEnding(false);
+    }
+  }
+
   async function handleCreateSession(
     event: React.FormEvent<HTMLFormElement>
   ): Promise<void> {
@@ -3575,6 +3622,7 @@ export function App() {
           sessionBootstrapState={sessionBootstrapState}
           isPreparingRound={isPreparingRound}
           isSubmittingTurn={isSubmittingTurn}
+          isDismissingEnding={isDismissingEnding}
           isInjectingManualNarration={isInjectingManualNarration}
           isSendingPrivateChat={isSendingPrivateChat}
           isUpdatingStoryControl={isUpdatingStoryControl}
@@ -3604,6 +3652,7 @@ export function App() {
           onSendPrivateChat={handleSendPrivateChat}
           onStoryControlModeChange={handleStoryControlModeChange}
           onTurnInputChange={setTurnInput}
+          onDismissEnding={handleDismissEnding}
           onOpenSettlement={() => setView("settlement")}
           onSubmitTurn={handleSubmitTurn}
         />

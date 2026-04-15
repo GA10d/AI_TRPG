@@ -73,6 +73,7 @@ type GameScreenProps = {
   sessionBootstrapState: SessionBootstrapPanelState | null;
   isPreparingRound: boolean;
   isSubmittingTurn: boolean;
+  isDismissingEnding: boolean;
   isInjectingManualNarration: boolean;
   isSendingPrivateChat: boolean;
   isUpdatingStoryControl: boolean;
@@ -100,6 +101,7 @@ type GameScreenProps = {
   onSendPrivateChat: (targetParticipantId: string, content: string) => Promise<boolean>;
   onStoryControlModeChange: (mode: StoryControlMode) => Promise<void>;
   onTurnInputChange: (value: string) => void;
+  onDismissEnding: () => Promise<void>;
   onOpenSettlement: () => void;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -204,6 +206,7 @@ export function GameScreen(props: GameScreenProps) {
     sessionBootstrapState,
     isPreparingRound,
     isSubmittingTurn,
+    isDismissingEnding,
     isInjectingManualNarration,
     isSendingPrivateChat,
     isUpdatingStoryControl,
@@ -231,6 +234,7 @@ export function GameScreen(props: GameScreenProps) {
     onSendPrivateChat,
     onStoryControlModeChange,
     onTurnInputChange,
+    onDismissEnding,
     onOpenSettlement,
     onSubmitTurn
   } = props;
@@ -332,6 +336,7 @@ export function GameScreen(props: GameScreenProps) {
     actionLocked ||
     isPreparingRound ||
     isSubmittingTurn ||
+    isDismissingEnding ||
     isUpdatingStoryControl ||
     storyAutoMode;
   const endingJudgeDecision = snapshot?.session.gameState.lastEndingJudgeDecision ?? null;
@@ -414,11 +419,21 @@ export function GameScreen(props: GameScreenProps) {
   const supportsReasoningPanel =
     snapshot?.session.settings.modelProfileId === "deepseek-reasoner";
   const storyControlLocked = isUpdatingStoryControl;
+  const dismissEndingLocked =
+    actionLocked ||
+    isPreparingRound ||
+    isSubmittingTurn ||
+    isDismissingEnding ||
+    isInjectingManualNarration ||
+    isSendingPrivateChat ||
+    isUpdatingStoryControl ||
+    storyAutoMode;
   const privateChatLocked =
     actionLocked ||
     isSessionEnded ||
     isPreparingRound ||
     isSubmittingTurn ||
+    isDismissingEnding ||
     isSendingPrivateChat ||
     isUpdatingStoryControl ||
     storyAutoMode;
@@ -426,6 +441,7 @@ export function GameScreen(props: GameScreenProps) {
     actionLocked ||
     isPreparingRound ||
     isSubmittingTurn ||
+    isDismissingEnding ||
     isInjectingManualNarration;
   const bootstrapProgressPercent = Math.max(
     8,
@@ -1143,6 +1159,18 @@ export function GameScreen(props: GameScreenProps) {
                     </button>
                   </div>
                 </div>
+              ) : null}
+              {hasEndingState ? (
+                <button
+                  className="ghost-button"
+                  disabled={dismissEndingLocked}
+                  onClick={() => void onDismissEnding()}
+                  type="button"
+                >
+                  {isDismissingEnding
+                    ? text.gameScreen.dismissEndingFalsePositiveSubmitting
+                    : text.gameScreen.dismissEndingFalsePositive}
+                </button>
               ) : null}
               {hasEndingState ? (
                 <button className="ghost-button" onClick={onOpenSettlement} type="button">

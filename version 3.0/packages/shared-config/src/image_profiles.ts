@@ -13,7 +13,7 @@ export const IMAGE_MODEL_FEATURE_LABELS: Record<ImageModelFeatureKey, string> = 
   reference_image: "Reference Image"
 };
 
-export type ImageProviderDependence = "Mock" | "OpenAI" | "Google";
+export type ImageProviderDependence = "Mock" | "OpenAI" | "Google" | "DashScope";
 
 export type ImageProfileDefinition = {
   id: string;
@@ -306,6 +306,138 @@ export const IMAGE_PROFILES: ImageProfileDefinition[] = [
         url: null
       }
     }
+  },
+  {
+    id: "wan-image-pro",
+    order: 32,
+    name: "Wan 2.7 Image Pro",
+    code: "wan_image_pro",
+    providerFamily: "dashscope-native",
+    dependence: "DashScope",
+    description: "Most capable DashScope image model. Supports 4K output, stronger facial and color control, and image-set workflows.",
+    urlRequirements: true,
+    baseUrl: "https://dashscope-intl.aliyuncs.com/api/v1",
+    baseModel: "wan2.7-image-pro",
+    chargeUrl: "https://www.alibabacloud.com/help/en/model-studio/models",
+    docsUrl: "https://www.alibabacloud.com/help/en/model-studio/wan-image-generation-and-editing-api-reference",
+    envKeyCandidates: [
+      "TRPG_QWEN_IMAGE_API_KEY",
+      "QWEN_API_KEY",
+      "TRPG_QWEN_API_KEY",
+      "DASHSCOPE_API_KEY",
+      "BAILIAN_API_KEY",
+      "TRPG_IMAGE_API_KEY"
+    ],
+    modelEnvKeyCandidates: [
+      "TRPG_WAN_IMAGE_PRO_MODEL"
+    ],
+    baseUrlEnvKeyCandidates: [
+      "TRPG_QWEN_IMAGE_BASE_URL",
+      "TRPG_DASHSCOPE_IMAGE_BASE_URL"
+    ],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      text_to_image: {
+        supported: true,
+        model: "wan2.7-image-pro",
+        url: "https://www.alibabacloud.com/help/en/model-studio/wan-image-generation-and-editing-api-reference"
+      },
+      reference_image: {
+        supported: false,
+        model: null,
+        url: null
+      }
+    }
+  },
+  {
+    id: "qwen-image",
+    order: 33,
+    name: "Qwen Image 2.0 Pro",
+    code: "qwen_image_pro",
+    providerFamily: "dashscope-native",
+    dependence: "DashScope",
+    description: "Best at accurate Chinese and English text rendering. Good for posters, PPT-style visuals, charts, and layout-heavy prompts.",
+    urlRequirements: true,
+    baseUrl: "https://dashscope-intl.aliyuncs.com/api/v1",
+    baseModel: "qwen-image-2.0-pro",
+    chargeUrl: "https://www.alibabacloud.com/help/en/model-studio/models",
+    docsUrl: "https://www.alibabacloud.com/help/en/model-studio/qwen-image-api",
+    envKeyCandidates: [
+      "TRPG_QWEN_IMAGE_API_KEY",
+      "QWEN_API_KEY",
+      "TRPG_QWEN_API_KEY",
+      "DASHSCOPE_API_KEY",
+      "BAILIAN_API_KEY",
+      "TRPG_IMAGE_API_KEY"
+    ],
+    modelEnvKeyCandidates: [
+      "TRPG_QWEN_IMAGE_MODEL"
+    ],
+    baseUrlEnvKeyCandidates: [
+      "TRPG_QWEN_IMAGE_BASE_URL",
+      "TRPG_DASHSCOPE_IMAGE_BASE_URL"
+    ],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      text_to_image: {
+        supported: true,
+        model: "qwen-image-2.0-pro",
+        url: "https://www.alibabacloud.com/help/en/model-studio/qwen-image-api"
+      },
+      reference_image: {
+        supported: false,
+        model: null,
+        url: null
+      }
+    }
+  },
+  {
+    id: "z-image-turbo",
+    order: 34,
+    name: "Z-Image Turbo",
+    code: "z_image_turbo",
+    providerFamily: "dashscope-native",
+    dependence: "DashScope",
+    description: "Fastest and most cost-effective DashScope image option. Strong for photorealistic portraits and product shots.",
+    urlRequirements: true,
+    baseUrl: "https://dashscope-intl.aliyuncs.com/api/v1",
+    baseModel: "z-image-turbo",
+    chargeUrl: "https://www.alibabacloud.com/help/en/model-studio/models",
+    docsUrl: "https://www.alibabacloud.com/help/en/model-studio/z-image-api-reference",
+    envKeyCandidates: [
+      "TRPG_QWEN_IMAGE_API_KEY",
+      "QWEN_API_KEY",
+      "TRPG_QWEN_API_KEY",
+      "DASHSCOPE_API_KEY",
+      "BAILIAN_API_KEY",
+      "TRPG_IMAGE_API_KEY"
+    ],
+    modelEnvKeyCandidates: [
+      "TRPG_Z_IMAGE_TURBO_MODEL"
+    ],
+    baseUrlEnvKeyCandidates: [
+      "TRPG_QWEN_IMAGE_BASE_URL",
+      "TRPG_DASHSCOPE_IMAGE_BASE_URL"
+    ],
+    allowsCustomApiKey: true,
+    allowsCustomBaseUrl: true,
+    allowsCustomModel: true,
+    features: {
+      text_to_image: {
+        supported: true,
+        model: "z-image-turbo",
+        url: "https://www.alibabacloud.com/help/en/model-studio/z-image-api-reference"
+      },
+      reference_image: {
+        supported: false,
+        model: null,
+        url: null
+      }
+    }
   }
 ];
 
@@ -314,7 +446,8 @@ export function listImageProfiles(): ImageProfileDefinition[] {
 }
 
 export function getImageProfile(profileId: string): ImageProfileDefinition | null {
-  return IMAGE_PROFILES.find((item) => item.id === profileId) ?? null;
+  const normalizedProfileId = profileId === "qwen-image-fast" ? "z-image-turbo" : profileId;
+  return IMAGE_PROFILES.find((item) => item.id === normalizedProfileId) ?? null;
 }
 
 export function getDefaultImageProfileId(): string {

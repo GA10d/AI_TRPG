@@ -1,0 +1,14 @@
+{
+  "model": "qwen-plus",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a concise assistant for an AI TRPG project."
+    },
+    {
+      "role": "user",
+      "content": "Write a short opening narration for a campus mystery TRPG scene. Keep it under 120 words and end with a subtle hook."
+    }
+  ],
+  "temperature": 0.7
+}

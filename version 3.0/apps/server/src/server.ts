@@ -71,6 +71,7 @@ import {
   createSessionSnapshotWithProgress,
   getSessionContextPackState,
   getSessionMemoryState,
+  dismissEndingState,
   loadSessionFromSaveBundle,
   prepareRound,
   rebuildSessionMemoryForSession,
@@ -887,6 +888,26 @@ async function handleApiRequest(
       sendJson(response, 404, {
         error: "SESSION_NOT_FOUND",
         message: `鏈壘鍒?session: ${sessionId}`
+      });
+      return true;
+    }
+
+    sendJson(response, 200, snapshot);
+    return true;
+  }
+
+  if (
+    url.pathname.startsWith("/api/sessions/") &&
+    url.pathname.endsWith("/ending/dismiss") &&
+    request.method === "POST"
+  ) {
+    const sessionId = url.pathname.replace("/api/sessions/", "").replace("/ending/dismiss", "");
+    const snapshot = await dismissEndingState(sessionId, store);
+
+    if (!snapshot) {
+      sendJson(response, 404, {
+        error: "SESSION_NOT_FOUND",
+        message: `session not found: ${sessionId}`
       });
       return true;
     }

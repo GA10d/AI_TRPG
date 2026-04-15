@@ -1,0 +1,20 @@
+{
+  "model": "qwen-image-2.0-pro",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "text": "A dramatic manga-style comic panel set in a modern university corridor at dusk, a student detective pauses beside a classroom door, warm sunset light, strong composition, clean linework, cinematic atmosphere"
+          }
+        ]
+      }
+    ]
+  },
+  "parameters": {
+    "watermark": false,
+    "negative_prompt": "blurry, low detail, extra fingers, watermark, logo, unreadable text",
+    "prompt_extend": true
+  }
+}

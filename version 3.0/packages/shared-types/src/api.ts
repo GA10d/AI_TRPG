@@ -326,7 +326,7 @@ export type ImageProfileSummary = {
   name: string;
   code: string;
   providerFamily: string;
-  dependence: "Mock" | "OpenAI" | "Google";
+  dependence: "Mock" | "OpenAI" | "Google" | "DashScope";
   description: string;
   urlRequirements: boolean;
   baseUrl: string | null;

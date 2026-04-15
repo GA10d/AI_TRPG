@@ -464,6 +464,21 @@ type OpenAiCompatibleImageResponse = {
   }>;
 };
 
+type QwenImageResponse = {
+  output?: {
+    choices?: Array<{
+      message?: {
+        content?: Array<{
+          image?: string;
+          text?: string;
+          type?: string;
+        }>;
+        reasoning_content?: string;
+      };
+    }>;
+  };
+};
+
 async function extractOpenAiCompatibleImage(
   data: unknown,
   fallbackOutputFormat: string | undefined
@@ -580,6 +595,31 @@ async function generateOpenAiImage(args: {
   );
 }
 
+async function extractQwenImage(data: unknown): Promise<GeneratedImagePayload | null> {
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+
+  const payload = data as QwenImageResponse;
+  const content = payload.output?.choices?.[0]?.message?.content ?? [];
+  const rewrittenPrompt = content
+    .map((item) => (typeof item.text === "string" ? item.text.trim() : ""))
+    .find((item) => item.length > 0) ?? null;
+
+  for (const item of content) {
+    if (typeof item.image === "string" && item.image.length > 0) {
+      const resolved = await resolveReferenceImage(item.image);
+      return {
+        imageUrl: toDataUrl(resolved.mimeType, resolved.base64Data),
+        mimeType: resolved.mimeType,
+        revisedPrompt: rewrittenPrompt
+      };
+    }
+  }
+
+  return null;
+}
+
 async function generateDoubaoImage(args: {
   baseUrl: string;
   apiKey: string;
@@ -622,6 +662,79 @@ async function generateDoubaoImage(args: {
   const image = await extractOpenAiCompatibleImage(data, "png");
   if (!image) {
     throw new Error("Doubao image request returned no image data.");
+  }
+
+  return image;
+}
+
+async function generateQwenImage(args: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+  negativePrompt?: string;
+  imageSize?: string;
+  watermark?: boolean;
+}): Promise<GeneratedImagePayload> {
+  const normalizedModel = args.model.trim().toLowerCase();
+  const parameters: Record<string, unknown> = {
+    watermark: args.watermark ?? false
+  };
+
+  if (args.imageSize) {
+    parameters.size = args.imageSize;
+  }
+
+  if (args.negativePrompt?.trim()) {
+    parameters.negative_prompt = args.negativePrompt.trim();
+  }
+
+  if (normalizedModel.startsWith("wan2.7-image")) {
+    parameters.thinking_mode = true;
+    parameters.n = 1;
+  } else if (normalizedModel === "z-image-turbo") {
+    parameters.prompt_extend = false;
+  } else {
+    parameters.prompt_extend = true;
+  }
+
+  const response = await fetch(
+    `${args.baseUrl.replace(/\/+$/u, "")}/services/aigc/multimodal-generation/generation`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${args.apiKey}`
+      },
+      body: JSON.stringify({
+        model: args.model,
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  text: args.prompt
+                }
+              ]
+            }
+          ]
+        },
+        parameters
+      })
+    }
+  );
+
+  const data = await readResponseData(response);
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(data, `DashScope image request failed with HTTP ${response.status}.`)
+    );
+  }
+
+  const image = await extractQwenImage(data);
+  if (!image) {
+    throw new Error("DashScope image request returned no image data.");
   }
 
   return image;
@@ -734,6 +847,32 @@ export async function generateImage(
                 "outputCompression"
               )
             });
+
+      return {
+        imageUrl: generated.imageUrl,
+        revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
+        provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
+        cached: false,
+        mimeType: generated.mimeType,
+        outputPath: null
+      };
+    }
+
+    if (
+      providerConfig.dependence === "DashScope" &&
+      providerConfig.baseUrl &&
+      providerConfig.apiKey &&
+      providerConfig.model
+    ) {
+      const generated = await generateQwenImage({
+        baseUrl: providerConfig.baseUrl,
+        apiKey: providerConfig.apiKey,
+        model: providerConfig.model,
+        prompt: finalPrompt,
+        negativePrompt: request.negativePrompt,
+        imageSize: pickRuntimeImageString(request.runtimeImageModelConfig, "imageSize"),
+        watermark: pickRuntimeImageBoolean(request.runtimeImageModelConfig, "watermark")
+      });
 
       return {
         imageUrl: generated.imageUrl,

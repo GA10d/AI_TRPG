@@ -15,7 +15,7 @@ import type {
   RuntimeImageModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 
-export type ImageProxyDependence = "Mock" | "OpenAI" | "Google";
+export type ImageProxyDependence = "Mock" | "OpenAI" | "Google" | "DashScope";
 
 export type ImageProviderConfig = {
   profileId: string;
@@ -275,7 +275,9 @@ export function getImageProviderConfig(args?: {
         ? "image:mock"
         : profile.dependence === "Google"
           ? `image:google:${profile.code}`
-          : `image:openai:${profile.code}`,
+          : profile.dependence === "DashScope"
+            ? `image:dashscope:${profile.code}`
+            : `image:openai:${profile.code}`,
     features: profile.features
   };
 }

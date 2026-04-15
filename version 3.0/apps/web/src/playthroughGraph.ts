@@ -350,6 +350,21 @@ function buildEdge(
   };
 }
 
+function deriveGraphTerminalMetadata(
+  nodes: PlaythroughNode[]
+): Pick<PlaythroughGraph, "unlockedAtEnding" | "firstEndingReachedAt" | "terminalNodeIds"> {
+  const terminalNodes = nodes.filter((node) => node.terminalState.isTerminal);
+  const firstEndingReachedAt = terminalNodes
+    .map((node) => node.createdAt)
+    .sort((left, right) => left.localeCompare(right))[0];
+
+  return {
+    unlockedAtEnding: terminalNodes.length > 0,
+    firstEndingReachedAt,
+    terminalNodeIds: terminalNodes.map((node) => node.id)
+  };
+}
+
 function buildRootGraphBundle(
   snapshot: SessionSnapshot,
   runtimeConfig: SaveRuntimeConfig | undefined,
@@ -532,6 +547,78 @@ export function syncCurrentPlaythroughSaveBundle(
           }
         : snapshot
     )
+  };
+
+  return upsertGraphBundle(nextBundle);
+}
+
+export function refreshActivePlaythroughCurrentSnapshot(
+  snapshot: SessionSnapshot,
+  runtimeConfig?: SaveRuntimeConfig
+): PlaythroughGraphBundle | null {
+  const currentBundle = findActiveGraphBundle();
+  if (!currentBundle) {
+    return startPlaythroughGraph(snapshot, runtimeConfig);
+  }
+
+  const currentNodeId = currentBundle.graph.currentNodeId;
+  const currentNode = currentBundle.nodes.find((node) => node.id === currentNodeId);
+  const currentSnapshotBlob = currentBundle.snapshots.find(
+    (item) => item.nodeId === currentNodeId
+  );
+
+  if (!currentNode || !currentSnapshotBlob) {
+    return startPlaythroughGraph(snapshot, runtimeConfig);
+  }
+
+  const currentSaveBundle = currentSnapshotBlob.saveBundle;
+  if (
+    currentSaveBundle.session.id !== snapshot.session.id ||
+    currentSaveBundle.session.currentRound !== snapshot.session.currentRound ||
+    currentSaveBundle.session.ruleId !== snapshot.session.ruleId ||
+    currentSaveBundle.session.storyId !== snapshot.session.storyId
+  ) {
+    return relinkActivePlaythroughToSnapshot(snapshot, runtimeConfig, currentBundle.graph.id);
+  }
+
+  const saveBundle = buildSaveBundleFromSnapshot(snapshot, runtimeConfig, currentBundle.graph.id);
+  const { node: derivedNode, snapshotBlob } = buildNodeFromSnapshot(
+    currentBundle.graph.id,
+    snapshot,
+    saveBundle,
+    {
+      parentNodeId: currentNode.parentNodeId,
+      nodeId: currentNode.id,
+      snapshotId: currentSnapshotBlob.id
+    }
+  );
+
+  const refreshedNode: PlaythroughNode = {
+    ...derivedNode,
+    createdAt: currentNode.createdAt
+  };
+  const nextNodes = currentBundle.nodes.map((node) =>
+    node.id === currentNode.id ? refreshedNode : node
+  );
+  const nextSnapshots = currentBundle.snapshots.map((item) =>
+    item.id === currentSnapshotBlob.id
+      ? {
+          ...snapshotBlob,
+          createdAt: snapshot.session.updatedAt
+        }
+      : item
+  );
+  const terminalMetadata = deriveGraphTerminalMetadata(nextNodes);
+
+  const nextBundle: PlaythroughGraphBundle = {
+    graph: {
+      ...currentBundle.graph,
+      updatedAt: snapshot.session.updatedAt,
+      ...terminalMetadata
+    },
+    nodes: nextNodes,
+    edges: currentBundle.edges,
+    snapshots: nextSnapshots
   };
 
   return upsertGraphBundle(nextBundle);

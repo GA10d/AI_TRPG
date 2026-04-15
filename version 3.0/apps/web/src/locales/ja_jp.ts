@@ -220,6 +220,9 @@ export const jaJp = {
       manualNarrationPending: "手動ナレーター返信をエンディング判定にかけています...",
       manualNarrationSuccess: "手動ナレーター返信を記録し、判定を完了しました。",
       manualNarrationEnded: "手動ナレーター返信でエンディングが確定しました。",
+      dismissEndingUnavailable: "取り消せるエンディング状態はまだありません。",
+      dismissEndingPending: "誤判定だったエンディングを取り消しています...",
+      dismissEndingSuccess: "エンディング状態を解除しました。通常の進行へ戻れます。",
       noActiveSessionToSave: "保存できるアクティブなセッションがありません。",
       creatingLocalSave: "ローカルセーブを作成しています...",
       localSaveCreated: "ローカルセーブを作成しました。",
@@ -505,6 +508,8 @@ export const jaJp = {
     commitRound: "??????",
     submitTurn: "?????",
     endingFollowupSubmit: "追問を送信",
+    dismissEndingFalsePositive: "誤判定を解除",
+    dismissEndingFalsePositiveSubmitting: "解除中...",
     openSettlementPage: "結算ページ",
     settlementPageTitle: "結算ページ",
     settlementPageDescription:

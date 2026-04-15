@@ -121,7 +121,11 @@ function parseOptionalNumber(rawValue: string | undefined): number | null {
 }
 
 function resolveDefaultTimeoutMs(profileId: string): number {
-  if (profileId === "doubao" || profileId === "deepseek-reasoner") {
+  if (
+    profileId === "doubao" ||
+    profileId === "deepseek-reasoner" ||
+    profileId === "qwen"
+  ) {
     return 180_000;
   }
 
@@ -134,6 +138,13 @@ function resolveTimeoutMs(profile: ModelProfileDefinition): number {
   if (profile.id === "deepseek-reasoner") {
     return parseNumberOrDefault(
       envFirst("TRPG_DEEPSEEK_REASONER_TIMEOUT_MS", "TRPG_SERVER_PROXY_TIMEOUT_MS"),
+      defaultTimeoutMs
+    );
+  }
+
+  if (profile.id === "qwen") {
+    return parseNumberOrDefault(
+      envFirst("TRPG_QWEN_TIMEOUT_MS", "TRPG_SERVER_PROXY_TIMEOUT_MS"),
       defaultTimeoutMs
     );
   }

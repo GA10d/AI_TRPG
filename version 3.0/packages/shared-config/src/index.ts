@@ -47,6 +47,12 @@ export const DEFAULT_MODEL_PROFILES = [
     providerFamily: "openai-compatible"
   },
   {
+    id: "qwen",
+    label: "Qwen",
+    accessMode: "server_proxy",
+    providerFamily: "openai-compatible"
+  },
+  {
     id: "custom-openai-compatible",
     label: "Custom OpenAI-Compatible",
     accessMode: "server_proxy",

@@ -241,6 +241,7 @@ export type ReplayEvent = {
     | "turn_submitted"
     | "gm_response_received"
     | "ending_confirmed"
+    | "ending_dismissed"
     | "save_created"
     | "save_loaded";
   displayLevel: "core" | "detail" | "debug";

@@ -10,6 +10,7 @@ import {
   appendSnapshotToActivePlaythrough,
   loadActivePlaythroughGraph,
   prepareResumeFromPlaythroughNode,
+  refreshActivePlaythroughCurrentSnapshot,
   relinkActivePlaythroughToSaveBundle,
   relinkActivePlaythroughToSnapshot,
   startPlaythroughGraph,
@@ -43,6 +44,15 @@ export function usePlaythroughGraph() {
 
   function syncSavedBundle(saveBundle: SaveBundle): PlaythroughGraphBundle | null {
     const nextBundle = syncCurrentPlaythroughSaveBundle(saveBundle);
+    setActiveGraphBundle(nextBundle);
+    return nextBundle;
+  }
+
+  function refreshCurrentSnapshot(
+    snapshot: SessionSnapshot,
+    runtimeConfig?: SaveRuntimeConfig
+  ): PlaythroughGraphBundle | null {
+    const nextBundle = refreshActivePlaythroughCurrentSnapshot(snapshot, runtimeConfig);
     setActiveGraphBundle(nextBundle);
     return nextBundle;
   }
@@ -91,6 +101,7 @@ export function usePlaythroughGraph() {
     beginFromSnapshot,
     captureTurn,
     syncSavedBundle,
+    refreshCurrentSnapshot,
     relinkSnapshot,
     relinkSaveBundle,
     prepareResume

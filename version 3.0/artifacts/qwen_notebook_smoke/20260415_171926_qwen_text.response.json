@@ -1,0 +1,26 @@
+{
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "Rain slicks the cobblestones of Blackwood University as dusk bleeds into violet. The old Bellweather Hall looms—ivy-clad, windows dark except for one third-floor room glowing with a soft, *steady* amber light. No one’s scheduled there tonight. You stand beneath its dripping eaves, breath fogging, clutching a crumpled note found slipped under your dorm door: *“She didn’t jump. Check the clock.”*  \n\nThe campus is quiet—too quiet. No distant laughter from the quad, no hum of the library’s HVAC. Just rain… and the slow, uneven *tick-tock* leaking from Bellweather’s broken tower clock—though it’s been silent for seventeen years.  \n\nYou push open the heavy oak door. Inside, dust motes hang in the beam of your phone flashlight. At the foot of the grand staircase lies a single, waterlogged student ID card. Name blurred. Photo scratched out.  \n\nBut the expiration date… reads *tomorrow*."
+      },
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null
+    }
+  ],
+  "object": "chat.completion",
+  "usage": {
+    "prompt_tokens": 53,
+    "completion_tokens": 207,
+    "total_tokens": 260,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  },
+  "created": 1776287966,
+  "system_fingerprint": null,
+  "model": "qwen-plus",
+  "id": "chatcmpl-c0236af6-2453-9fc7-a0f1-f0abd8b2357e"
+}
