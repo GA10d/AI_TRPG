@@ -5,6 +5,8 @@ import type {
   AiGenerationMetadata,
   CharacterConceptAssistMode,
   ComicCharacterReferenceInput,
+  ComicPromptPresetResponse,
+  ComicStylePreset,
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
   GenerateOpeningPreviewRequest,
@@ -24,6 +26,7 @@ import type {
 import {
   assistCharacterConcept,
   createSave,
+  fetchComicPromptPresets,
   fetchSaveBundle,
   fetchLocalSaveSettings,
   fetchSession,
@@ -106,6 +109,26 @@ const SESSION_BOOTSTRAP_STAGE_ORDER: SessionBootstrapVisualStage[] = [
   "finalizing_session"
 ];
 const AUTO_COMMIT_COUNTDOWN_SECONDS = 3;
+const DEFAULT_COMIC_STYLE_ID = "noir";
+
+function resolveComicStyleId(
+  styles: ComicStylePreset[],
+  preferredStyleId: string | null | undefined
+): string | undefined {
+  const normalizedPreferredStyleId = preferredStyleId?.trim() ?? "";
+  if (normalizedPreferredStyleId) {
+    if (styles.length === 0) {
+      return normalizedPreferredStyleId;
+    }
+
+    const matched = styles.find((style) => style.id === normalizedPreferredStyleId);
+    if (matched) {
+      return matched.id;
+    }
+  }
+
+  return styles.find((style) => style.id === DEFAULT_COMIC_STYLE_ID)?.id ?? styles[0]?.id;
+}
 
 function buildSessionBootstrapPanelState(text: UiText, input: {
   coverAssetUrl: string | null;
@@ -639,6 +662,11 @@ export function App() {
   const [worldlineComicProject, setWorldlineComicProject] = useState<PersistedComicProject | null>(
     null
   );
+  const [comicPromptPresets, setComicPromptPresets] = useState<ComicPromptPresetResponse | null>(
+    null
+  );
+  const [comicPromptPresetsError, setComicPromptPresetsError] = useState<string | null>(null);
+  const [comicPromptPresetsLoading, setComicPromptPresetsLoading] = useState(false);
   const [isComicLoading, setIsComicLoading] = useState(false);
   const [pendingComicGenerationTasks, setPendingComicGenerationTasks] = useState<
     PendingComicGenerationTask[]
@@ -688,6 +716,7 @@ export function App() {
     imageProfileId,
     runtimeImageModelConfig,
     imageProfileRuntimeConfigs,
+    comicStyleId,
     imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
@@ -708,6 +737,7 @@ export function App() {
     setImageProfileId,
     setImageProfileRuntimeConfig,
     clearImageProfileRuntimeConfigs,
+    setComicStyleId,
     setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,
@@ -755,6 +785,8 @@ export function App() {
   );
   const normalizedGlobalRuntimeModelConfig =
     normalizeEditableRuntimeModelConfig(runtimeModelConfig);
+  const availableComicStyles = comicPromptPresets?.styles ?? [];
+  const resolvedComicStyleId = resolveComicStyleId(availableComicStyles, comicStyleId);
   const effectiveNarratorSelection = {
     modelProfileId:
       normalizedAdvancedTextModelConfig?.narrator?.modelProfileId?.trim() || modelProfileId,
@@ -781,6 +813,51 @@ export function App() {
   useEffect(() => {
     setStoryControlModeOverride(null);
   }, [snapshot?.session.id]);
+
+  useEffect(() => {
+    if (!bootstrap) {
+      return;
+    }
+
+    let cancelled = false;
+    setComicPromptPresetsLoading(true);
+    setComicPromptPresetsError(null);
+
+    async function loadComicPromptPresets(): Promise<void> {
+      try {
+        const nextPresets = await fetchComicPromptPresets();
+        if (cancelled) {
+          return;
+        }
+
+        setComicPromptPresets(nextPresets);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setComicPromptPresets(null);
+        setComicPromptPresetsError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!cancelled) {
+          setComicPromptPresetsLoading(false);
+        }
+      }
+    }
+
+    void loadComicPromptPresets();
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (!resolvedComicStyleId || resolvedComicStyleId === comicStyleId) {
+      return;
+    }
+
+    setComicStyleId(resolvedComicStyleId);
+  }, [comicStyleId, resolvedComicStyleId, setComicStyleId]);
 
   useEffect(() => {
     if (!snapshot) {
@@ -1549,6 +1626,7 @@ export function App() {
         locale: nextSnapshot.contentSummary.resolvedLocale,
         pageIndex: plan.pageIndex,
         storyPrompt: plan.storyPrompt,
+        styleId: resolvedComicStyleId,
         storyMemorySummary: plan.storyMemorySummary,
         characterReferences: buildWorldlineComicCharacterReferences(nextSnapshot),
         imageProfileId,
@@ -1634,6 +1712,7 @@ export function App() {
       imageProfileId,
       runtimeImageModelConfig,
       imageProfileRuntimeConfigs,
+      comicStyleId: resolvedComicStyleId ?? comicStyleId,
       imagePromptTemplateConfig:
         imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
       debugEnabled,
@@ -1659,6 +1738,7 @@ export function App() {
       imageProfileId,
       runtimeImageModelConfig,
       imageProfileRuntimeConfigs,
+      comicStyleId: resolvedComicStyleId ?? comicStyleId,
       imagePromptTemplateConfig:
         imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
       debugEnabled,
@@ -3024,6 +3104,7 @@ export function App() {
     clearProfileRuntimeConfigs();
     setImageProfileId(bootstrap.defaults.imageProfileId);
     clearImageProfileRuntimeConfigs();
+    setComicStyleId(resolveComicStyleId(availableComicStyles, undefined) ?? "");
     setImagePromptTemplateConfig(bootstrap.imagePromptTemplateConfig);
     setLogViewMode(bootstrap.defaults.logViewMode);
     setOpeningPreviewDeliveryMode("stream");
@@ -3326,6 +3407,10 @@ export function App() {
           advancedTextModelConfig={advancedTextModelConfig}
           imageProfileId={imageProfileId}
           runtimeImageModelConfig={runtimeImageModelConfig}
+          comicStyleId={resolvedComicStyleId ?? comicStyleId}
+          comicStyles={availableComicStyles}
+          comicStylesLoading={comicPromptPresetsLoading}
+          comicStylesError={comicPromptPresetsError}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           openingPreviewDeliveryMode={openingPreviewDeliveryMode}
@@ -3361,6 +3446,7 @@ export function App() {
           }
           onImageProfileIdChange={setImageProfileId}
           onImageProfileRuntimeConfigChange={setImageProfileRuntimeConfig}
+          onComicStyleIdChange={setComicStyleId}
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
           onRegenerateOpeningPreview={handleRegenerateOpeningPreview}

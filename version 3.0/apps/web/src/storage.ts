@@ -30,6 +30,7 @@ export type StoredWebDefaults = {
   imageProfileId?: string;
   runtimeImageModelConfig?: RuntimeImageModelConfigInput;
   imageProfileRuntimeConfigs?: Record<string, RuntimeImageModelConfigInput>;
+  comicStyleId?: string;
   imagePromptTemplateConfig?: ImagePromptTemplateConfig;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;

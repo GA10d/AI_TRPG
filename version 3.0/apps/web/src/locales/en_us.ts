@@ -730,6 +730,14 @@ export const enUs = {
       modelModeHint: "Choose whether this run stays in mock mode or goes through a real model proxy.",
       modelProfileLabel: "Model Profile",
       modelProfileHint: "This picker only decides which model profile this run will use.",
+      comicStyleLabel: "Comic Style",
+      comicStyleHint:
+        "Choose the default style for newly created worldline comic projects. Once a worldline generates page one, later pages keep that established style.",
+      comicStyleLoadingHint: "Loading the available comic style presets.",
+      comicStyleUnavailableHint:
+        "Comic style presets could not be loaded right now. If you start anyway, the backend will fall back to its default style.",
+      comicStyleLoadingOption: "Loading comic styles...",
+      comicStyleUnavailableOption: "Comic styles unavailable",
       logViewLabel: "Log View",
       logViewHint: "Adjust log detail for play or debugging.",
       previewDeliveryLabel: "Opening Delivery",
@@ -769,6 +777,7 @@ export const enUs = {
       currentProfile: (value: string) => `Current profile: ${value}`,
       accessMode: (value: string) => `Access: ${value}`,
       profile: (value: string) => `Profile: ${value}`,
+      comicStyle: (value: string) => `Comic style: ${value}`,
       resolvedModel: (value: string) => `Actual model: ${value}`,
       status: (value: string) => `Status: ${value}`,
       message: (value: string) => `Notes: ${value}`,

@@ -742,6 +742,14 @@ export const jaJp = {
       modelModeHint: "この回を mock で進めるか、実モデルへ接続するかを決めます。",
       modelProfileLabel: "モデルプロファイル",
       modelProfileHint: "ここではこの回で使うモデルプロファイルを選びます。",
+      comicStyleLabel: "漫画画風",
+      comicStyleHint:
+        "新しく作る世界線漫画プロジェクトの既定画風を選びます。同じ世界線で 1 ページ目が生成されると、以降はその画風を引き継ぎます。",
+      comicStyleLoadingHint: "利用可能な漫画画風プリセットを読み込んでいます。",
+      comicStyleUnavailableHint:
+        "漫画画風プリセットを今は読み込めませんでした。このまま開始すると、バックエンド既定の画風にフォールバックします。",
+      comicStyleLoadingOption: "画風プリセットを読み込み中...",
+      comicStyleUnavailableOption: "画風プリセットを利用できません",
       logViewLabel: "ログ表示",
       logViewHint: "遊ぶ時にも調査時にも使いやすいよう、ログ粒度を調整します。",
       previewDeliveryLabel: "開場伝送",
@@ -782,6 +790,7 @@ export const jaJp = {
       currentProfile: (value: string) => `現在のプロファイル: ${value}`,
       accessMode: (value: string) => `入口: ${value}`,
       profile: (value: string) => `プロファイル: ${value}`,
+      comicStyle: (value: string) => `漫画画風: ${value}`,
       resolvedModel: (value: string) => `実際のモデル: ${value}`,
       status: (value: string) => `状態: ${value}`,
       message: (value: string) => `説明: ${value}`,

@@ -1571,7 +1571,7 @@ export async function upsertWorldlineComicPage(
 
       const generatedPage = await generateComicPage({
         storyPrompt,
-        styleId: existingProject?.style.id,
+        styleId: existingProject?.style.id ?? request.styleId,
         pageNumber,
         storyMemorySummary: compactWhitespace(request.storyMemorySummary ?? "") || undefined,
         previousPages: existingProject

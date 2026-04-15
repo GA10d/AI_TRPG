@@ -13,6 +13,7 @@ import type {
   AiPersonalityTag,
   BootstrapResponse,
   CharacterConceptAssistMode,
+  ComicStylePreset,
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
   RoleTextModelConfigInput,
@@ -58,6 +59,10 @@ type GameSetupScreenProps = {
   advancedTextModelConfig: AdvancedTextModelConfigInput | null;
   imageProfileId: string;
   runtimeImageModelConfig: RuntimeImageModelConfigInput;
+  comicStyleId: string;
+  comicStyles: ComicStylePreset[];
+  comicStylesLoading: boolean;
+  comicStylesError: string | null;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
@@ -98,6 +103,7 @@ type GameSetupScreenProps = {
     profileId: string,
     value: RuntimeImageModelConfigInput
   ) => void;
+  onComicStyleIdChange: (value: string) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
@@ -381,6 +387,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     advancedTextModelConfig,
     imageProfileId,
     runtimeImageModelConfig,
+    comicStyleId,
+    comicStyles,
+    comicStylesLoading,
+    comicStylesError,
     debugEnabled,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -413,6 +423,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onAdvancedCompanionTextModelConfigChange,
     onImageProfileIdChange,
     onImageProfileRuntimeConfigChange,
+    onComicStyleIdChange,
     onDebugEnabledChange,
     onLogViewModeChange,
     onOpeningPreviewDeliveryModeChange,
@@ -725,6 +736,17 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     bootstrap?.imageProfiles.find((item) => item.id === imageProfileId) ??
     bootstrap?.imageProfiles[0] ??
     null;
+  const selectedComicStyle =
+    comicStyles.find((style) => style.id === comicStyleId) ?? comicStyles[0] ?? null;
+  const comicStyleFieldHint = comicStylesLoading
+    ? setupText.fields.comicStyleLoadingHint
+    : comicStyles.length === 0
+      ? comicStylesError
+        ? `${setupText.fields.comicStyleUnavailableHint} ${setupText.model.message(comicStylesError)}`
+        : setupText.fields.comicStyleUnavailableHint
+      : `${setupText.fields.comicStyleHint}${
+          selectedComicStyle ? ` ${setupText.model.message(selectedComicStyle.prompt)}` : ""
+        }`;
   const effectiveImageRuntimeConfig = getEffectiveRuntimeConfig(runtimeImageModelConfig);
   const profileReady = isProfileReady(modelAccessMode, selectedProfile, runtimeModelConfig);
   const imageProfileReady = isImageProfileReady(
@@ -1446,6 +1468,31 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     return (
       <>
         <div className={containerClassName}>
+          <SettingField
+            label={setupText.fields.comicStyleLabel}
+            hint={comicStyleFieldHint}
+          >
+            <select
+              disabled={comicStylesLoading || comicStyles.length === 0}
+              value={selectedComicStyle?.id ?? ""}
+              onChange={(event) => onComicStyleIdChange(event.target.value)}
+            >
+              {comicStyles.length === 0 ? (
+                <option value="">
+                  {comicStylesLoading
+                    ? setupText.fields.comicStyleLoadingOption
+                    : setupText.fields.comicStyleUnavailableOption}
+                </option>
+              ) : (
+                comicStyles.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </SettingField>
+
           <SettingField
             label={settingsText.imageModelProfile}
             hint={selectedImageProfile?.description ?? setupText.fields.modelProfileHint}
@@ -2572,6 +2619,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )}
             </div>
             <div className="summary-text">
+              {setupText.model.comicStyle(
+                selectedComicStyle?.name ?? setupText.model.notConfigured
+              )}
+            </div>
+            <div className="summary-text">
               {setupText.model.resolvedModel(resolvedImageModelName)}
             </div>
             <div className="summary-text">
@@ -2735,6 +2787,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       <div className="summary-text">
                         {setupText.model.currentProfile(
                           selectedImageProfile?.name ?? setupText.model.notConfigured
+                        )}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.comicStyle(
+                          selectedComicStyle?.name ?? setupText.model.notConfigured
                         )}
                       </div>
                       <div className="summary-text">

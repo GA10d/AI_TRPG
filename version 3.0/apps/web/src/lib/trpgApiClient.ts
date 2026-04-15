@@ -3,6 +3,7 @@ import type {
   CharacterConceptAssistRequest,
   CharacterConceptAssistResponse,
   CommitRoundRequest,
+  ComicPromptPresetResponse,
   CreateSaveRequest,
   CreateSaveResponse,
   CreateSessionRequest,
@@ -92,6 +93,15 @@ export async function fetchBootstrap(): Promise<BootstrapResponse> {
   try {
     const response = await fetch("/api/bootstrap");
     return parseJson<BootstrapResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchComicPromptPresets(): Promise<ComicPromptPresetResponse> {
+  try {
+    const response = await fetch("/api/comics/presets");
+    return parseJson<ComicPromptPresetResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

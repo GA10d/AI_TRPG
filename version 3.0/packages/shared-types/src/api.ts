@@ -261,6 +261,7 @@ export type UpsertWorldlineComicPageRequest = {
   locale: LocaleCode;
   pageIndex: number;
   storyPrompt: string;
+  styleId?: string;
   storyMemorySummary?: string;
   characterReferences?: ComicCharacterReferenceInput[];
   imageProfileId?: string;

@@ -285,6 +285,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [imageProfileRuntimeConfigs, setImageProfileRuntimeConfigs] = useState<
     Record<string, RuntimeImageModelConfigInput>
   >({});
+  const [comicStyleId, setComicStyleId] = useState("");
   const [imagePromptTemplateConfig, setImagePromptTemplateConfig] =
     useState<ImagePromptTemplateConfig | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(true);
@@ -389,6 +390,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
           storedImageProfileRuntimeConfigs[resolvedImageProfileId] ??
             EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
         );
+        setComicStyleId(storedDefaults?.comicStyleId?.trim() ?? "");
         setImagePromptTemplateConfig(
           sanitizeImagePromptTemplateConfig(
             data.imagePromptTemplateConfig,
@@ -560,6 +562,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     imageProfileId,
     runtimeImageModelConfig,
     imageProfileRuntimeConfigs,
+    comicStyleId,
     imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
@@ -582,6 +585,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setRuntimeImageModelConfig,
     setImageProfileRuntimeConfig,
     clearImageProfileRuntimeConfigs,
+    setComicStyleId,
     setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,
