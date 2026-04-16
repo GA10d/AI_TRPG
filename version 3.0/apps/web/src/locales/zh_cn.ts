@@ -532,7 +532,10 @@
     redrawPortrait: "重新绘制",
     generatingPortrait: "生成中...",
     noPortraitYet: "这个 NPC 暂时还没有立绘。",
-    portraitPreparingHint: "已经进入游戏，NPC 立绘正在后台准备中；已有缓存会直接复用。",
+    noPortraitYetPreparing: (ready: number, total: number) =>
+      `这个 NPC 的立绘还在后台准备中。当前已有 ${ready} / ${total} 位角色可显示立绘。`,
+    portraitPreparingHint: (ready: number, total: number) =>
+      `已经进入游戏，NPC 立绘正在后台准备中；已有缓存会直接复用。当前已有 ${ready} / ${total} 位角色可显示立绘。`,
     portraitPrev: "上一张",
     portraitNext: "下一张",
     portraitCounter: (current: number, total: number) => `第 ${current} / ${total} 张`,

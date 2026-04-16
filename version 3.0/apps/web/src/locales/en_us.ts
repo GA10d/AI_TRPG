@@ -559,8 +559,10 @@ export const enUs = {
     redrawPortrait: "Redraw Portrait",
     generatingPortrait: "Generating...",
     noPortraitYet: "This NPC does not have a portrait yet.",
-    portraitPreparingHint:
-      "You are already in the game. NPC portraits are being prepared in the background, and cached portraits will be reused when available.",
+    noPortraitYetPreparing: (ready: number, total: number) =>
+      `This NPC portrait is still being prepared in the background. Portraits are already visible for ${ready} / ${total} NPCs.`,
+    portraitPreparingHint: (ready: number, total: number) =>
+      `You are already in the game. NPC portraits are being prepared in the background, and cached portraits will be reused when available. Portraits are already visible for ${ready} / ${total} NPCs.`,
     portraitPrev: "Previous",
     portraitNext: "Next",
     portraitCounter: (current: number, total: number) => `${current} / ${total}`,

@@ -214,6 +214,18 @@ function resolveSelectedNpcPortrait(npc: NpcRosterEntry | null): NpcPortraitVari
   );
 }
 
+function hasDisplayableNpcPortrait(npc: NpcRosterEntry): boolean {
+  const selectedPortrait = resolveSelectedNpcPortrait(npc);
+  return Boolean(selectedPortrait?.image.apiPath || npc.portraitAssetUrl);
+}
+
+function countDisplayableNpcPortraits(roster: NpcRosterEntry[]): number {
+  return roster.reduce(
+    (count, npc) => count + (hasDisplayableNpcPortrait(npc) ? 1 : 0),
+    0
+  );
+}
+
 export function GameScreen(props: GameScreenProps) {
   const {
     snapshot,
@@ -380,6 +392,7 @@ export function GameScreen(props: GameScreenProps) {
         (portrait) => portrait.portraitId === selectedNpcPortrait.portraitId
       )
     : -1;
+  const visibleNpcPortraitCount = countDisplayableNpcPortraits(npcRoster);
   const previousNpcPortrait =
     selectedNpcPortraitIndex > 0 ? selectedNpcPortraits[selectedNpcPortraitIndex - 1] : null;
   const nextNpcPortrait =
@@ -783,6 +796,47 @@ export function GameScreen(props: GameScreenProps) {
   ]);
 
   useEffect(() => {
+    if (activeDrawer !== "npcs" || !snapshot) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+    if (!ruleDirectoryName || !storyDirectoryName) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetchNpcRoster(ruleDirectoryName, storyDirectoryName, comicStyleId ?? undefined)
+      .then((roster) => {
+        if (cancelled) {
+          return;
+        }
+
+        setNpcError(null);
+        setNpcRoster(roster);
+        setSelectedNpcId((current) =>
+          current && roster.some((item) => item.id === current) ? current : roster[0]?.id ?? null
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setNpcError(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeDrawer,
+    comicStyleId,
+    snapshot?.contentSummary.ruleDirectoryName,
+    snapshot?.contentSummary.storyDirectoryName,
+    snapshot?.session.id
+  ]);
+
+  useEffect(() => {
     if (!snapshot || npcLoading) {
       return;
     }
@@ -846,6 +900,60 @@ export function GameScreen(props: GameScreenProps) {
     imagePromptTemplateConfig,
     npcLoading,
     runtimeImageModelConfig,
+    snapshot?.contentSummary.ruleDirectoryName,
+    snapshot?.contentSummary.storyDirectoryName,
+    snapshot?.session.id
+  ]);
+
+  useEffect(() => {
+    if (!snapshot || npcLoading || !isPreparingNpcPortraits) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+    if (!ruleDirectoryName || !storyDirectoryName) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshRoster = async (): Promise<void> => {
+      try {
+        const roster = await fetchNpcRoster(
+          ruleDirectoryName,
+          storyDirectoryName,
+          comicStyleId ?? undefined
+        );
+        if (cancelled) {
+          return;
+        }
+
+        setNpcError(null);
+        setNpcRoster(roster);
+        setSelectedNpcId((current) =>
+          current && roster.some((item) => item.id === current) ? current : roster[0]?.id ?? null
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setNpcError(error instanceof Error ? error.message : String(error));
+        }
+      }
+    };
+
+    void refreshRoster();
+    const intervalId = window.setInterval(() => {
+      void refreshRoster();
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    comicStyleId,
+    isPreparingNpcPortraits,
+    npcLoading,
     snapshot?.contentSummary.ruleDirectoryName,
     snapshot?.contentSummary.storyDirectoryName,
     snapshot?.session.id
@@ -1876,7 +1984,12 @@ export function GameScreen(props: GameScreenProps) {
                 {npcLoading ? <div className="empty-state">{text.gameScreen.loadingNpcFiles}</div> : null}
                 {npcError ? <div className="info-banner info-banner-warning">{npcError}</div> : null}
                 {!npcLoading && !npcError && isPreparingNpcPortraits ? (
-                  <div className="summary-text">{text.gameScreen.portraitPreparingHint}</div>
+                  <div className="summary-text">
+                    {text.gameScreen.portraitPreparingHint(
+                      visibleNpcPortraitCount,
+                      npcRoster.length
+                    )}
+                  </div>
                 ) : null}
 
                 {!npcLoading && !npcError ? (
@@ -1934,7 +2047,14 @@ export function GameScreen(props: GameScreenProps) {
                                 }
                               />
                             ) : (
-                              <div className="empty-state">{text.gameScreen.noPortraitYet}</div>
+                              <div className="empty-state">
+                                {isPreparingNpcPortraits
+                                  ? text.gameScreen.noPortraitYetPreparing(
+                                      visibleNpcPortraitCount,
+                                      npcRoster.length
+                                    )
+                                  : text.gameScreen.noPortraitYet}
+                              </div>
                             )}
                           </div>
 
