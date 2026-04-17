@@ -1,5 +1,6 @@
 import type {
   ContentCatalogEntry,
+  Difficulty,
   GmArchitecture,
   LocaleCode,
   PlayMode
@@ -84,6 +85,7 @@ export type CreateSessionRequest = {
   storyDirectoryName: string;
   locale: LocaleCode;
   playMode: PlayMode;
+  difficulty: Difficulty;
   gmArchitecture: GmArchitecture;
   backgroundCompressionEnabled?: boolean;
   modelAccessMode: ModelAccessMode;
@@ -227,6 +229,9 @@ export type SessionCreateStreamEvent =
     };
 
 export type TurnResolutionStage =
+  | "waiting_director"
+  | "requesting_support_agents"
+  | "waiting_support_agents"
   | "requesting_narrator"
   | "waiting_turn_narration"
   | "judging_ending"
@@ -607,6 +612,7 @@ export type BootstrapResponse = {
   defaults: {
     locale: LocaleCode;
     playMode: PlayMode;
+    difficulty: Difficulty;
     gmArchitecture: GmArchitecture;
     backgroundCompressionEnabled: boolean;
     modelAccessMode: ModelAccessMode;

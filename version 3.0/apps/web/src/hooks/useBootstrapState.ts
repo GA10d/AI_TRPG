@@ -14,6 +14,7 @@ import {
 } from "../openingPreviewPreferences.ts";
 import { loadStoredWebDefaults } from "../storage.ts";
 import {
+  getDifficultyOptions,
   getGmArchitectureOptions,
   getLogViewOptions,
   getMarkdownFontSizeOptions,
@@ -257,6 +258,7 @@ function sanitizeImagePromptTemplateConfig(
 
 export function useBootstrapState(args: UseBootstrapStateArgs) {
   const playModeOptions = getPlayModeOptions();
+  const difficultyOptions = getDifficultyOptions();
   const gmArchitectureOptions = getGmArchitectureOptions();
   const logViewOptions = getLogViewOptions();
   const openingPreviewDeliveryOptions = getOpeningPreviewDeliveryOptions();
@@ -269,6 +271,8 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [uiLocale, setUiLocale] = useState<UiLocaleCode>(DEFAULT_UI_LOCALE);
   const [locale, setLocale] = useState<CreateSessionRequest["locale"]>("zh-CN");
   const [playMode, setPlayMode] = useState<CreateSessionRequest["playMode"]>("single_player");
+  const [difficulty, setDifficulty] =
+    useState<CreateSessionRequest["difficulty"]>("easy");
   const [gmArchitecture, setGmArchitecture] =
     useState<CreateSessionRequest["gmArchitecture"]>("single_agent");
   const [backgroundCompressionEnabled, setBackgroundCompressionEnabled] = useState(true);
@@ -370,6 +374,13 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             storedDefaults?.playMode,
             playModeOptions.map((item) => item.value),
             data.defaults.playMode
+          )
+        );
+        setDifficulty(
+          pickOption(
+            storedDefaults?.difficulty,
+            difficultyOptions.map((item) => item.value),
+            data.defaults.difficulty
           )
         );
         setGmArchitecture(
@@ -558,6 +569,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     uiLocale,
     locale,
     playMode,
+    difficulty,
     gmArchitecture,
     backgroundCompressionEnabled,
     modelAccessMode,
@@ -580,6 +592,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setUiLocale,
     setLocale,
     setPlayMode,
+    setDifficulty,
     setGmArchitecture,
     setBackgroundCompressionEnabled,
     setModelAccessMode,

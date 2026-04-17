@@ -9,7 +9,10 @@ type RawAppearanceEntry = {
   description?: unknown;
 };
 
-type RawAppearanceCatalog = Record<string, RawAppearanceEntry[] | unknown>;
+type RawAppearanceCatalog = Record<
+  string,
+  RawAppearanceEntry[] | Record<string, RawAppearanceEntry[] | unknown> | unknown
+>;
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../..");
@@ -33,38 +36,83 @@ function assertString(value: unknown, fieldName: string): string {
 
 function normalizeAppearanceEntry(
   category: string,
+  subgroup: string | undefined,
   rawEntry: unknown,
   index: number
 ): AiAppearanceTag {
   if (typeof rawEntry !== "object" || rawEntry === null || Array.isArray(rawEntry)) {
-    throw new Error(`Invalid appearance entry at ${category}[${index}]`);
+    throw new Error(
+      `Invalid appearance entry at ${subgroup ? `${category}.${subgroup}` : category}[${index}]`
+    );
   }
 
   const entry = rawEntry as RawAppearanceEntry;
-  const keyword = assertString(entry.keyword, `${category}[${index}].keyword`);
-  const description = assertString(entry.description, `${category}[${index}].description`);
+  const location = subgroup ? `${category}.${subgroup}[${index}]` : `${category}[${index}]`;
+  const keyword = assertString(entry.keyword, `${location}.keyword`);
+  const description = assertString(entry.description, `${location}.description`);
 
   return {
     id: `${category}:${keyword}`,
     category,
+    subgroup,
     keyword,
     description
   };
+}
+
+function collectAppearanceEntries(input: {
+  category: string;
+  subgroup?: string;
+  entries: unknown;
+  tags: AiAppearanceTag[];
+}): void {
+  if (Array.isArray(input.entries)) {
+    input.entries.forEach((entry, index) => {
+      input.tags.push(
+        normalizeAppearanceEntry(input.category, input.subgroup, entry, index)
+      );
+    });
+    return;
+  }
+
+  if (typeof input.entries !== "object" || input.entries === null) {
+    return;
+  }
+
+  for (const [subgroup, subgroupEntries] of Object.entries(input.entries)) {
+    if (!Array.isArray(subgroupEntries)) {
+      continue;
+    }
+
+    subgroupEntries.forEach((entry, index) => {
+      input.tags.push(
+        normalizeAppearanceEntry(input.category, subgroup.trim() || undefined, entry, index)
+      );
+    });
+  }
 }
 
 async function readAppearanceTags(): Promise<AiAppearanceTag[]> {
   const rawText = await readFile(appearanceListPath, "utf8");
   const parsed = JSON.parse(rawText) as RawAppearanceCatalog;
   const tags: AiAppearanceTag[] = [];
+  const seenTagIds = new Set<string>();
 
   for (const [category, entries] of Object.entries(parsed)) {
-    if (!Array.isArray(entries)) {
-      continue;
-    }
-
-    entries.forEach((entry, index) => {
-      tags.push(normalizeAppearanceEntry(category, entry, index));
+    const beforeCount = tags.length;
+    collectAppearanceEntries({
+      category: category.trim(),
+      entries,
+      tags
     });
+
+    for (const tag of tags.slice(beforeCount)) {
+      if (seenTagIds.has(tag.id)) {
+        throw new Error(`Duplicate AI appearance tag id: ${tag.id}`);
+      }
+
+      seenTagIds.add(tag.id);
+    }
   }
 
   if (tags.length === 0) {

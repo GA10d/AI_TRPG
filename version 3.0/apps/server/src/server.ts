@@ -262,6 +262,7 @@ async function buildBootstrapResponse(
     defaults: {
       locale: PHASE1_DEFAULTS.locale,
       playMode: PHASE1_DEFAULTS.playMode,
+      difficulty: PHASE1_DEFAULTS.difficulty,
       gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
       backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
       modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
@@ -421,6 +422,8 @@ async function handleApiRequest(
       modelAccessMode: payload.modelAccessMode,
       modelProfileId: payload.modelProfileId,
       runtimeModelConfig: payload.runtimeModelConfig,
+      difficulty: payload.difficulty,
+      gmArchitecture: payload.gmArchitecture,
       forceRegenerateOpening: payload.forceRegenerateOpening
     });
     sendJson(response, 200, openingPreview);
@@ -454,6 +457,8 @@ async function handleApiRequest(
           modelAccessMode: payload.modelAccessMode,
           modelProfileId: payload.modelProfileId,
           runtimeModelConfig: payload.runtimeModelConfig,
+          difficulty: payload.difficulty,
+          gmArchitecture: payload.gmArchitecture,
           forceRegenerateOpening: payload.forceRegenerateOpening
         },
         {
@@ -839,7 +844,7 @@ async function handleApiRequest(
     response.flushHeaders?.();
 
     try {
-      const snapshot = await commitPreparedRound(sessionId, payload, store, {
+      const snapshot = await commitPreparedRound(sessionId, payload, store, contentRoot, {
         onStage: async (event) => {
           if (response.writableEnded || response.destroyed) {
             return;
@@ -891,7 +896,7 @@ async function handleApiRequest(
   ) {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/rounds/commit", "");
     const payload = await readJsonBody<CommitRoundRequest>(request);
-    const snapshot = await commitPreparedRound(sessionId, payload, store);
+    const snapshot = await commitPreparedRound(sessionId, payload, store, contentRoot);
 
     if (!snapshot) {
       sendJson(response, 404, {
@@ -991,7 +996,7 @@ async function handleApiRequest(
   if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/turns") && request.method === "POST") {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns", "");
     const payload = await readJsonBody<SubmitTurnRequest>(request);
-    const snapshot = await submitTurn(sessionId, payload, store);
+    const snapshot = await submitTurn(sessionId, payload, store, contentRoot);
 
     if (!snapshot) {
       sendJson(response, 404, {
@@ -1022,7 +1027,7 @@ async function handleApiRequest(
     response.flushHeaders?.();
 
     try {
-      const snapshot = await submitTurn(sessionId, payload, store, {
+      const snapshot = await submitTurn(sessionId, payload, store, contentRoot, {
         onStage: async (event) => {
           if (response.writableEnded || response.destroyed) {
             return;

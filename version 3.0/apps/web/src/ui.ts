@@ -52,6 +52,18 @@ export function getGmArchitectureOptions(
 
 export const GM_ARCHITECTURE_OPTIONS = getGmArchitectureOptions();
 
+export function getDifficultyOptions(
+  text: UiText = zhCn
+): Array<{
+  value: CreateSessionRequest["difficulty"];
+  label: string;
+  description: string;
+}> {
+  return [...text.options.difficulties];
+}
+
+export const DIFFICULTY_OPTIONS = getDifficultyOptions();
+
 export function getLogViewOptions(
   text: UiText = zhCn
 ): Array<{

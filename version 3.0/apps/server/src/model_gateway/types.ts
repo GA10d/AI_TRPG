@@ -1,7 +1,9 @@
 import type {
   AiGenerationMetadata,
+  Difficulty,
   EndingAdjudication,
   EndingJudgeDecision,
+  GmArchitecture,
   LocaleCode,
   ModelAccessMode,
   RuntimeModelConfigInput
@@ -12,6 +14,8 @@ export type OpeningGenerationInput = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
+  difficulty: Difficulty;
+  gmArchitecture: GmArchitecture;
   ruleTitle: string;
   ruleText: string;
   storyTitle: string;
@@ -35,6 +39,8 @@ export type InitialSessionNarrationInput = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
+  difficulty: Difficulty;
+  gmArchitecture: GmArchitecture;
   ruleTitle: string;
   ruleText: string;
   storyTitle: string;
@@ -47,6 +53,7 @@ export type TurnNarrationInput = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   locale: LocaleCode;
+  difficulty: Difficulty;
   storyTitle: string;
   playerInput: string;
   round: number;

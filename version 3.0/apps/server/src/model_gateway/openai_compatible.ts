@@ -1,7 +1,4 @@
 import { Buffer } from "node:buffer";
-import { readdir, readFile } from "node:fs/promises";
-import { dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   buildLanguageSystemPrompt,
@@ -9,6 +6,8 @@ import {
   fromLocaleCode
 } from "../../../../packages/shared-config/src/index.ts";
 import type { AiGenerationUsage } from "../../../../packages/shared-types/src/index.ts";
+import { buildMultiAgentSystemPrompt } from "../multi_agent/service.ts";
+import { buildNarratorSystemPrompt } from "../single_agent/service.ts";
 import type {
   OpeningGenerationInput,
   OpeningGenerationOutput,
@@ -19,13 +18,6 @@ import type {
   TurnNarrationOutput
 } from "./types.ts";
 import { getServerProxyConfig, type ServerProxyConfig } from "./config.ts";
-
-const currentDir = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(currentDir, "../../../..");
-const beginningPromptDir = join(projectRoot, "apps", "prompt", "beginning");
-const promptFileExtensions = new Set([".txt", ".md", ".markdown"]);
-
-let cachedBeginningSystemPrompt: string | null = null;
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -139,27 +131,18 @@ type StreamTextOptions = {
   signal?: AbortSignal;
 };
 
-async function loadBeginningSystemPrompt(): Promise<string> {
-  if (cachedBeginningSystemPrompt !== null) {
-    return cachedBeginningSystemPrompt;
+async function buildOpeningSystemPrompt(
+  input: OpeningGenerationInput,
+  config: ServerProxyConfig
+): Promise<string> {
+  if (input.gmArchitecture === "multi_agent") {
+    return buildMultiAgentSystemPrompt("beginning", input.locale, input.difficulty);
   }
 
-  const fileNames = (await readdir(beginningPromptDir))
-    .filter((fileName) => promptFileExtensions.has(extname(fileName).toLowerCase()))
-    .sort((left, right) => left.localeCompare(right, "en"));
-
-  if (fileNames.length === 0) {
-    throw new Error("apps/prompt/beginning does not contain any prompt files.");
-  }
-
-  const contents = await Promise.all(
-    fileNames.map((fileName) =>
-      readFile(join(beginningPromptDir, fileName), "utf8").then((content) => content.trim())
-    )
-  );
-
-  cachedBeginningSystemPrompt = contents.filter(Boolean).join("\n\n");
-  return cachedBeginningSystemPrompt;
+  return buildNarratorSystemPrompt(input.locale, {
+    difficulty: input.difficulty,
+    profileId: config.profileId
+  });
 }
 
 function buildOpeningTaskText(input: OpeningGenerationInput): string {
@@ -182,7 +165,13 @@ function buildOpeningTaskText(input: OpeningGenerationInput): string {
 }
 
 async function buildOpeningMessages(input: OpeningGenerationInput): Promise<ChatMessage[]> {
-  const openingSystemPrompt = await loadBeginningSystemPrompt();
+  const openingSystemPrompt = await buildOpeningSystemPrompt(
+    input,
+    getServerProxyConfig({
+      modelProfileId: input.modelProfileId,
+      runtimeModelConfig: input.runtimeModelConfig
+    })
+  );
   const languageDefinition = fromLocaleCode(input.locale);
   const openingLanguageLine = `请严格以${languageDefinition.nativeName}（${languageDefinition.code}）回答。`;
 
@@ -1261,7 +1250,7 @@ async function callOpeningWithUploadedFiles(
   config: ServerProxyConfig,
   input: OpeningGenerationInput
 ): Promise<ChatCompletionResult> {
-  const openingSystemPrompt = await loadBeginningSystemPrompt();
+  const openingSystemPrompt = await buildOpeningSystemPrompt(input, config);
 
   if (config.dependence === "Google") {
     let uploadedRuleFile: UploadedGeminiFile | null = null;
@@ -1336,7 +1325,7 @@ async function callOpeningWithUploadedFilesStream(
   input: OpeningGenerationInput,
   options?: StreamTextOptions
 ): Promise<ChatCompletionResult> {
-  const openingSystemPrompt = await loadBeginningSystemPrompt();
+  const openingSystemPrompt = await buildOpeningSystemPrompt(input, config);
 
   if (config.dependence === "Google") {
     const completion = await callOpeningWithUploadedFiles(config, input);

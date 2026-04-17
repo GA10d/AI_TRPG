@@ -24,6 +24,7 @@ import {
   buildPreviewLines,
   clipText,
   formatAiGenerationMeta,
+  getDifficultyOptions,
   getGmArchitectureOptions,
   getLogViewOptions,
   getMarkdownFontSizeOptions,
@@ -51,6 +52,7 @@ type GameSetupScreenProps = {
   storyDirectoryName: string;
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
+  difficulty: CreateSessionRequest["difficulty"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   backgroundCompressionEnabled: boolean;
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
@@ -89,6 +91,7 @@ type GameSetupScreenProps = {
   onAssistCharacterConcept: () => Promise<void>;
   onLocaleChange: (value: CreateSessionRequest["locale"]) => void;
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
+  onDifficultyChange: (value: CreateSessionRequest["difficulty"]) => void;
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
   onBackgroundCompressionEnabledChange: (value: boolean) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
@@ -140,6 +143,18 @@ type SetupLayoutState = {
   isRightCollapsed: boolean;
 };
 
+type AppearanceTagSubsection = {
+  key: string;
+  title: string;
+  tags: AiAppearanceTag[];
+};
+
+type AppearanceTagSection = {
+  key: string;
+  title: string;
+  subSections: AppearanceTagSubsection[];
+};
+
 const SETUP_LAYOUT_STORAGE_KEY = "trpg3.gameSetupLayout";
 const LEFT_MIN_WIDTH = 280;
 const CENTER_MIN_WIDTH = 420;
@@ -165,6 +180,17 @@ function clampNumber(value: number, minValue: number, maxValue: number): number 
   }
 
   return Math.min(maxValue, Math.max(minValue, value));
+}
+
+function formatAppearanceSubgroupFallback(value: string): string {
+  return value
+    .split("_")
+    .map((segment) =>
+      segment.length > 0
+        ? `${segment.charAt(0).toUpperCase()}${segment.slice(1)}`
+        : segment
+    )
+    .join(" ");
 }
 
 function loadStoredLayout(): SetupLayoutState {
@@ -371,6 +397,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const setupText = text.gameSetupScreen;
   const settingsText = text.settingsScreen;
   const playModeOptions = getPlayModeOptions(text);
+  const difficultyOptions = getDifficultyOptions(text);
   const gmArchitectureOptions = getGmArchitectureOptions(text);
   const logViewOptions = getLogViewOptions(text);
   const markdownFontSizeOptions = getMarkdownFontSizeOptions(text);
@@ -381,6 +408,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     storyDirectoryName,
     locale,
     playMode,
+    difficulty,
     gmArchitecture,
     backgroundCompressionEnabled,
     modelAccessMode,
@@ -417,6 +445,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onAssistCharacterConcept,
     onLocaleChange,
     onPlayModeChange,
+    onDifficultyChange,
     onGmArchitectureChange,
     onBackgroundCompressionEnabledChange,
     onModelAccessModeChange,
@@ -867,22 +896,49 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
       )
     }
   ].filter((section) => section.tags.length > 0);
-  const appearanceTagSections: Array<{
-    key: string;
-    title: string;
-    tags: AiAppearanceTag[];
-  }> = [
+  const appearanceTagSections: AppearanceTagSection[] = [
     {
       key: "appearance",
       title: setupText.companions.appearanceLabel,
-      tags: appearanceTags.filter((tag) => tag.category === "appearance")
+      subSections: []
     },
     {
       key: "outfit",
       title: setupText.companions.outfitLabel,
-      tags: appearanceTags.filter((tag) => tag.category === "outfit")
+      subSections: []
     }
-  ].filter((section) => section.tags.length > 0);
+  ];
+  const appearanceSubgroupLabels =
+    setupText.companions.appearanceSubgroupLabels as Record<string, string>;
+
+  for (const section of appearanceTagSections) {
+    const groupedTags = new Map<string, AiAppearanceTag[]>();
+    const orderedSubgroups: string[] = [];
+
+    for (const tag of appearanceTags.filter((item) => item.category === section.key)) {
+      const subgroupKey = tag.subgroup?.trim() || "__default__";
+      if (!groupedTags.has(subgroupKey)) {
+        groupedTags.set(subgroupKey, []);
+        orderedSubgroups.push(subgroupKey);
+      }
+
+      groupedTags.get(subgroupKey)?.push(tag);
+    }
+
+    section.subSections = orderedSubgroups.map((subgroupKey) => ({
+      key: `${section.key}:${subgroupKey}`,
+      title:
+        subgroupKey === "__default__"
+          ? section.title
+          : appearanceSubgroupLabels[subgroupKey] ??
+            formatAppearanceSubgroupFallback(subgroupKey),
+      tags: groupedTags.get(subgroupKey) ?? []
+    }));
+  }
+
+  const visibleAppearanceTagSections = appearanceTagSections.filter(
+    (section) => section.subSections.length > 0
+  );
 
   const leftPaneStyle: CSSProperties = {
     width: layout.leftWidth,
@@ -1054,8 +1110,19 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           label={setupText.fields.difficultyLabel}
           hint={setupText.fields.difficultyHint}
         >
-          <select disabled value="normal">
-            <option value="normal">{setupText.fields.difficultyStandardPending}</option>
+          <select
+            value={difficulty}
+            onChange={(event) =>
+              onDifficultyChange(
+                event.target.value as CreateSessionRequest["difficulty"]
+              )
+            }
+          >
+            {difficultyOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
           </select>
         </SettingField>
 
@@ -1079,27 +1146,25 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
           </select>
         </SettingField>
 
-        {gmArchitecture === "single_agent" ? (
-          <SettingField
-            label={setupText.fields.backgroundCompressionLabel}
-            hint={setupText.fields.backgroundCompressionHint}
-          >
-            <label className="toggle-row">
-              <input
-                checked={backgroundCompressionEnabled}
-                type="checkbox"
-                onChange={(event) =>
-                  onBackgroundCompressionEnabledChange(event.target.checked)
-                }
-              />
-              <span>
-                {backgroundCompressionEnabled
-                  ? setupText.fields.backgroundCompressionOn
-                  : setupText.fields.backgroundCompressionOff}
-              </span>
-            </label>
-          </SettingField>
-        ) : null}
+        <SettingField
+          label={setupText.fields.backgroundCompressionLabel}
+          hint={setupText.fields.backgroundCompressionHint}
+        >
+          <label className="toggle-row">
+            <input
+              checked={backgroundCompressionEnabled}
+              type="checkbox"
+              onChange={(event) =>
+                onBackgroundCompressionEnabledChange(event.target.checked)
+              }
+            />
+            <span>
+              {backgroundCompressionEnabled
+                ? setupText.fields.backgroundCompressionOn
+                : setupText.fields.backgroundCompressionOff}
+            </span>
+          </label>
+        </SettingField>
 
         <SettingField
           label={setupText.fields.playModeLabel}
@@ -1687,33 +1752,36 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   }
 
   function renderAppearanceTagSection(
-    section: {
-      key: string;
-      title: string;
-      tags: AiAppearanceTag[];
-    },
+    section: AppearanceTagSection,
     selectedTagIds: string[],
     onToggleTag: (appearanceTagId: string) => void
   ): React.ReactNode {
     return (
       <div className="companion-tag-section" key={section.key}>
         <div className="companion-tag-section-title">{section.title}</div>
-        <div className="companion-tag-list">
-          {section.tags.map((tag) => {
-            const isSelected = selectedTagIds.includes(tag.id);
+        <div className="companion-tag-subsections">
+          {section.subSections.map((subSection) => (
+            <div className="companion-tag-subsection" key={subSection.key}>
+              <div className="companion-tag-subsection-title">{subSection.title}</div>
+              <div className="companion-tag-list">
+                {subSection.tags.map((tag) => {
+                  const isSelected = selectedTagIds.includes(tag.id);
 
-            return (
-              <button
-                className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
-                key={tag.id}
-                onClick={() => onToggleTag(tag.id)}
-                title={tag.description}
-                type="button"
-              >
-                <span>{tag.keyword}</span>
-              </button>
-            );
-          })}
+                  return (
+                    <button
+                      className={`companion-tag-button${isSelected ? " companion-tag-button-selected" : ""}`}
+                      key={tag.id}
+                      onClick={() => onToggleTag(tag.id)}
+                      title={tag.description}
+                      type="button"
+                    >
+                      <span>{tag.keyword}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -2237,9 +2305,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )}
             </div>
 
-            {appearanceTagSections.length ? (
+            {visibleAppearanceTagSections.length ? (
               <div className="companion-tag-sections">
-                {appearanceTagSections.map((section) =>
+                {visibleAppearanceTagSections.map((section) =>
                   renderAppearanceTagSection(
                     section,
                     primaryPlayerAppearanceTagIds,
@@ -2320,9 +2388,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )}
             </div>
 
-            {appearanceTagSections.length ? (
+            {visibleAppearanceTagSections.length ? (
               <div className="companion-tag-sections">
-                {appearanceTagSections.map((section) =>
+                {visibleAppearanceTagSections.map((section) =>
                   renderAppearanceTagSection(
                     section,
                     aiCompanions[appearanceEditorIndex]?.appearanceTagIds ?? [],

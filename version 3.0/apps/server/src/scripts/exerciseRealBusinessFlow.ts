@@ -257,6 +257,7 @@ function buildRequestFromBootstrap(
     storyDirectoryName: firstStory.directoryName,
     locale: bootstrap.defaults.locale,
     playMode: bootstrap.defaults.playMode,
+    difficulty: bootstrap.defaults.difficulty,
     gmArchitecture: bootstrap.defaults.gmArchitecture,
     modelAccessMode: mode,
     modelProfileId,

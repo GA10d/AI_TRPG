@@ -58,7 +58,19 @@ export const enUs = {
       {
         value: "multi_agent",
         label: "Multi-Agent GM",
-        description: "A future entry point for coordinated agents. The current build still centers on a single narrator."
+        description: "Coordinate Dicer, NPC Manager, Director, and Narrator in one GM pipeline."
+      }
+    ],
+    difficulties: [
+      {
+        value: "easy",
+        label: "Easy",
+        description: "Use the easy prompt set for a more forgiving opening and GM style."
+      },
+      {
+        value: "hard",
+        label: "Hard",
+        description: "Use the hard prompt set for more pressure and a stricter GM style."
       }
     ],
     logViews: [
@@ -733,13 +745,12 @@ export const enUs = {
       languageLabel: "Language",
       languageHint: "Controls the base language of content text and interface text.",
       difficultyLabel: "Difficulty",
-      difficultyHint: "Difficulty is not wired into real adjudication yet, so it is fixed for now.",
-      difficultyStandardPending: "Standard (Coming later)",
+      difficultyHint: "Chooses whether Beginning and GM prompts load from the easy or hard folders.",
       gmArchitectureLabel: "GM Architecture",
       gmArchitectureHint: "A shared entry point for single-agent and multi-agent hosting.",
       backgroundCompressionLabel: "Background Compression",
       backgroundCompressionHint:
-        "Only affects the single-agent Narrator path. When enabled, the Narrator receives the compressed context pack; when disabled, it receives the full public context directly.",
+        "In single-agent mode, this controls whether the Narrator receives a compressed context pack. In multi-agent mode, it controls whether shared public context is compressed before it is sent to NPC Manager, Director, and Narrator. When disabled, full public context is used instead.",
       backgroundCompressionOn: "Enable background compression",
       backgroundCompressionOff: "Disable compression and use full context",
       playModeLabel: "Play Mode",
@@ -901,7 +912,7 @@ export const enUs = {
         "Open a dedicated appearance panel to choose this teammate's look and outfit cues.",
       tagHint: "Click the personality tags below to multi-select them. Hover to read the description.",
       appearanceTagHint:
-        "Click the appearance tags below to multi-select them. They are grouped into looks and outfits.",
+        "Click the appearance tags below to multi-select them. They are grouped by looks, outfits, and subcategories.",
       loadPresetTitle: "Load AI Companion Preset",
       loadPresetDescription:
         "These presets are stored in the local browser. Loading one adds that AI teammate to the current party immediately.",
@@ -918,6 +929,25 @@ export const enUs = {
       advancedNegativeLabel: "Advanced Negative",
       appearanceLabel: "Appearance",
       outfitLabel: "Outfit",
+      appearanceSubgroupLabels: {
+        gender: "Gender",
+        age_impression: "Age Impression",
+        height_and_proportion: "Height & Proportion",
+        body_type: "Body Type",
+        hair: "Hair",
+        skin: "Skin",
+        eyes_and_expression: "Eyes & Expression",
+        facial_features: "Facial Features",
+        distinguishing_marks: "Distinguishing Marks",
+        accessories: "Accessories",
+        overall_style: "Overall Style",
+        outerwear: "Outerwear",
+        tops: "Tops",
+        bottoms: "Bottoms",
+        one_piece: "One-Piece",
+        footwear: "Footwear",
+        ornaments_and_gear: "Ornaments & Gear"
+      },
       warningsTitle: "Content Warnings"
     },
     protagonist: {
@@ -949,7 +979,7 @@ export const enUs = {
       presetNameFallback: "Unnamed AI Preset",
       tagHint: "Click the personality tags below to multi-select them. Hover to read the description.",
       appearanceTagHint:
-        "Click the appearance tags below to multi-select them. They are grouped into looks and outfits.",
+        "Click the appearance tags below to multi-select them. They are grouped by looks, outfits, and subcategories.",
       noTags: "Personality tags have not finished loading yet.",
       noAppearanceTags: "Appearance tags have not finished loading yet."
     },

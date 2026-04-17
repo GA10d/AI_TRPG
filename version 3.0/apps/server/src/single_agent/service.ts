@@ -7,6 +7,7 @@ import {
   fromLocaleCode
 } from "../../../../packages/shared-config/src/index.ts";
 import type {
+  Difficulty,
   EndingAdjudication,
   EndingJudgeDecision,
   EndingType,
@@ -29,7 +30,7 @@ const promptFileMap: Record<PromptKind, string> = {
   narrator: "narrator_prompt.txt"
 };
 
-const promptCache = new Map<PromptKind, string>();
+const promptCache = new Map<string, string>();
 const structuredPromptSpecMap: Record<
   StructuredPromptKind,
   {
@@ -58,19 +59,30 @@ const structuredPromptSpecMap: Record<
 const structuredPromptCache = new Map<StructuredPromptKind, string>();
 const structuredSchemaCache = new Map<StructuredPromptKind, Record<string, unknown>>();
 
-async function loadPrompt(kind: PromptKind): Promise<string> {
-  const cachedPrompt = promptCache.get(kind);
+function normalizeDifficulty(difficulty: Difficulty | undefined): Difficulty {
+  return difficulty === "hard" ? "hard" : "easy";
+}
+
+async function loadPrompt(kind: PromptKind, difficulty: Difficulty = "easy"): Promise<string> {
+  const normalizedDifficulty = normalizeDifficulty(difficulty);
+  const cacheKey = `${kind}:${normalizedDifficulty}`;
+  const cachedPrompt = promptCache.get(cacheKey);
   if (cachedPrompt) {
     return cachedPrompt;
   }
 
-  const prompt = (await readFile(join(singleAgentPromptDir, promptFileMap[kind]), "utf8")).trim();
-  promptCache.set(kind, prompt);
+  const prompt = (
+    await readFile(
+      join(singleAgentPromptDir, normalizedDifficulty, promptFileMap[kind]),
+      "utf8"
+    )
+  ).trim();
+  promptCache.set(cacheKey, prompt);
   return prompt;
 }
 
-export async function loadNarratorPrompt(): Promise<string> {
-  return loadPrompt("narrator");
+export async function loadNarratorPrompt(difficulty: Difficulty = "easy"): Promise<string> {
+  return loadPrompt("narrator", difficulty);
 }
 
 export async function loadStructuredTaskPrompt(kind: StructuredPromptKind): Promise<string> {
@@ -126,10 +138,11 @@ function buildAdditionalLanguageInstruction(
 export async function buildNarratorSystemPrompt(
   locale: LocaleCode,
   options?: {
+    difficulty?: Difficulty;
     profileId?: string;
   }
 ): Promise<string> {
-  const basePrompt = await loadNarratorPrompt();
+  const basePrompt = await loadNarratorPrompt(options?.difficulty);
   return [
     basePrompt,
     "",

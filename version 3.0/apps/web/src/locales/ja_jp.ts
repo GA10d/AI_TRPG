@@ -58,7 +58,19 @@ export const jaJp = {
       {
         value: "multi_agent",
         label: "マルチ Agent GM",
-        description: "将来の複数エージェント協調向け入口です。現行版は単一ナレーター中心です。"
+        description: "Dicer、NPC Manager、Director、Narrator を連携させる GM 進行です。"
+      }
+    ],
+    difficulties: [
+      {
+        value: "easy",
+        label: "易しい",
+        description: "easy プロンプト群を使い、導入と進行をやや寛容にします。"
+      },
+      {
+        value: "hard",
+        label: "難しい",
+        description: "hard プロンプト群を使い、圧力と厳しさを強めます。"
       }
     ],
     logViews: [
@@ -745,13 +757,12 @@ export const jaJp = {
       languageLabel: "言語",
       languageHint: "コンテンツ本文と UI の基本言語を切り替えます。",
       difficultyLabel: "難易度",
-      difficultyHint: "難易度はまだ実裁定に接続されていないため、現状は固定です。",
-      difficultyStandardPending: "標準（開発予定）",
+      difficultyHint: "Beginning と GM プロンプトで easy / hard のどちらを読むかを切り替えます。",
       gmArchitectureLabel: "GM 構成",
       gmArchitectureHint: "単一 Agent / 複数 Agent 進行の共通入口です。",
       backgroundCompressionLabel: "背景圧縮",
       backgroundCompressionHint:
-        "単一 Agent Narrator にのみ適用されます。オンでは圧縮済み context pack を渡し、オフでは完全な公開コンテキストをそのまま Narrator に渡します。",
+        "単一 Agent では Narrator に圧縮済み context pack を渡すかを制御し、複数 Agent では共有公開コンテキストを NPC Manager、Director、Narrator へ渡す前に圧縮するかを制御します。オフでは完全な公開コンテキストを使います。",
       backgroundCompressionOn: "背景圧縮を有効化",
       backgroundCompressionOff: "背景圧縮を無効化して全量コンテキストを使用",
       playModeLabel: "ゲームモード",
@@ -914,7 +925,7 @@ export const jaJp = {
         "専用の見た目画面を開いて、この AI 仲間の外見と服装の手掛かりを選択または調整します。",
       tagHint: "下の人格タグをクリックして複数選択できます。ホバーで説明を確認できます。",
       appearanceTagHint:
-        "下の形象タグをクリックして複数選択できます。外貌と服装に分かれています。",
+        "下の形象タグをクリックして複数選択できます。外見・服装・子分類ごとに整理して表示します。",
       loadPresetTitle: "AI 仲間設定を読み込む",
       loadPresetDescription:
         "ここにはブラウザのローカルに保存された AI 仲間設定が並びます。読み込むと現在のパーティへすぐ追加されます。",
@@ -931,6 +942,25 @@ export const jaJp = {
       advancedNegativeLabel: "上級・負向",
       appearanceLabel: "外見",
       outfitLabel: "服装",
+      appearanceSubgroupLabels: {
+        gender: "性別印象",
+        age_impression: "年齢印象",
+        height_and_proportion: "身長と比率",
+        body_type: "体型",
+        hair: "髪型",
+        skin: "肌",
+        eyes_and_expression: "目元と表情",
+        facial_features: "顔立ち",
+        distinguishing_marks: "識別特徴",
+        accessories: "アクセサリー",
+        overall_style: "全体スタイル",
+        outerwear: "アウター",
+        tops: "トップス",
+        bottoms: "ボトムス",
+        one_piece: "ワンピース・つなぎ",
+        footwear: "履物",
+        ornaments_and_gear: "装飾と装備"
+      },
       warningsTitle: "コンテンツ警告"
     },
     protagonist: {
@@ -962,7 +992,7 @@ export const jaJp = {
       presetNameFallback: "無名の AI 設定",
       tagHint: "下の人格タグをクリックして複数選択できます。ホバーで説明を確認できます。",
       appearanceTagHint:
-        "下の形象タグをクリックして複数選択できます。外貌と服装に分かれています。",
+        "下の形象タグをクリックして複数選択できます。外見・服装・子分類ごとに整理して表示します。",
       noTags: "人格タグはまだ読み込み中です。",
       noAppearanceTags: "形象タグはまだ読み込み中です。"
     },

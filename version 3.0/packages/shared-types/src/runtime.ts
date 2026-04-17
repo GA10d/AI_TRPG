@@ -1,4 +1,4 @@
-import type { GmArchitecture, LocaleCode, PlayMode } from "./content.ts";
+import type { Difficulty, GmArchitecture, LocaleCode, PlayMode } from "./content.ts";
 
 export type SessionStatus =
   | "draft"
@@ -125,6 +125,7 @@ export type AiPersonalityTag = {
 export type AiAppearanceTag = {
   id: string;
   category: string;
+  subgroup?: string;
   keyword: string;
   description: string;
 };
@@ -170,6 +171,7 @@ export type RoundInputState = {
 
 export type SessionSettings = {
   logViewMode: "all" | "compact" | "hidden";
+  difficulty?: Difficulty;
   backgroundCompressionEnabled?: boolean;
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
@@ -183,6 +185,7 @@ export type GameState = {
   lastEndingJudgeDecision?: EndingJudgeDecision | null;
   roundInputState?: RoundInputState | null;
   storyControlMode?: StoryControlMode | null;
+  multiAgent?: MultiAgentState | null;
 };
 
 export type Session = {
@@ -388,6 +391,40 @@ export type SessionRuntimeContextPack = {
   retrievedOpenLoopIds: string[];
   recentMessageIds: string[];
   episodeSummaryIds: string[];
+};
+
+export type MultiAgentAgentOutput = {
+  createdAt: string;
+  content: string;
+  provider: string;
+  meta?: AiGenerationMetadata | null;
+};
+
+export type MultiAgentRoundState = {
+  round: number;
+  dicer?: MultiAgentAgentOutput | null;
+  npcManager?: MultiAgentAgentOutput | null;
+  director?: MultiAgentAgentOutput | null;
+};
+
+export type MultiAgentDirectorTaskStatus =
+  | "queued"
+  | "running"
+  | "ready"
+  | "failed";
+
+export type MultiAgentDirectorTaskState = {
+  round: number;
+  status: MultiAgentDirectorTaskStatus;
+  queuedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  error?: string | null;
+};
+
+export type MultiAgentState = {
+  rounds: MultiAgentRoundState[];
+  directorTask?: MultiAgentDirectorTaskState | null;
 };
 
 export type SaveRuntimeConfig = {

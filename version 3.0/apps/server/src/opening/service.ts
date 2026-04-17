@@ -2,6 +2,8 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  Difficulty,
+  GmArchitecture,
   LoadedContentBundle,
   LocaleCode,
   ModelAccessMode,
@@ -20,6 +22,8 @@ type ResolveStoryOpeningRequest = {
   modelAccessMode: ModelAccessMode;
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
+  difficulty: Difficulty;
+  gmArchitecture: GmArchitecture;
   forceRegenerateOpening?: boolean;
 };
 
@@ -32,10 +36,20 @@ function sanitizeLocaleForFileName(locale: LocaleCode): string {
   return String(locale).replace(/[^a-zA-Z0-9._-]+/gu, "_");
 }
 
-function buildBeginningFileCandidates(locale: LocaleCode): string[] {
-  const normalizedLocale = sanitizeLocaleForFileName(locale);
+function buildBeginningFileCandidates(input: {
+  locale: LocaleCode;
+  difficulty: Difficulty;
+  gmArchitecture: GmArchitecture;
+}): string[] {
+  const normalizedLocale = sanitizeLocaleForFileName(input.locale);
+  const normalizedDifficulty = sanitizeLocaleForFileName(input.difficulty);
+  const normalizedArchitecture = sanitizeLocaleForFileName(input.gmArchitecture);
 
   return [
+    `beginning.${normalizedArchitecture}.${normalizedDifficulty}.${normalizedLocale}.md`,
+    `beginning.${normalizedArchitecture}.${normalizedDifficulty}.${normalizedLocale}.txt`,
+    `beginning.${normalizedArchitecture}.${normalizedDifficulty}.md`,
+    `beginning.${normalizedArchitecture}.${normalizedDifficulty}.txt`,
     `beginning.${normalizedLocale}.md`,
     `beginning.${normalizedLocale}.txt`,
     "beginning.md",
@@ -58,7 +72,11 @@ async function pathExists(targetPath: string): Promise<boolean> {
 
 async function readCachedBeginningAsset(
   storyBaseDir: string,
-  locale: LocaleCode
+  input: {
+    locale: LocaleCode;
+    difficulty: Difficulty;
+    gmArchitecture: GmArchitecture;
+  }
 ): Promise<CachedBeginningAsset | null> {
   const textAssetsDir = getTextAssetsDir(storyBaseDir);
 
@@ -66,7 +84,7 @@ async function readCachedBeginningAsset(
     return null;
   }
 
-  for (const fileName of buildBeginningFileCandidates(locale)) {
+  for (const fileName of buildBeginningFileCandidates(input)) {
     const absolutePath = join(textAssetsDir, fileName);
     if (!(await pathExists(absolutePath))) {
       continue;
@@ -88,7 +106,11 @@ async function readCachedBeginningAsset(
 
 async function writeCachedBeginningAsset(
   storyBaseDir: string,
-  locale: LocaleCode,
+  input: {
+    locale: LocaleCode;
+    difficulty: Difficulty;
+    gmArchitecture: GmArchitecture;
+  },
   text: string
 ): Promise<void> {
   const normalizedText = text.trim();
@@ -101,7 +123,7 @@ async function writeCachedBeginningAsset(
     recursive: true
   });
 
-  const fileName = `beginning.${sanitizeLocaleForFileName(locale)}.md`;
+  const fileName = `beginning.${sanitizeLocaleForFileName(input.gmArchitecture)}.${sanitizeLocaleForFileName(input.difficulty)}.${sanitizeLocaleForFileName(input.locale)}.md`;
   await writeFile(join(textAssetsDir, fileName), normalizedText, "utf8");
 }
 
@@ -119,6 +141,8 @@ function buildOpeningInput(
     modelProfileId: request.modelProfileId,
     runtimeModelConfig: request.runtimeModelConfig,
     locale: bundle.resolvedLocale,
+    difficulty: request.difficulty,
+    gmArchitecture: request.gmArchitecture,
     ruleTitle,
     ruleText: bundle.rule.rule.content,
     storyTitle,
@@ -208,7 +232,11 @@ export async function resolveStoryOpening(
   if (!request.forceRegenerateOpening) {
     const cachedAsset = await readCachedBeginningAsset(
       bundle.story.baseDir,
-      bundle.resolvedLocale
+      {
+        locale: bundle.resolvedLocale,
+        difficulty: request.difficulty,
+        gmArchitecture: request.gmArchitecture
+      }
     );
 
     if (cachedAsset) {
@@ -226,7 +254,11 @@ export async function resolveStoryOpening(
   try {
     await writeCachedBeginningAsset(
       bundle.story.baseDir,
-      bundle.resolvedLocale,
+      {
+        locale: bundle.resolvedLocale,
+        difficulty: request.difficulty,
+        gmArchitecture: request.gmArchitecture
+      },
       generatedOpening.text
     );
   } catch (error) {

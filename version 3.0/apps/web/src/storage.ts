@@ -22,6 +22,7 @@ export type StoredWebDefaults = {
   uiLocale?: UiLocaleCode;
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
+  difficulty: CreateSessionRequest["difficulty"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
   backgroundCompressionEnabled?: boolean;
   modelAccessMode: CreateSessionRequest["modelAccessMode"];

@@ -710,6 +710,7 @@ export function App() {
     uiLocale,
     locale,
     playMode,
+    difficulty,
     gmArchitecture,
     backgroundCompressionEnabled,
     modelAccessMode,
@@ -732,6 +733,7 @@ export function App() {
     setUiLocale,
     setLocale,
     setPlayMode,
+    setDifficulty,
     setGmArchitecture,
     setBackgroundCompressionEnabled,
     setModelAccessMode,
@@ -1226,6 +1228,7 @@ export function App() {
           storyDirectoryName,
           locale,
           playMode,
+          difficulty,
           gmArchitecture,
           backgroundCompressionEnabled,
           modelAccessMode,
@@ -1295,6 +1298,7 @@ export function App() {
   }, [
     bootstrap,
     debugEnabled,
+    difficulty,
     gmArchitecture,
     backgroundCompressionEnabled,
     locale,
@@ -1711,6 +1715,7 @@ export function App() {
       uiLocale,
       locale,
       playMode,
+      difficulty,
       gmArchitecture,
       backgroundCompressionEnabled,
       modelAccessMode,
@@ -1738,6 +1743,7 @@ export function App() {
       uiLocale: nextUiLocale,
       locale,
       playMode,
+      difficulty,
       gmArchitecture,
       backgroundCompressionEnabled,
       modelAccessMode,
@@ -2020,6 +2026,7 @@ export function App() {
         playerParticipantId,
         settings: {
           logViewMode,
+          difficulty,
           backgroundCompressionEnabled,
           debugEnabled,
           promptDebugEnabled: false,
@@ -2554,6 +2561,7 @@ export function App() {
           storyDirectoryName,
           locale,
           playMode,
+          difficulty,
           gmArchitecture,
           backgroundCompressionEnabled,
           modelAccessMode,
@@ -3153,6 +3161,7 @@ export function App() {
 
     setLocale(bootstrap.defaults.locale);
     setPlayMode(bootstrap.defaults.playMode);
+    setDifficulty(bootstrap.defaults.difficulty);
     setGmArchitecture(bootstrap.defaults.gmArchitecture);
     setBackgroundCompressionEnabled(bootstrap.defaults.backgroundCompressionEnabled);
     setModelAccessMode(bootstrap.defaults.modelAccessMode);
@@ -3371,6 +3380,7 @@ export function App() {
         storyDirectoryName,
         locale,
         playMode,
+        difficulty,
         gmArchitecture,
         backgroundCompressionEnabled,
         modelAccessMode,
@@ -3456,6 +3466,7 @@ export function App() {
           storyDirectoryName={storyDirectoryName}
           locale={locale}
           playMode={playMode}
+          difficulty={difficulty}
           gmArchitecture={gmArchitecture}
           backgroundCompressionEnabled={backgroundCompressionEnabled}
           modelAccessMode={modelAccessMode}
@@ -3489,6 +3500,7 @@ export function App() {
           onSubmit={handleCreateSession}
           onLocaleChange={setLocale}
           onPlayModeChange={setPlayMode}
+          onDifficultyChange={setDifficulty}
           onGmArchitectureChange={setGmArchitecture}
           onBackgroundCompressionEnabledChange={setBackgroundCompressionEnabled}
           onModelAccessModeChange={setModelAccessMode}

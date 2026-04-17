@@ -75,6 +75,7 @@ export const PHASE1_MODEL_ACCESS_MODE_OPTIONS = [
 
 export const PHASE1_DEFAULTS = {
   playMode: "single_player",
+  difficulty: "easy",
   gmArchitecture: "single_agent",
   backgroundCompressionEnabled: true,
   modelAccessMode: "mock",

@@ -14,6 +14,9 @@ import type {
   CreateSessionAiCompanionInput,
   CreateSessionRequest,
   Message,
+  MultiAgentAgentOutput,
+  MultiAgentRoundState,
+  MultiAgentState,
   Participant,
   PrepareRoundRequest,
   ReplayEvent,
@@ -33,6 +36,13 @@ import type {
   SubmitManualNarrationRequest,
   UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
+import {
+  buildDicerUserPrompt,
+  buildDirectorUserPrompt,
+  buildMultiAgentSystemPrompt,
+  buildNarratorUserPrompt,
+  buildNpcManagerUserPrompt
+} from "../multi_agent/service.ts";
 import {
   generateAiPrivateChatReply,
   generateAiRoundDraft,
@@ -160,6 +170,174 @@ function buildNarratorConversationContext(input: {
 }): string {
   if (!isNarratorBackgroundCompressionEnabled(input.snapshot.session)) {
     return buildConversationContext(input.snapshot.session, input.snapshot.messages);
+  }
+
+  return buildNarratorContextPack({
+    snapshot: input.snapshot,
+    latestPlayerInput: input.latestPlayerInput,
+    round: input.round
+  }).assembledText;
+}
+
+function isMultiAgentSession(session: Session): boolean {
+  return session.gmArchitecture === "multi_agent";
+}
+
+function createEmptyMultiAgentState(): MultiAgentState {
+  return {
+    rounds: [],
+    directorTask: null
+  };
+}
+
+function getMultiAgentState(session: Session): MultiAgentState {
+  return session.gameState.multiAgent ?? createEmptyMultiAgentState();
+}
+
+function findMultiAgentRoundState(
+  state: MultiAgentState,
+  round: number
+): MultiAgentRoundState | null {
+  return state.rounds.find((item) => item.round === round) ?? null;
+}
+
+function findMultiAgentOutput(
+  state: MultiAgentState,
+  role: keyof Pick<MultiAgentRoundState, "dicer" | "npcManager" | "director">,
+  round: number
+): MultiAgentAgentOutput | null {
+  return findMultiAgentRoundState(state, round)?.[role] ?? null;
+}
+
+function upsertMultiAgentOutput(input: {
+  state: MultiAgentState | null | undefined;
+  round: number;
+  role: keyof Pick<MultiAgentRoundState, "dicer" | "npcManager" | "director">;
+  output: MultiAgentAgentOutput;
+  directorTask?: MultiAgentState["directorTask"];
+}): MultiAgentState {
+  const currentState = input.state ?? createEmptyMultiAgentState();
+  const existingRoundIndex = currentState.rounds.findIndex((item) => item.round === input.round);
+  const nextRoundState: MultiAgentRoundState =
+    existingRoundIndex >= 0
+      ? {
+          ...currentState.rounds[existingRoundIndex],
+          [input.role]: input.output
+        }
+      : {
+          round: input.round,
+          [input.role]: input.output
+        };
+  const nextRounds =
+    existingRoundIndex >= 0
+      ? currentState.rounds.map((item, index) =>
+          index === existingRoundIndex ? nextRoundState : item
+        )
+      : [...currentState.rounds, nextRoundState].sort((left, right) => left.round - right.round);
+
+  return {
+    ...currentState,
+    rounds: nextRounds,
+    directorTask: input.directorTask ?? currentState.directorTask ?? null
+  };
+}
+
+function updateMultiAgentDirectorTask(
+  state: MultiAgentState | null | undefined,
+  directorTask: MultiAgentState["directorTask"]
+): MultiAgentState {
+  const currentState = state ?? createEmptyMultiAgentState();
+  return {
+    ...currentState,
+    directorTask
+  };
+}
+
+function buildPublicHistoryContext(
+  session: Session,
+  messages: Message[],
+  maxRound?: number
+): string {
+  return messages
+    .filter((message) => inferMessageChannel(message) === "public_story")
+    .filter((message) => (typeof maxRound === "number" ? message.round <= maxRound : true))
+    .map((message) => `[${formatPublicMessageSpeaker(session, message)}][R${message.round}] ${message.content}`)
+    .join("\n\n");
+}
+
+function buildPublicRoundContext(
+  session: Session,
+  messages: Message[],
+  round: number
+): string {
+  const lines = messages
+    .filter((message) => inferMessageChannel(message) === "public_story" && message.round === round)
+    .map((message) => `[${formatPublicMessageSpeaker(session, message)}][R${message.round}] ${message.content}`);
+
+  return lines.length > 0 ? lines.join("\n") : `No public story items were recorded for round ${round}.`;
+}
+
+function buildSubmittedInputContext(
+  session: Session,
+  drafts: Array<{
+    participantId: string;
+    displayName: string;
+    content: string;
+  }>,
+  round: number
+): string {
+  if (!drafts.length) {
+    return `No submitted party inputs were recorded for round ${round}.`;
+  }
+
+  return drafts
+    .map(
+      (draft) =>
+        `[${formatParticipantActionLabel(session, draft.participantId, draft.displayName)}][R${round}] ${draft.content}`
+    )
+    .join("\n");
+}
+
+function buildMultiAgentHistoryContext(
+  state: MultiAgentState,
+  role: keyof Pick<MultiAgentRoundState, "npcManager" | "director">,
+  maxRound: number
+): string {
+  const lines = state.rounds
+    .filter((item) => item.round <= maxRound)
+    .map((item) => {
+      const output = item[role];
+      if (!output?.content.trim()) {
+        return "";
+      }
+
+      const label = role === "npcManager" ? "NPC Manager" : "Director";
+      return [`[${label}][R${item.round}]`, output.content.trim()].join("\n");
+    })
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return role === "npcManager"
+      ? "No previous NPC Manager outputs are recorded yet."
+      : "No previous Director outputs are recorded yet.";
+  }
+
+  return lines.join("\n\n");
+}
+
+function buildMultiAgentSharedPublicContext(input: {
+  snapshot: SessionSnapshot;
+  latestPlayerInput: string;
+  round: number;
+}): string {
+  if (!isNarratorBackgroundCompressionEnabled(input.snapshot.session)) {
+    return (
+      buildPublicHistoryContext(
+        input.snapshot.session,
+        input.snapshot.messages,
+        input.round
+      ) || "No shared public context yet."
+    );
   }
 
   return buildNarratorContextPack({
@@ -605,6 +783,8 @@ async function createSessionSnapshotInternal(
     modelProfileId: narratorModelProfileId,
     runtimeModelConfig: narratorRuntimeConfig,
     locale: bundle.resolvedLocale,
+    difficulty: request.difficulty,
+    gmArchitecture: request.gmArchitecture,
     ruleTitle,
     ruleText: bundle.rule.rule.content,
     storyTitle,
@@ -684,6 +864,7 @@ async function createSessionSnapshotInternal(
     companionParticipantIds: aiCompanions.map((companion) => companion.participantId),
     settings: {
       logViewMode: request.logViewMode ?? DEFAULT_LOG_VIEW_MODE,
+      difficulty: request.difficulty,
       backgroundCompressionEnabled: request.backgroundCompressionEnabled ?? true,
       debugEnabled: request.debugEnabled ?? true,
       promptDebugEnabled: request.promptDebugEnabled ?? false,
@@ -700,7 +881,11 @@ async function createSessionSnapshotInternal(
       lastEndingJudgeResult: null,
       lastEndingJudgeDecision: null,
       roundInputState: null,
-      storyControlMode: primaryPlayerMode === "ai" ? "intervene" : null
+      storyControlMode: primaryPlayerMode === "ai" ? "intervene" : null,
+      multiAgent:
+        request.gmArchitecture === "multi_agent"
+          ? createEmptyMultiAgentState()
+          : null
     }
   };
 
@@ -826,6 +1011,9 @@ async function createSessionSnapshotInternal(
   });
 
   store.save(snapshot, sessionRuntimeConfig);
+  if (request.gmArchitecture === "multi_agent") {
+    void queueDirectorGeneration(sessionId, 0, contentRoot, store).catch(() => {});
+  }
   scheduleBackgroundMemoryRefresh(sessionId, store);
   return snapshot;
 }
@@ -853,6 +1041,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     storyDirectoryName: "The_Silence",
     locale: PHASE1_DEFAULTS.locale,
     playMode: PHASE1_DEFAULTS.playMode,
+    difficulty: PHASE1_DEFAULTS.difficulty,
     gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
     backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
     modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
@@ -1011,10 +1200,713 @@ export async function prepareRound(
   }));
 }
 
+async function loadSessionContentBundle(
+  contentRoot: string,
+  snapshot: SessionSnapshot
+): Promise<Awaited<ReturnType<typeof loadPlayableContentBundle>>> {
+  return loadPlayableContentBundle(
+    contentRoot,
+    snapshot.contentSummary.ruleDirectoryName ?? snapshot.session.ruleId,
+    snapshot.contentSummary.storyDirectoryName ?? snapshot.session.storyId,
+    snapshot.contentSummary.resolvedLocale
+  );
+}
+
+function buildStoredAgentOutput(input: {
+  content: string;
+  provider: string;
+  meta?: AiGenerationMetadata | null;
+  createdAt?: string;
+}): MultiAgentAgentOutput {
+  return {
+    createdAt: input.createdAt ?? nowIso(),
+    content: input.content.trim(),
+    provider: input.provider,
+    meta: input.meta ?? null
+  };
+}
+
+const directorGenerationChains = new Map<string, Promise<void>>();
+const directorRoundPromises = new Map<string, Map<number, Promise<void>>>();
+
+function getDirectorRoundPromiseMap(sessionId: string): Map<number, Promise<void>> {
+  const existing = directorRoundPromises.get(sessionId);
+  if (existing) {
+    return existing;
+  }
+
+  const created = new Map<number, Promise<void>>();
+  directorRoundPromises.set(sessionId, created);
+  return created;
+}
+
+function setDirectorTaskState(
+  sessionId: string,
+  store: InMemorySessionStore,
+  directorTask: MultiAgentState["directorTask"]
+): void {
+  store.update(sessionId, (current) => ({
+    ...current,
+    session: {
+      ...current.session,
+      gameState: {
+        ...current.session.gameState,
+        multiAgent: updateMultiAgentDirectorTask(
+          current.session.gameState.multiAgent,
+          directorTask
+        )
+      }
+    }
+  }));
+}
+
+function markDirectorTaskReady(
+  sessionId: string,
+  store: InMemorySessionStore,
+  round: number,
+  timestamp: string
+): void {
+  setDirectorTaskState(sessionId, store, {
+    round,
+    status: "ready",
+    queuedAt: timestamp,
+    startedAt: timestamp,
+    completedAt: timestamp,
+    error: null
+  });
+}
+
+function queueDirectorGeneration(
+  sessionId: string,
+  targetRound: number,
+  contentRoot: string,
+  store: InMemorySessionStore
+): Promise<void> {
+  const latestSnapshot = store.get(sessionId);
+  if (!latestSnapshot || !isMultiAgentSession(latestSnapshot.session)) {
+    return Promise.resolve();
+  }
+
+  if (latestSnapshot.session.status === "ended") {
+    return Promise.resolve();
+  }
+
+  const existingOutput = findMultiAgentOutput(
+    getMultiAgentState(latestSnapshot.session),
+    "director",
+    targetRound
+  );
+  if (existingOutput) {
+    markDirectorTaskReady(sessionId, store, targetRound, existingOutput.createdAt);
+    return Promise.resolve();
+  }
+
+  const roundPromiseMap = getDirectorRoundPromiseMap(sessionId);
+  const existingPromise = roundPromiseMap.get(targetRound);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const queuedAt = nowIso();
+  setDirectorTaskState(sessionId, store, {
+    round: targetRound,
+    status: "queued",
+    queuedAt,
+    startedAt: null,
+    completedAt: null,
+    error: null
+  });
+
+  const previous = directorGenerationChains.get(sessionId) ?? Promise.resolve();
+  const promise = previous
+    .catch(() => {})
+    .then(async () => {
+      const beforeRun = store.get(sessionId);
+      if (!beforeRun || !isMultiAgentSession(beforeRun.session) || beforeRun.session.status === "ended") {
+        return;
+      }
+
+      const alreadyReady = findMultiAgentOutput(
+        getMultiAgentState(beforeRun.session),
+        "director",
+        targetRound
+      );
+      if (alreadyReady) {
+        markDirectorTaskReady(sessionId, store, targetRound, alreadyReady.createdAt);
+        return;
+      }
+
+      const startedAt = nowIso();
+      setDirectorTaskState(sessionId, store, {
+        round: targetRound,
+        status: "running",
+        queuedAt,
+        startedAt,
+        completedAt: null,
+        error: null
+      });
+
+      const runtimeConfig = store.getRuntimeConfig(sessionId);
+      const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+        beforeRun.session,
+        runtimeConfig
+      );
+      const modelGateway = getModelGateway(beforeRun.session.modelAccessMode);
+      const bundle = await loadSessionContentBundle(contentRoot, beforeRun);
+      const sharedPublicContext = buildMultiAgentSharedPublicContext({
+        snapshot: beforeRun,
+        latestPlayerInput: "",
+        round: targetRound
+      });
+      const directorHistory = buildMultiAgentHistoryContext(
+        getMultiAgentState(beforeRun.session),
+        "director",
+        targetRound - 1
+      );
+      const directorResult = await modelGateway.generatePromptedText({
+        accessMode: beforeRun.session.modelAccessMode,
+        modelProfileId: narratorRuntimeSelection.modelProfileId,
+        runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+        locale: beforeRun.session.locale,
+        systemPrompt: await buildMultiAgentSystemPrompt(
+          "director",
+          beforeRun.session.locale,
+          beforeRun.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
+        ),
+        userPrompt: buildDirectorUserPrompt({
+          bundle,
+          locale: beforeRun.session.locale,
+          round: targetRound,
+          sharedPublicContext,
+          ownHistory: directorHistory
+        })
+      });
+      const output = buildStoredAgentOutput({
+        content: directorResult.text,
+        provider: directorResult.provider,
+        meta: directorResult.meta
+      });
+
+      store.update(sessionId, (current) => ({
+        ...current,
+        session: {
+          ...current.session,
+          gameState: {
+            ...current.session.gameState,
+            multiAgent: upsertMultiAgentOutput({
+              state: updateMultiAgentDirectorTask(current.session.gameState.multiAgent, {
+                round: targetRound,
+                status: "ready",
+                queuedAt,
+                startedAt,
+                completedAt: output.createdAt,
+                error: null
+              }),
+              round: targetRound,
+              role: "director",
+              output
+            })
+          }
+        }
+      }));
+    })
+    .catch((error) => {
+      setDirectorTaskState(sessionId, store, {
+        round: targetRound,
+        status: "failed",
+        queuedAt,
+        startedAt: null,
+        completedAt: nowIso(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    })
+    .finally(() => {
+      const currentRoundPromises = directorRoundPromises.get(sessionId);
+      currentRoundPromises?.delete(targetRound);
+      if (currentRoundPromises && currentRoundPromises.size === 0) {
+        directorRoundPromises.delete(sessionId);
+      }
+
+      if (directorGenerationChains.get(sessionId) === promise) {
+        directorGenerationChains.delete(sessionId);
+      }
+    });
+
+  roundPromiseMap.set(targetRound, promise);
+  directorGenerationChains.set(sessionId, promise);
+  return promise;
+}
+
+async function waitForDirectorOutput(input: {
+  sessionId: string;
+  currentSnapshot: SessionSnapshot;
+  contentRoot: string;
+  store: InMemorySessionStore;
+  options?: TurnResolutionOptions;
+}): Promise<MultiAgentAgentOutput | null> {
+  const targetRound = input.currentSnapshot.session.currentRound;
+  if (targetRound < 0) {
+    return null;
+  }
+
+  const currentState = getMultiAgentState(input.currentSnapshot.session);
+  const existingOutput = findMultiAgentOutput(currentState, "director", targetRound);
+  if (existingOutput) {
+    return existingOutput;
+  }
+
+  await emitTurnResolutionStage(
+    input.options,
+    "waiting_director",
+    "等待 Director 输出",
+    `正在等待第 ${targetRound} 轮 Director 后台指导完成。`,
+    0.12
+  );
+  await queueDirectorGeneration(
+    input.sessionId,
+    targetRound,
+    input.contentRoot,
+    input.store
+  );
+
+  const latestSnapshot = input.store.get(input.sessionId);
+  if (!latestSnapshot) {
+    return null;
+  }
+
+  return findMultiAgentOutput(
+    getMultiAgentState(latestSnapshot.session),
+    "director",
+    targetRound
+  );
+}
+
+async function runMultiAgentTurnPipeline(input: {
+  sessionId: string;
+  currentSnapshot: SessionSnapshot;
+  contentRoot: string;
+  store: InMemorySessionStore;
+  nextRound: number;
+  playerMessages: Message[];
+  submittedInputs: Array<{
+    participantId: string;
+    displayName: string;
+    content: string;
+  }>;
+  committedPartyInput: string;
+  options?: TurnResolutionOptions;
+}): Promise<{
+  directorOutput: MultiAgentAgentOutput | null;
+  dicerOutput: MultiAgentAgentOutput;
+  npcManagerOutput: MultiAgentAgentOutput;
+  narratorText: string;
+  narratorProvider: string;
+  narratorMeta: AiGenerationMetadata;
+  narratorMode: Session["modelAccessMode"];
+  endingJudge: Awaited<ReturnType<ReturnType<typeof getModelGateway>["judgeEnding"]>>;
+}> {
+  const current = input.currentSnapshot;
+  const runtimeConfig = input.store.getRuntimeConfig(input.sessionId);
+  const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+    current.session,
+    runtimeConfig
+  );
+  const bundle = await loadSessionContentBundle(input.contentRoot, current);
+  const interimSnapshot: SessionSnapshot = {
+    ...current,
+    messages: [
+      ...current.messages,
+      ...input.playerMessages
+    ]
+  };
+  const previousRoundContext =
+    current.session.currentRound > 0
+      ? buildPublicRoundContext(
+          current.session,
+          current.messages,
+          current.session.currentRound - 1
+        )
+      : "No earlier completed public round is available yet.";
+  const latestCompletedRoundContext = buildPublicRoundContext(
+    current.session,
+    current.messages,
+    current.session.currentRound
+  );
+  const currentSubmittedInputsContext = buildSubmittedInputContext(
+    current.session,
+    input.submittedInputs,
+    input.nextRound
+  );
+  const sharedPublicContext = buildMultiAgentSharedPublicContext({
+    snapshot: interimSnapshot,
+    latestPlayerInput: input.committedPartyInput,
+    round: input.nextRound
+  });
+  const directorOutput = await waitForDirectorOutput({
+    sessionId: input.sessionId,
+    currentSnapshot: current,
+    contentRoot: input.contentRoot,
+    store: input.store,
+    options: input.options
+  });
+  const modelGateway = getModelGateway(current.session.modelAccessMode);
+
+  await emitTurnResolutionStage(
+    input.options,
+    "requesting_support_agents",
+    "请求 Dicer / NPC Manager",
+    "正在把当前公共上下文和队伍输入发给 Dicer 与 NPC Manager。",
+    0.28
+  );
+  const dicerPromise = modelGateway.generatePromptedText({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    locale: current.session.locale,
+    systemPrompt: await buildMultiAgentSystemPrompt(
+      "dicer",
+      current.session.locale,
+      current.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
+    ),
+    userPrompt: buildDicerUserPrompt({
+      bundle,
+      locale: current.session.locale,
+      round: input.nextRound,
+      previousRoundContext,
+      latestRoundContext: latestCompletedRoundContext,
+      currentSubmittedInputs: currentSubmittedInputsContext
+    })
+  });
+  const npcManagerPromise = modelGateway.generatePromptedText({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    locale: current.session.locale,
+    systemPrompt: await buildMultiAgentSystemPrompt(
+      "npc_manager",
+      current.session.locale,
+      current.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
+    ),
+    userPrompt: buildNpcManagerUserPrompt({
+      bundle,
+      locale: current.session.locale,
+      round: input.nextRound,
+      sharedPublicContext,
+      currentSubmittedInputs: currentSubmittedInputsContext,
+      ownHistory: buildMultiAgentHistoryContext(
+        getMultiAgentState(current.session),
+        "npcManager",
+        current.session.currentRound
+      )
+    })
+  });
+
+  await emitTurnResolutionStage(
+    input.options,
+    "waiting_support_agents",
+    "等待 Dicer / NPC Manager",
+    "支持 agent 已开始处理，正在等待规则判定和 NPC 管理结果返回。",
+    0.46
+  );
+  const [dicerResult, npcManagerResult] = await Promise.all([
+    dicerPromise,
+    npcManagerPromise
+  ]);
+  const dicerOutput = buildStoredAgentOutput({
+    content: dicerResult.text,
+    provider: dicerResult.provider,
+    meta: dicerResult.meta
+  });
+  const npcManagerOutput = buildStoredAgentOutput({
+    content: npcManagerResult.text,
+    provider: npcManagerResult.provider,
+    meta: npcManagerResult.meta
+  });
+
+  await emitTurnResolutionStage(
+    input.options,
+    "requesting_narrator",
+    "整理 Narrator 输入",
+    "正在整合 Dicer、NPC Manager、Director 和当前回合输入。",
+    0.62
+  );
+  const narratorPromise = modelGateway.generatePromptedText({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    locale: current.session.locale,
+    systemPrompt: await buildMultiAgentSystemPrompt(
+      "narrator",
+      current.session.locale,
+      current.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
+    ),
+    userPrompt: buildNarratorUserPrompt({
+      bundle,
+      locale: current.session.locale,
+      round: input.nextRound,
+      sharedPublicContext,
+      latestCompletedRound: latestCompletedRoundContext,
+      currentSubmittedInputs: currentSubmittedInputsContext,
+      dicerOutput: dicerOutput.content,
+      npcManagerOutput: npcManagerOutput.content,
+      directorOutput:
+        directorOutput?.content.trim() || "No Director output is available for the previous completed round."
+    })
+  });
+  await emitTurnResolutionStage(
+    input.options,
+    "waiting_turn_narration",
+    "等待 Narrator 回复",
+    "Narrator 已开始整合多 agent 结果，正在等待正式叙事。",
+    0.76
+  );
+  const narratorResult = await narratorPromise;
+
+  await emitTurnResolutionStage(
+    input.options,
+    "judging_ending",
+    "进行结局判定",
+    "Narrator 已回复，正在检查这段回复是否触发结局。",
+    0.88
+  );
+  const endingJudge = await modelGateway.judgeEnding({
+    accessMode: current.session.modelAccessMode,
+    modelProfileId: narratorRuntimeSelection.modelProfileId,
+    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    locale: current.session.locale,
+    round: input.nextRound,
+    narrationText: narratorResult.text
+  });
+
+  return {
+    directorOutput,
+    dicerOutput,
+    npcManagerOutput,
+    narratorText: narratorResult.text,
+    narratorProvider: narratorResult.provider,
+    narratorMeta: narratorResult.meta,
+    narratorMode: narratorResult.mode,
+    endingJudge
+  };
+}
+
+async function commitPreparedRoundWithMultiAgentGm(
+  sessionId: string,
+  store: InMemorySessionStore,
+  contentRoot: string,
+  current: SessionSnapshot,
+  finalDrafts: RoundDraft[],
+  options?: TurnResolutionOptions
+): Promise<SessionSnapshot | null> {
+  const timestamp = nowIso();
+  const nextRound = current.session.currentRound + 1;
+  const primaryParticipant = findPrimaryPlayerParticipant(current.session);
+  const gmParticipant = findGmParticipant(current.session);
+  const committedPartyInput = buildCommittedPartyInput(current.session, finalDrafts);
+  const playerMessages: Message[] = finalDrafts.map((draft) => ({
+    id: `msg_${randomUUID()}`,
+    round: nextRound,
+    createdAt: timestamp,
+    senderId: draft.participantId,
+    recipientIds: [gmParticipant.id],
+    visibility: "public",
+    kind: "player_input",
+    channel: "public_story",
+    content: draft.content,
+    aiMetadata: draft.source === "ai" ? draft.aiMetadata ?? null : null,
+    tags: [
+      "turn_input",
+      draft.isPrimary ? "primary_player" : "ai_teammate"
+    ]
+  }));
+  const pipeline = await runMultiAgentTurnPipeline({
+    sessionId,
+    currentSnapshot: current,
+    contentRoot,
+    store,
+    nextRound,
+    playerMessages,
+    submittedInputs: finalDrafts.map((draft) => ({
+      participantId: draft.participantId,
+      displayName: draft.displayName,
+      content: draft.content
+    })),
+    committedPartyInput,
+    options
+  });
+  const gmMessage: Message = {
+    id: `msg_${randomUUID()}`,
+    round: nextRound,
+    createdAt: timestamp,
+    senderId: gmParticipant.id,
+    recipientIds: buildStoryRecipientIds(current.session),
+    visibility: "public",
+    kind: "gm_narration",
+    channel: "public_story",
+    content: pipeline.narratorText,
+    aiMetadata: pipeline.narratorMeta,
+    tags: [
+      "turn_response",
+      "multi_agent",
+      `provider:${pipeline.narratorProvider}`
+    ]
+  };
+  const endingAdjudication = pipeline.endingJudge.adjudication
+    ? {
+        ...pipeline.endingJudge.adjudication,
+        adjudicationSource: "multi_agent" as const
+      }
+    : null;
+  const multiAgentStateAfterDirector = getMultiAgentState(
+    store.get(sessionId)?.session ?? current.session
+  );
+  const multiAgentStateWithOutputs = upsertMultiAgentOutput({
+    state: upsertMultiAgentOutput({
+      state: multiAgentStateAfterDirector,
+      round: nextRound,
+      role: "dicer",
+      output: pipeline.dicerOutput
+    }),
+    round: nextRound,
+    role: "npcManager",
+    output: pipeline.npcManagerOutput
+  });
+  const replayEntries: ReplayEvent[] = [
+    {
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: primaryParticipant.id,
+      type: "turn_submitted",
+      displayLevel: "core",
+      summary: `Party committed round ${nextRound}`,
+      payload: {
+        participantCount: playerMessages.length,
+        messageIds: playerMessages.map((message) => message.id),
+        gmArchitecture: "multi_agent"
+      }
+    },
+    ...playerMessages.map((message) => ({
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: message.senderId,
+      type: "message_created" as const,
+      displayLevel: "detail" as const,
+      summary: "Prepared player input recorded",
+      payload: {
+        messageId: message.id
+      }
+    })),
+    {
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "gm_response_received",
+      displayLevel: "core",
+      summary: "Multi-agent turn narration generated",
+      payload: {
+        messageId: gmMessage.id,
+        provider: pipeline.narratorProvider,
+        mode: pipeline.narratorMode,
+        dicerProvider: pipeline.dicerOutput.provider,
+        npcManagerProvider: pipeline.npcManagerOutput.provider,
+        directorRound: current.session.currentRound,
+        directorProvider: pipeline.directorOutput?.provider ?? null,
+        endingJudgeProvider: pipeline.endingJudge.provider,
+        endingJudgeRawText: pipeline.endingJudge.rawText
+      }
+    }
+  ];
+
+  if (endingAdjudication?.isGameOver && endingAdjudication.endingState) {
+    replayEntries.push({
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "ending_confirmed",
+      displayLevel: "core",
+      summary: `Ending confirmed: ${endingAdjudication.endingState.title}`,
+      payload: {
+        endingId: endingAdjudication.endingState.endingId,
+        endingType: endingAdjudication.endingState.endingType,
+        adjudicationSource: endingAdjudication.adjudicationSource
+      }
+    });
+  }
+
+  await emitTurnResolutionStage(
+    options,
+    "finalizing_turn",
+    "写入本轮结果",
+    "正在把多 agent 结果、队伍输入和 Narrator 回复写入会话。",
+    0.96
+  );
+
+  const updatedSnapshot = store.update(sessionId, (latest) => ({
+    ...latest,
+    session: {
+      ...latest.session,
+      status:
+        endingAdjudication?.isGameOver && endingAdjudication.endingState
+          ? "ended"
+          : latest.session.status,
+      currentRound: nextRound,
+      updatedAt: timestamp,
+      gameState: {
+        ...latest.session.gameState,
+        phase:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? "ended"
+            : "playing",
+        lastEndingJudgeResult: endingAdjudication,
+        lastEndingJudgeDecision: pipeline.endingJudge.judgeDecision,
+        endingState:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? endingAdjudication.endingState
+            : latest.session.gameState.endingState ?? null,
+        roundInputState: null,
+        multiAgent: multiAgentStateWithOutputs
+      }
+    },
+    messages: [
+      ...latest.messages,
+      ...playerMessages,
+      gmMessage
+    ],
+    replay: [
+      ...latest.replay,
+      ...replayEntries
+    ]
+  }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  store.save(updatedSnapshot);
+  if (updatedSnapshot.session.status !== "ended") {
+    void queueDirectorGeneration(sessionId, nextRound, contentRoot, store).catch(() => {});
+  }
+  await emitTurnResolutionStage(
+    options,
+    "memory_deferred",
+    "后台刷新记忆",
+    "本轮已提交完成，memory 会在后台异步更新，不再阻塞你继续游戏。",
+    1
+  );
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
+}
+
 export async function commitPreparedRound(
   sessionId: string,
   request: CommitRoundRequest,
   store: InMemorySessionStore,
+  contentRoot: string,
   options?: TurnResolutionOptions
 ): Promise<SessionSnapshot | null> {
   const current = store.get(sessionId);
@@ -1042,6 +1934,17 @@ export async function commitPreparedRound(
 
   if (finalDrafts.some((draft) => draft.content.length === 0)) {
     throw new Error("All prepared drafts must contain text before committing the round.");
+  }
+
+  if (isMultiAgentSession(current.session)) {
+    return commitPreparedRoundWithMultiAgentGm(
+      sessionId,
+      store,
+      contentRoot,
+      current,
+      finalDrafts,
+      options
+    );
   }
 
   const timestamp = nowIso();
@@ -1096,6 +1999,7 @@ export async function commitPreparedRound(
     modelProfileId: narratorRuntimeSelection.modelProfileId,
     runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
+    difficulty: current.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty,
     storyTitle: current.contentSummary.storyTitle,
     playerInput: committedPartyInput,
     round: nextRound,
@@ -1660,10 +2564,227 @@ export async function sendPrivateChat(
   return updatedSnapshot;
 }
 
+async function submitTurnWithMultiAgentGm(
+  sessionId: string,
+  store: InMemorySessionStore,
+  contentRoot: string,
+  current: SessionSnapshot,
+  playerParticipant: Participant,
+  gmParticipant: Participant,
+  trimmedInput: string,
+  options?: TurnResolutionOptions
+): Promise<SessionSnapshot | null> {
+  const timestamp = nowIso();
+  const nextRound = current.session.currentRound + 1;
+  const playerMessage: Message = {
+    id: `msg_${randomUUID()}`,
+    round: nextRound,
+    createdAt: timestamp,
+    senderId: playerParticipant.id,
+    recipientIds: [gmParticipant.id],
+    visibility: "public",
+    kind: "player_input",
+    channel: "public_story",
+    content: trimmedInput,
+    tags: [
+      "turn_input"
+    ]
+  };
+  const labeledPlayerInput = `${formatParticipantActionLabel(
+    current.session,
+    playerParticipant.id,
+    playerParticipant.displayName
+  )}: ${trimmedInput}`;
+  const pipeline = await runMultiAgentTurnPipeline({
+    sessionId,
+    currentSnapshot: current,
+    contentRoot,
+    store,
+    nextRound,
+    playerMessages: [playerMessage],
+    submittedInputs: [
+      {
+        participantId: playerParticipant.id,
+        displayName: playerParticipant.displayName,
+        content: trimmedInput
+      }
+    ],
+    committedPartyInput: labeledPlayerInput,
+    options
+  });
+  const gmMessage: Message = {
+    id: `msg_${randomUUID()}`,
+    round: nextRound,
+    createdAt: timestamp,
+    senderId: gmParticipant.id,
+    recipientIds: buildStoryRecipientIds(current.session),
+    visibility: "public",
+    kind: "gm_narration",
+    channel: "public_story",
+    content: pipeline.narratorText,
+    aiMetadata: pipeline.narratorMeta,
+    tags: [
+      "turn_response",
+      "multi_agent",
+      `provider:${pipeline.narratorProvider}`
+    ]
+  };
+  const endingAdjudication = pipeline.endingJudge.adjudication
+    ? {
+        ...pipeline.endingJudge.adjudication,
+        adjudicationSource: "multi_agent" as const
+      }
+    : null;
+  const multiAgentStateAfterDirector = getMultiAgentState(
+    store.get(sessionId)?.session ?? current.session
+  );
+  const multiAgentStateWithOutputs = upsertMultiAgentOutput({
+    state: upsertMultiAgentOutput({
+      state: multiAgentStateAfterDirector,
+      round: nextRound,
+      role: "dicer",
+      output: pipeline.dicerOutput
+    }),
+    round: nextRound,
+    role: "npcManager",
+    output: pipeline.npcManagerOutput
+  });
+  const replayEntries: ReplayEvent[] = [
+    {
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: playerParticipant.id,
+      type: "turn_submitted",
+      displayLevel: "core",
+      summary: `Player submitted turn ${nextRound}`,
+      payload: {
+        messageId: playerMessage.id,
+        gmArchitecture: "multi_agent"
+      }
+    },
+    {
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: playerParticipant.id,
+      type: "message_created",
+      displayLevel: "detail",
+      summary: "Player input recorded",
+      payload: {
+        messageId: playerMessage.id
+      }
+    },
+    {
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "gm_response_received",
+      displayLevel: "core",
+      summary: "Multi-agent turn narration generated",
+      payload: {
+        messageId: gmMessage.id,
+        provider: pipeline.narratorProvider,
+        mode: pipeline.narratorMode,
+        dicerProvider: pipeline.dicerOutput.provider,
+        npcManagerProvider: pipeline.npcManagerOutput.provider,
+        directorRound: current.session.currentRound,
+        directorProvider: pipeline.directorOutput?.provider ?? null,
+        endingJudgeProvider: pipeline.endingJudge.provider,
+        endingJudgeRawText: pipeline.endingJudge.rawText
+      }
+    }
+  ];
+
+  if (endingAdjudication?.isGameOver && endingAdjudication.endingState) {
+    replayEntries.push({
+      id: `evt_${randomUUID()}`,
+      round: nextRound,
+      createdAt: timestamp,
+      actorId: gmParticipant.id,
+      type: "ending_confirmed",
+      displayLevel: "core",
+      summary: `Ending confirmed: ${endingAdjudication.endingState.title}`,
+      payload: {
+        endingId: endingAdjudication.endingState.endingId,
+        endingType: endingAdjudication.endingState.endingType,
+        adjudicationSource: endingAdjudication.adjudicationSource
+      }
+    });
+  }
+
+  await emitTurnResolutionStage(
+    options,
+    "finalizing_turn",
+    "写入本轮结果",
+    "正在把多 agent 结果、玩家输入和 Narrator 回复写入会话。",
+    0.96
+  );
+
+  const updatedSnapshot = store.update(sessionId, () => ({
+    ...current,
+    session: {
+      ...current.session,
+      status:
+        endingAdjudication?.isGameOver && endingAdjudication.endingState
+          ? "ended"
+          : current.session.status,
+      currentRound: nextRound,
+      updatedAt: timestamp,
+      gameState: {
+        ...current.session.gameState,
+        phase:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? "ended"
+            : current.session.gameState.endingState
+              ? "ended"
+              : "playing",
+        lastEndingJudgeResult: endingAdjudication,
+        lastEndingJudgeDecision: pipeline.endingJudge.judgeDecision,
+        endingState:
+          endingAdjudication?.isGameOver && endingAdjudication.endingState
+            ? endingAdjudication.endingState
+            : current.session.gameState.endingState ?? null,
+        roundInputState: null,
+        multiAgent: multiAgentStateWithOutputs
+      }
+    },
+    messages: [
+      ...current.messages,
+      playerMessage,
+      gmMessage
+    ],
+    replay: [
+      ...current.replay,
+      ...replayEntries
+    ]
+  }));
+
+  if (!updatedSnapshot) {
+    return null;
+  }
+
+  store.save(updatedSnapshot);
+  if (updatedSnapshot.session.status !== "ended") {
+    void queueDirectorGeneration(sessionId, nextRound, contentRoot, store).catch(() => {});
+  }
+  await emitTurnResolutionStage(
+    options,
+    "memory_deferred",
+    "后台刷新记忆",
+    "本轮已提交完成，memory 会在后台异步更新，不再阻塞你继续游戏。",
+    1
+  );
+  scheduleBackgroundMemoryRefresh(sessionId, store);
+  return updatedSnapshot;
+}
+
 export async function submitTurn(
   sessionId: string,
   request: SubmitTurnRequest,
   store: InMemorySessionStore,
+  contentRoot: string,
   options?: TurnResolutionOptions
 ): Promise<SessionSnapshot | null> {
   const trimmedInput = request.playerInput.trim();
@@ -1690,6 +2811,19 @@ export async function submitTurn(
 
   if (!playerParticipant || !gmParticipant) {
     throw new Error("Session participants 不完整，无法提交 turn。");
+  }
+
+  if (isMultiAgentSession(current.session) && !current.session.gameState.endingState) {
+    return submitTurnWithMultiAgentGm(
+      sessionId,
+      store,
+      contentRoot,
+      current,
+      playerParticipant,
+      gmParticipant,
+      trimmedInput,
+      options
+    );
   }
 
   const playerMessage: Message = {
@@ -1742,6 +2876,7 @@ export async function submitTurn(
     modelProfileId: narratorRuntimeSelection.modelProfileId,
     runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
+    difficulty: current.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty,
     storyTitle: current.contentSummary.storyTitle,
     playerInput: labeledPlayerInput,
     round: nextRound,

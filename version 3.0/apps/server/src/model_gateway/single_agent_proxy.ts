@@ -14,6 +14,7 @@ import {
   loadEndingJudgeOutputSchema,
   parseEndingJudgeDecision
 } from "../single_agent/service.ts";
+import { buildMultiAgentSystemPrompt } from "../multi_agent/service.ts";
 import { getServerProxyConfig, type ServerProxyConfig } from "./config.ts";
 import type {
   EndingJudgeInput,
@@ -852,6 +853,20 @@ function buildInlineInitialNarrationMessages(
   ];
 }
 
+async function buildInitialNarrationSystemPrompt(
+  input: InitialSessionNarrationInput,
+  profileId: string
+): Promise<string> {
+  if (input.gmArchitecture === "multi_agent") {
+    return buildMultiAgentSystemPrompt("beginning", input.locale, input.difficulty);
+  }
+
+  return buildNarratorSystemPrompt(input.locale, {
+    difficulty: input.difficulty,
+    profileId
+  });
+}
+
 export async function generateInitialSessionNarrationViaServerProxy(
   input: InitialSessionNarrationInput
 ): Promise<TurnNarrationOutput> {
@@ -859,9 +874,7 @@ export async function generateInitialSessionNarrationViaServerProxy(
     modelProfileId: input.modelProfileId,
     runtimeModelConfig: input.runtimeModelConfig
   });
-  const systemPrompt = await buildNarratorSystemPrompt(input.locale, {
-    profileId: config.profileId
-  });
+  const systemPrompt = await buildInitialNarrationSystemPrompt(input, config.profileId);
   const userPrompt = buildSessionOpeningTaskText({
     locale: input.locale,
     ruleTitle: input.ruleTitle,
@@ -897,6 +910,7 @@ export async function generateTurnNarrationViaSingleAgentServerProxy(
     runtimeModelConfig: input.runtimeModelConfig
   });
   const systemPrompt = await buildNarratorSystemPrompt(input.locale, {
+    difficulty: input.difficulty,
     profileId: config.profileId
   });
   const completion = await callChatCompletion(config, [

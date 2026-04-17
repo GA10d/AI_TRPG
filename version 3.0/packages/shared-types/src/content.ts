@@ -10,6 +10,10 @@ export type GmArchitecture =
   | "single_agent"
   | "multi_agent";
 
+export type Difficulty =
+  | "easy"
+  | "hard";
+
 export type RuleManifest = {
   schemaVersion: string;
   id: string;

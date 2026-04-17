@@ -56,7 +56,19 @@
       {
         value: "multi_agent",
         label: "多 Agent 主持",
-        description: "为未来多智能体协作保留入口，当前仍以单 Agent 为主。"
+        description: "由 Dicer、NPC Manager、Director 和 Narrator 协同处理主持流程。"
+      }
+    ],
+    difficulties: [
+      {
+        value: "easy",
+        label: "简单",
+        description: "使用 easy 提示词，适合更宽松的开场和主持风格。"
+      },
+      {
+        value: "hard",
+        label: "困难",
+        description: "使用 hard 提示词，适合更强压力和更严格的主持风格。"
       }
     ],
     logViews: [
@@ -701,13 +713,12 @@
       languageLabel: "语言",
       languageHint: "控制内容文本和界面的基础语言。",
       difficultyLabel: "难度",
-      difficultyHint: "难度还没接入真实裁定，当前先固定为标准。",
-      difficultyStandardPending: "标准（待开发）",
+      difficultyHint: "决定 Beginning 与主持 prompt 读取 easy 还是 hard 目录。",
       gmArchitectureLabel: "主持架构",
       gmArchitectureHint: "为单 Agent / 多 Agent 主持预留统一入口。",
       backgroundCompressionLabel: "背景压缩",
       backgroundCompressionHint:
-        "仅对单 Agent Narrator 生效。开启后会使用压缩后的 context pack；关闭后会把完整公共上下文直接交给 Narrator。",
+        "单 Agent 时控制 Narrator 是否使用压缩 context pack；多 Agent 时控制共享公共上下文是否先压缩后再分发给 NPC Manager、Director 和 Narrator。关闭后会改用全量公共上下文。",
       backgroundCompressionOn: "启用背景压缩功能",
       backgroundCompressionOff: "关闭背景压缩，改用全量上下文",
       playModeLabel: "游戏模式",
@@ -855,7 +866,7 @@
       configureAppearanceDescription:
         "点击进入独立形象界面，为这名 AI 队友挑选外貌和穿着参考。",
       tagHint: "点击下方人格标签即可多选；悬停时可以查看描述。",
-      appearanceTagHint: "点击下方形象标签即可多选；会按外貌和穿着分组显示。",
+      appearanceTagHint: "点击下方形象标签即可多选；会按外貌、穿着及子类分组显示。",
       loadPresetTitle: "读取 AI 队友配置",
       loadPresetDescription: "这里会列出保存在本地浏览器里的 AI 队友配置，读取后会直接加入当前队伍。",
       usePresetButton: "读取这个配置",
@@ -871,6 +882,25 @@
       advancedNegativeLabel: "高级负向",
       appearanceLabel: "外貌",
       outfitLabel: "穿着",
+      appearanceSubgroupLabels: {
+        gender: "性别气质",
+        age_impression: "年龄印象",
+        height_and_proportion: "身高与比例",
+        body_type: "体型",
+        hair: "发型",
+        skin: "肤色与肤质",
+        eyes_and_expression: "眼神与表情",
+        facial_features: "五官轮廓",
+        distinguishing_marks: "识别特征",
+        accessories: "配饰",
+        overall_style: "整体风格",
+        outerwear: "外套",
+        tops: "上装",
+        bottoms: "下装",
+        one_piece: "连体与整套",
+        footwear: "鞋履",
+        ornaments_and_gear: "装备配件"
+      },
       warningsTitle: "内容警告"
     },
     protagonist: {
@@ -900,7 +930,7 @@
       usePresetButton: "应用到主角",
       presetNameFallback: "未命名 AI 配置",
       tagHint: "点击下方人格标签即可多选；悬停时可以查看描述。",
-      appearanceTagHint: "点击下方形象标签即可多选；会按外貌和穿着分组显示。",
+      appearanceTagHint: "点击下方形象标签即可多选；会按外貌、穿着及子类分组显示。",
       noTags: "人格标签尚未加载完成。",
       noAppearanceTags: "形象标签尚未加载完成。"
     },
