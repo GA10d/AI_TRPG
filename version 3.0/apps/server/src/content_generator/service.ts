@@ -240,7 +240,7 @@ function getContentGeneratorStepLabel(
   }
 }
 
-function buildContentGeneratorProgressPlan(
+export function buildContentGeneratorProgressPlan(
   request: ContentGeneratorRequest,
   locale: LocaleCode
 ): ContentGeneratorProgressStep[] {
@@ -375,7 +375,12 @@ function sanitizeDirectoryName(value: string, fallbackPrefix: string): string {
 }
 
 function sanitizeFileStem(value: string, fallbackPrefix: string): string {
-  const sanitized = value
+  let stemSource = value.trim();
+  while (/\.(?:png|jpe?g|webp|svg)$/iu.test(stemSource)) {
+    stemSource = stemSource.replace(/\.(?:png|jpe?g|webp|svg)$/iu, "");
+  }
+
+  const sanitized = stemSource
     .replace(/[<>:"/\\|?*\u0000-\u001F]/gu, "_")
     .replace(/\s+/gu, " ")
     .trim()
@@ -1912,7 +1917,7 @@ async function planAssets(
   const otherRaw = Array.isArray(data.otherAssets) ? data.otherAssets : fallbackPlan.otherAssets;
   return {
     cover: {
-      fileName: sanitizeFileStem(ensureString(coverRaw.fileName) || fallbackPlan.cover.fileName, "cover"),
+      fileName: "cover",
       purpose: ensureString(coverRaw.purpose) || fallbackPlan.cover.purpose,
       visualFocus: ensureString(coverRaw.visualFocus) || fallbackPlan.cover.visualFocus,
       spoilerLevel:
@@ -2698,7 +2703,7 @@ export async function generateContentPackage(args: {
           ruleDirectoryName: linkedRule.directoryName,
           storyDirectoryName: storyPackage.directoryName,
           relativeDir: "art_assets",
-          fileStem: sanitizeFileStem(storyPackage.assetPlan.cover.fileName, "cover"),
+          fileStem: "cover",
           prompt: coverPrompt,
           sceneId: storyPackage.manifest.startSceneId,
           tones: generatedStorySpec.tones

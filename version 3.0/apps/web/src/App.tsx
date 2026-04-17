@@ -739,9 +739,11 @@ export function App() {
     setBackgroundCompressionEnabled,
     setModelAccessMode,
     setModelProfileId,
+    setRuntimeModelConfig,
     setProfileRuntimeConfig,
     clearProfileRuntimeConfigs,
     setImageProfileId,
+    setRuntimeImageModelConfig,
     setImageProfileRuntimeConfig,
     clearImageProfileRuntimeConfigs,
     setComicStyleId,
@@ -3456,6 +3458,11 @@ export function App() {
           runtimeModelConfig={runtimeModelConfig}
           imageProfileId={imageProfileId}
           runtimeImageModelConfig={runtimeImageModelConfig}
+          onModelAccessModeChange={setModelAccessMode}
+          onModelProfileIdChange={setModelProfileId}
+          onRuntimeModelConfigChange={setRuntimeModelConfig}
+          onImageProfileIdChange={setImageProfileId}
+          onRuntimeImageModelConfigChange={setRuntimeImageModelConfig}
           onBack={() => setView("menu")}
           onClose={() => setView("menu")}
           onGenerationComplete={async (result) => {

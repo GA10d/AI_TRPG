@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "STORY_C4A31974",
+  "version": "0.1.0",
+  "ruleId": "DET",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "《大明宫谜案：景王夜殒之谜》"
+  },
+  "playerCount": {
+    "min": 1,
+    "max": 1
+  },
+  "supportsModes": [
+    "single_player"
+  ],
+  "coverQuote": {
+    "zh-CN": "唐大和九年（835年），深秋。长安城大明宫笼罩在连绵阴雨之中，紫宸殿的琉璃瓦被雨水冲刷得发亮，却映不出半分暖意。近日，宰相与宦官集团的争斗愈演愈烈，东宫与诸王的势力暗流涌动。今夜，景王李涵的府邸突然传出哀嚎——这位素有“贤王”之名的皇子，竟"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "fast",
+  "gmStyle": "atmospheric-guidance",
+  "tags": [
+    "custom"
+  ],
+  "contentWarnings": [],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "1"
+}

@@ -111,7 +111,11 @@ import {
   saveBundleToDisk
 } from "./save_repository.ts";
 import { generateCharacterConcept } from "./text_completion/service.ts";
-import { generateContentPackage } from "./content_generator/index.ts";
+import {
+  createContentGeneratorJob,
+  generateContentPackage,
+  getContentGeneratorJob
+} from "./content_generator/index.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -620,6 +624,34 @@ async function handleApiRequest(
       }
     }
 
+    return true;
+  }
+
+  if (url.pathname === "/api/content-generator/jobs" && request.method === "POST") {
+    const payload = await readJsonBody<ContentGeneratorRequest>(request);
+    const job = createContentGeneratorJob({
+      contentRoot,
+      request: payload
+    });
+    sendJson(response, 202, job);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/content-generator/jobs/") && request.method === "GET") {
+    const jobId = decodeURIComponent(
+      url.pathname.replace("/api/content-generator/jobs/", "").trim()
+    );
+    const job = jobId ? getContentGeneratorJob(jobId) : null;
+
+    if (!job) {
+      sendJson(response, 404, {
+        error: "CONTENT_GENERATOR_JOB_NOT_FOUND",
+        message: "The requested content generator job was not found."
+      });
+      return true;
+    }
+
+    sendJson(response, 200, job);
     return true;
   }
 

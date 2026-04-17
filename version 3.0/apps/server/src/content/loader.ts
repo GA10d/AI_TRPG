@@ -297,6 +297,29 @@ async function findCatalogAssets(
     }
   }
 
+  const artAssetsDir = join(packageDir, "art_assets");
+  if (await pathExists(artAssetsDir)) {
+    const entries = await readdir(artAssetsDir, { withFileTypes: true });
+    const legacyCoverEntry = entries
+      .filter((entry) => entry.isFile())
+      .find((entry) => {
+        const normalizedName = entry.name.toLowerCase();
+        return (
+          /^cover(?:[._-]|$)/u.test(normalizedName) &&
+          STORY_ART_ASSET_EXTENSIONS.has(extname(normalizedName))
+        );
+      });
+
+    if (legacyCoverEntry) {
+      return [
+        {
+          type: "cover",
+          url: buildAssetUrl(assetUrlPrefix, join("art_assets", legacyCoverEntry.name))
+        }
+      ];
+    }
+  }
+
   return [];
 }
 
@@ -304,11 +327,11 @@ function compareStoryArtAssets(left: StoryArtAsset, right: StoryArtAsset): numbe
   const groupRank = (value: StoryArtAsset["group"]): number => (value === "main" ? 0 : 1);
   const assetRank = (relativePath: string): number => {
     const normalized = relativePath.toLowerCase();
-    if (/^art_assets\/cover\./u.test(normalized)) {
+    if (/^art_assets\/cover(?:[._-]|$)/u.test(normalized)) {
       return 0;
     }
 
-    if (/^art_assets\/image\./u.test(normalized)) {
+    if (/^art_assets\/image(?:[._-]|$)/u.test(normalized)) {
       return 1;
     }
 

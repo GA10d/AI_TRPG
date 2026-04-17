@@ -198,6 +198,28 @@ export type ContentGeneratorProgressStep = {
   label: string;
 };
 
+export type ContentGeneratorJobStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed";
+
+export type ContentGeneratorJobSnapshot = {
+  jobId: string;
+  status: ContentGeneratorJobStatus;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  queuePosition?: number | null;
+  progress: number;
+  currentStepId?: ContentGeneratorProgressStepId | null;
+  currentStepLabel?: string | null;
+  currentDetail?: string | null;
+  progressPlan: ContentGeneratorProgressStep[];
+  result?: ContentGeneratorResponse | null;
+  error?: string | null;
+};
+
 export type ContentGeneratorStreamEvent =
   | {
       type: "stage";

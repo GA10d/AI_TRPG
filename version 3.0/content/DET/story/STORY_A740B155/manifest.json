@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "STORY_A740B155",
+  "version": "0.1.0",
+  "ruleId": "DET",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "《雾都魅影：布莱克伍德庄园谋杀案》"
+  },
+  "playerCount": {
+    "min": 1,
+    "max": 1
+  },
+  "supportsModes": [
+    "single_player"
+  ],
+  "coverQuote": {
+    "zh-CN": "1887年，伦敦。深秋的浓雾像湿冷的裹尸布，笼罩着这座城市的每一条街道。东区的贫民窟污水横流，西区的豪宅却灯火通明——阶级的鸿沟在煤气灯的光晕里愈发刺眼。今晚，汉普斯特德区的布莱克伍德庄园打破了往日的宁静，一场谋杀案正在浓雾中酝酿。"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "fast",
+  "gmStyle": "atmospheric-guidance",
+  "tags": [
+    "investigation"
+  ],
+  "contentWarnings": [
+    "death"
+  ],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "1"
+}

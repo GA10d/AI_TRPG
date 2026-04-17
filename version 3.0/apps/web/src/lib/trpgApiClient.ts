@@ -3,6 +3,7 @@ import type {
   CharacterConceptAssistRequest,
   CharacterConceptAssistResponse,
   CommitRoundRequest,
+  ContentGeneratorJobSnapshot,
   ContentGeneratorRequest,
   ContentGeneratorResponse,
   ContentGeneratorStreamEvent,
@@ -610,6 +611,39 @@ export async function generateContentPackage(
     });
 
     return parseJson<ContentGeneratorResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function createContentGeneratorJob(
+  payload: ContentGeneratorRequest
+): Promise<ContentGeneratorJobSnapshot> {
+  try {
+    const response = await fetch("/api/content-generator/jobs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<ContentGeneratorJobSnapshot>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchContentGeneratorJob(
+  jobId: string
+): Promise<ContentGeneratorJobSnapshot | null> {
+  try {
+    const response = await fetch(`/api/content-generator/jobs/${encodeURIComponent(jobId)}`);
+    if (response.status === 404) {
+      return null;
+    }
+
+    return parseJson<ContentGeneratorJobSnapshot>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "STORY_2CA69E8A",
+  "version": "0.1.0",
+  "ruleId": "VHS",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "《教堂阴影》—— 中世纪单人恐怖冒险"
+  },
+  "playerCount": {
+    "min": 1,
+    "max": 1
+  },
+  "supportsModes": [
+    "single_player"
+  ],
+  "coverQuote": {
+    "zh-CN": "曾是守护教堂的炽天使，因目睹人类罪行而堕落，化身黑袍身影游荡于教堂。企图通过污染圣水泉破坏信徒信仰，以血祭打开地狱之门。"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "medium",
+  "gmStyle": "atmospheric-guidance",
+  "tags": [
+    "horror",
+    "adventure"
+  ],
+  "contentWarnings": [
+    "violence"
+  ],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "1"
+}
