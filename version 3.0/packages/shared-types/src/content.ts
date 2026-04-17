@@ -89,6 +89,12 @@ export type ContentCatalogAsset = {
   url: string;
 };
 
+export type StoryArtAsset = {
+  group: "main" | "other";
+  relativePath: string;
+  url: string;
+};
+
 export type ContentCatalogStoryEntry = {
   storyId: string;
   directoryName: string;

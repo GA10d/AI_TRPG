@@ -1,5 +1,5 @@
 import { access, readFile, readdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 
 import {
   buildLocaleFallbackChain,
@@ -15,6 +15,7 @@ import type {
   LocaleCode,
   LocalizedTextAsset,
   RuleManifest,
+  StoryArtAsset,
   StoryManifest
 } from "../../../../packages/shared-types/src/index.ts";
 
@@ -23,6 +24,8 @@ type AssetSelection = {
   relativePath: string;
   source: "localized" | "root-fallback";
 };
+
+const STORY_ART_ASSET_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 
 function assertString(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -248,6 +251,14 @@ function normalizeCatalogText(content: string | null | undefined): string | null
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeAssetRelativePath(relativePath: string): string {
+  return relativePath.replace(/\\/g, "/");
+}
+
+function buildAssetUrl(assetUrlPrefix: string, relativePath: string): string {
+  return `${assetUrlPrefix}/${normalizeAssetRelativePath(relativePath)}`;
+}
+
 async function findCatalogAssets(
   packageDir: string,
   assetUrlPrefix: string
@@ -276,13 +287,91 @@ async function findCatalogAssets(
       return [
         {
           type: "cover",
-          url: `${assetUrlPrefix}/${relativePath}`
+          url: buildAssetUrl(assetUrlPrefix, relativePath)
         }
       ];
     }
   }
 
   return [];
+}
+
+function compareStoryArtAssets(left: StoryArtAsset, right: StoryArtAsset): number {
+  const groupRank = (value: StoryArtAsset["group"]): number => (value === "main" ? 0 : 1);
+  const assetRank = (relativePath: string): number => {
+    const normalized = relativePath.toLowerCase();
+    if (/^art_assets\/cover\./u.test(normalized)) {
+      return 0;
+    }
+
+    if (/^art_assets\/image\./u.test(normalized)) {
+      return 1;
+    }
+
+    return 2;
+  };
+
+  const groupDifference = groupRank(left.group) - groupRank(right.group);
+  if (groupDifference !== 0) {
+    return groupDifference;
+  }
+
+  const rankDifference = assetRank(left.relativePath) - assetRank(right.relativePath);
+  if (rankDifference !== 0) {
+    return rankDifference;
+  }
+
+  return left.relativePath.localeCompare(right.relativePath);
+}
+
+export async function listStoryArtAssets(
+  contentRoot: string,
+  ruleId: string,
+  storyDirectoryName: string
+): Promise<StoryArtAsset[]> {
+  const normalizedRoot = normalizeContentRoot(contentRoot);
+  const storyBaseDir = join(normalizedRoot, ruleId, "story", storyDirectoryName);
+
+  if (!(await pathExists(storyBaseDir))) {
+    throw new Error(`Story package not found: ${ruleId}/${storyDirectoryName}`);
+  }
+
+  const artAssetsDir = join(storyBaseDir, "art_assets");
+  if (!(await pathExists(artAssetsDir))) {
+    return [];
+  }
+
+  const assetUrlPrefix = `/api/content-assets/${encodeURIComponent(ruleId)}/story/${encodeURIComponent(storyDirectoryName)}`;
+  const assets: StoryArtAsset[] = [];
+
+  async function walkAssetDir(currentDir: string, relativeDir = ""): Promise<void> {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const relativeEntryPath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+      const absoluteEntryPath = join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        await walkAssetDir(absoluteEntryPath, relativeEntryPath);
+        continue;
+      }
+
+      const extension = extname(entry.name).toLowerCase();
+      if (!STORY_ART_ASSET_EXTENSIONS.has(extension)) {
+        continue;
+      }
+
+      const relativePath = normalizeAssetRelativePath(join("art_assets", relativeEntryPath));
+      assets.push({
+        group: relativePath.startsWith("art_assets/other/") ? "other" : "main",
+        relativePath,
+        url: buildAssetUrl(assetUrlPrefix, relativePath)
+      });
+    }
+  }
+
+  await walkAssetDir(artAssetsDir);
+  return assets.sort(compareStoryArtAssets);
 }
 
 export async function loadRulePackage(

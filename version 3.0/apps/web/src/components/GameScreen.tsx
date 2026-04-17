@@ -20,9 +20,11 @@ import type {
   SessionMemory,
   SessionSnapshot,
   SessionRuntimeContextPack,
+  StoryArtAsset,
   StoryControlMode
 } from "../../../../packages/shared-types/src/index.ts";
 import {
+  fetchStoryArtAssets,
   fetchNpcRoster,
   fetchSessionContextPack,
   fetchSessionMemory,
@@ -109,7 +111,14 @@ type GameScreenProps = {
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-type SidePanelMode = "history" | "round" | "comics" | "worldline" | "judge" | "reasoning";
+type SidePanelMode =
+  | "history"
+  | "round"
+  | "comics"
+  | "art_assets"
+  | "worldline"
+  | "judge"
+  | "reasoning";
 
 type GameDrawer = "none" | "saves" | "npcs" | "details" | "private_chat";
 
@@ -226,6 +235,11 @@ function countDisplayableNpcPortraits(roster: NpcRosterEntry[]): number {
   );
 }
 
+function getStoryArtAssetLabel(relativePath: string): string {
+  const pathSegments = relativePath.split("/").filter(Boolean);
+  return pathSegments.at(-1) ?? relativePath;
+}
+
 export function GameScreen(props: GameScreenProps) {
   const {
     snapshot,
@@ -296,6 +310,9 @@ export function GameScreen(props: GameScreenProps) {
   const [debugMemoryLoading, setDebugMemoryLoading] = useState(false);
   const [debugMemoryError, setDebugMemoryError] = useState<string | null>(null);
   const [isRebuildingMemory, setIsRebuildingMemory] = useState(false);
+  const [storyArtAssets, setStoryArtAssets] = useState<StoryArtAsset[]>([]);
+  const [storyArtAssetsLoading, setStoryArtAssetsLoading] = useState(false);
+  const [storyArtAssetsError, setStoryArtAssetsError] = useState<string | null>(null);
   const [activityStageStartedAt, setActivityStageStartedAt] = useState<number | null>(null);
   const [activityStageNow, setActivityStageNow] = useState(() => Date.now());
 
@@ -405,6 +422,8 @@ export function GameScreen(props: GameScreenProps) {
     !roundPreparationRequired &&
     !isPreparingRound &&
     !actionLocked;
+  const primaryStoryArtAssets = storyArtAssets.filter((asset) => asset.group === "main");
+  const otherStoryArtAssets = storyArtAssets.filter((asset) => asset.group === "other");
   const reasoningRecords: ReasoningRecord[] = [
     ...publicStoryMessages.flatMap((message) => {
       if (!(isNarrationMessage(message) || message.kind === "player_input")) {
@@ -584,6 +603,8 @@ export function GameScreen(props: GameScreenProps) {
       ? text.gameScreen.roundDraftsEyebrow
       : sidePanelMode === "comics"
         ? text.gameScreen.comicEyebrow
+        : sidePanelMode === "art_assets"
+          ? text.gameScreen.artAssetsEyebrow
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningEyebrow
       : sidePanelMode === "worldline"
@@ -596,6 +617,8 @@ export function GameScreen(props: GameScreenProps) {
       ? text.gameScreen.roundRepliesTitle
       : sidePanelMode === "comics"
         ? text.gameScreen.comicTitle
+        : sidePanelMode === "art_assets"
+          ? text.gameScreen.artAssetsTitle
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningTitle
       : sidePanelMode === "worldline"
@@ -616,6 +639,10 @@ export function GameScreen(props: GameScreenProps) {
             : isComicGenerating
               ? `${text.common.generating} (${comicGenerationTaskCount})`
               : text.common.none
+        : sidePanelMode === "art_assets"
+          ? storyArtAssetsLoading
+            ? text.common.loading
+            : text.gameScreen.artAssetsCount(storyArtAssets.length)
       : sidePanelMode === "reasoning"
         ? text.gameScreen.reasoningCount(reasoningRecords.length)
       : sidePanelMode === "worldline"
@@ -651,6 +678,9 @@ export function GameScreen(props: GameScreenProps) {
     setDebugMemoryError(null);
     setDebugMemoryLoading(false);
     setIsRebuildingMemory(false);
+    setStoryArtAssets([]);
+    setStoryArtAssetsError(null);
+    setStoryArtAssetsLoading(false);
   }, [snapshot?.session.id]);
 
   useEffect(() => {
@@ -689,6 +719,58 @@ export function GameScreen(props: GameScreenProps) {
       setComicLightboxPageNumber(null);
     }
   }, [sidePanelMode]);
+
+  useEffect(() => {
+    if (sidePanelMode !== "art_assets" || !snapshot) {
+      return;
+    }
+
+    const ruleDirectoryName = snapshot.contentSummary.ruleDirectoryName?.trim() ?? "";
+    const storyDirectoryName = snapshot.contentSummary.storyDirectoryName?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName) {
+      setStoryArtAssets([]);
+      setStoryArtAssetsError(text.gameScreen.missingArtAssetContentInfo);
+      setStoryArtAssetsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setStoryArtAssetsLoading(true);
+    setStoryArtAssetsError(null);
+
+    void fetchStoryArtAssets(ruleDirectoryName, storyDirectoryName)
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        setStoryArtAssets(result.assets);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setStoryArtAssets([]);
+        setStoryArtAssetsError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStoryArtAssetsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    sidePanelMode,
+    snapshot?.contentSummary.ruleDirectoryName,
+    snapshot?.contentSummary.storyDirectoryName,
+    snapshot?.session.id,
+    text.gameScreen.missingArtAssetContentInfo
+  ]);
 
   useEffect(() => {
     if (
@@ -1501,6 +1583,15 @@ export function GameScreen(props: GameScreenProps) {
             >
               {text.gameScreen.comicButton}
             </button>
+            <button
+              className={`game-panel-toggle ${
+                sidePanelMode === "art_assets" ? "game-panel-toggle-active" : ""
+              }`}
+              onClick={() => setSidePanelMode("art_assets")}
+              type="button"
+            >
+              {text.gameScreen.artAssetsTab}
+            </button>
             {supportsReasoningPanel ? (
               <button
                 className={`game-panel-toggle ${
@@ -1683,6 +1774,102 @@ export function GameScreen(props: GameScreenProps) {
                     ? text.gameScreen.comicGeneratingHint
                     : text.gameScreen.comicEmpty}
                 </div>
+              )
+            ) : sidePanelMode === "art_assets" ? (
+              storyArtAssetsLoading ? (
+                <div className="empty-state">{text.gameScreen.loadingArtAssets}</div>
+              ) : storyArtAssetsError ? (
+                <div className="empty-state">{storyArtAssetsError}</div>
+              ) : storyArtAssets.length ? (
+                <div className="game-art-asset-sections">
+                  {primaryStoryArtAssets.length ? (
+                    <section className="game-art-asset-section">
+                      <div className="game-panel-head">
+                        <div>
+                          <div className="meta-label">{text.gameScreen.artAssetsMainSection}</div>
+                          <div className="summary-text">
+                            {text.gameScreen.artAssetsCount(primaryStoryArtAssets.length)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="game-art-asset-grid">
+                        {primaryStoryArtAssets.map((asset) => (
+                          <article
+                            className="summary-card game-art-asset-card"
+                            key={asset.relativePath}
+                          >
+                            <div className="game-art-asset-card-head">
+                              <div>
+                                <div className="summary-title">
+                                  {getStoryArtAssetLabel(asset.relativePath)}
+                                </div>
+                                <div className="summary-text">{asset.relativePath}</div>
+                              </div>
+                              <a
+                                className="ghost-button game-art-asset-link"
+                                href={asset.url}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                {text.common.open}
+                              </a>
+                            </div>
+                            <img
+                              alt={getStoryArtAssetLabel(asset.relativePath)}
+                              className="game-art-asset-preview"
+                              src={asset.url}
+                            />
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {otherStoryArtAssets.length ? (
+                    <section className="game-art-asset-section">
+                      <div className="game-panel-head">
+                        <div>
+                          <div className="meta-label">{text.gameScreen.artAssetsOtherSection}</div>
+                          <div className="summary-text">
+                            {text.gameScreen.artAssetsCount(otherStoryArtAssets.length)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="game-art-asset-grid">
+                        {otherStoryArtAssets.map((asset) => (
+                          <article
+                            className="summary-card game-art-asset-card"
+                            key={asset.relativePath}
+                          >
+                            <div className="game-art-asset-card-head">
+                              <div>
+                                <div className="summary-title">
+                                  {getStoryArtAssetLabel(asset.relativePath)}
+                                </div>
+                                <div className="summary-text">{asset.relativePath}</div>
+                              </div>
+                              <a
+                                className="ghost-button game-art-asset-link"
+                                href={asset.url}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                {text.common.open}
+                              </a>
+                            </div>
+                            <img
+                              alt={getStoryArtAssetLabel(asset.relativePath)}
+                              className="game-art-asset-preview"
+                              src={asset.url}
+                            />
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="empty-state">{text.gameScreen.artAssetsEmpty}</div>
               )
             ) : sidePanelMode === "worldline" ? (
               activeGraphBundle?.graph.unlockedAtEnding ? (

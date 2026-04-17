@@ -3100,6 +3100,51 @@ pre {
   align-content: start;
 }
 
+.game-art-asset-sections {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.game-art-asset-section {
+  display: grid;
+  gap: 12px;
+}
+
+.game-art-asset-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
+.game-art-asset-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.game-art-asset-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-art-asset-link {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.game-art-asset-preview {
+  width: 100%;
+  display: block;
+  border-radius: 18px;
+  border: 1px solid rgba(92, 57, 30, 0.12);
+  background: rgba(255, 251, 246, 0.96);
+  box-shadow: 0 16px 36px rgba(44, 23, 18, 0.08);
+}
+
 .game-comic-card {
   display: grid;
   gap: 12px;

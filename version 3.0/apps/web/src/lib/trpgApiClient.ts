@@ -30,6 +30,7 @@ import type {
   SessionSnapshot,
   SelectNpcPortraitRequest,
   SelectNpcPortraitResponse,
+  StoryArtAssetsResponse,
   SubmitManualNarrationRequest,
   SubmitTurnRequest,
   TurnResolutionStreamEvent,
@@ -503,6 +504,22 @@ export async function fetchNpcRoster(
     }
     const response = await fetch(`/api/npcs?${searchParams.toString()}`);
     return parseJson<NpcRosterEntry[]>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function fetchStoryArtAssets(
+  ruleDirectoryName: string,
+  storyDirectoryName: string
+): Promise<StoryArtAssetsResponse> {
+  try {
+    const searchParams = new URLSearchParams({
+      ruleDirectoryName,
+      storyDirectoryName
+    });
+    const response = await fetch(`/api/story-art-assets?${searchParams.toString()}`);
+    return parseJson<StoryArtAssetsResponse>(response);
   } catch (error) {
     throw normalizeNetworkError(error);
   }

@@ -5,6 +5,7 @@ import type {
   LocaleCode,
   PlayMode
 } from "./content.ts";
+import type { StoryArtAsset } from "./content.ts";
 import type {
   AiAppearanceTag,
   AiPersonalityTag,
@@ -641,4 +642,10 @@ export type BootstrapResponse = {
   imageProfiles: ImageProfileSummary[];
   imagePromptTemplateConfig: ImagePromptTemplateConfig;
   catalog: ContentCatalogEntry[];
+};
+
+export type StoryArtAssetsResponse = {
+  ruleDirectoryName: string;
+  storyDirectoryName: string;
+  assets: StoryArtAsset[];
 };

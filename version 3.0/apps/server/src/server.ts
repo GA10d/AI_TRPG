@@ -42,7 +42,8 @@ import type {
 } from "../../../packages/shared-types/src/index.ts";
 import {
   loadContentCatalog,
-  loadPlayableContentBundle
+  loadPlayableContentBundle,
+  listStoryArtAssets
 } from "./content/index.ts";
 import { loadAiAppearanceTags, loadAiPersonalityTags } from "./ai_players/index.ts";
 import {
@@ -542,6 +543,27 @@ async function handleApiRequest(
       styleId
     });
     sendJson(response, 200, roster);
+    return true;
+  }
+
+  if (url.pathname === "/api/story-art-assets" && request.method === "GET") {
+    const ruleDirectoryName = url.searchParams.get("ruleDirectoryName")?.trim() ?? "";
+    const storyDirectoryName = url.searchParams.get("storyDirectoryName")?.trim() ?? "";
+
+    if (!ruleDirectoryName || !storyDirectoryName) {
+      sendJson(response, 400, {
+        error: "INVALID_STORY_ART_ASSET_REQUEST",
+        message: "ruleDirectoryName and storyDirectoryName are required."
+      });
+      return true;
+    }
+
+    const assets = await listStoryArtAssets(contentRoot, ruleDirectoryName, storyDirectoryName);
+    sendJson(response, 200, {
+      ruleDirectoryName,
+      storyDirectoryName,
+      assets
+    });
     return true;
   }
 
