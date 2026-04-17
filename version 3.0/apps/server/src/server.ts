@@ -263,6 +263,7 @@ async function buildBootstrapResponse(
       locale: PHASE1_DEFAULTS.locale,
       playMode: PHASE1_DEFAULTS.playMode,
       gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
+      backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
       modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
       modelProfileId: PHASE1_DEFAULTS.modelProfileId,
       imageProfileId: PHASE1_DEFAULTS.imageProfileId,

@@ -271,6 +271,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [playMode, setPlayMode] = useState<CreateSessionRequest["playMode"]>("single_player");
   const [gmArchitecture, setGmArchitecture] =
     useState<CreateSessionRequest["gmArchitecture"]>("single_agent");
+  const [backgroundCompressionEnabled, setBackgroundCompressionEnabled] = useState(true);
   const [modelAccessMode, setModelAccessMode] =
     useState<CreateSessionRequest["modelAccessMode"]>("mock");
   const [modelProfileId, setModelProfileId] = useState("mock-local");
@@ -377,6 +378,9 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
             gmArchitectureOptions.map((item) => item.value),
             data.defaults.gmArchitecture
           )
+        );
+        setBackgroundCompressionEnabled(
+          storedDefaults?.backgroundCompressionEnabled ?? data.defaults.backgroundCompressionEnabled
         );
         setModelAccessMode(resolvedAccessMode);
         setModelProfileId(resolvedProfileId);
@@ -555,6 +559,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     locale,
     playMode,
     gmArchitecture,
+    backgroundCompressionEnabled,
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
@@ -576,6 +581,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setLocale,
     setPlayMode,
     setGmArchitecture,
+    setBackgroundCompressionEnabled,
     setModelAccessMode,
     setModelProfileId,
     setRuntimeModelConfig,

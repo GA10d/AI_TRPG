@@ -23,6 +23,7 @@ export type StoredWebDefaults = {
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
+  backgroundCompressionEnabled?: boolean;
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;

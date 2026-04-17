@@ -30,6 +30,7 @@ export type NpcPortraitCollection = {
 };
 
 const COLLECTION_FILE_NAME = "portraits.json";
+const COLLECTION_CACHE_NAMESPACE = "prompt_v2";
 
 function buildDigest(value: string): string {
   return createHash("sha1").update(value).digest("hex").slice(0, 10);
@@ -58,9 +59,12 @@ function buildCollectionId(
   storyDirectoryName: string,
   styleId: string
 ): string {
-  const digest = buildDigest([ruleDirectoryName, storyDirectoryName, styleId].join("::"));
+  const digest = buildDigest(
+    [COLLECTION_CACHE_NAMESPACE, ruleDirectoryName, storyDirectoryName, styleId].join("::")
+  );
   return [
     "npc_portraits",
+    COLLECTION_CACHE_NAMESPACE,
     sanitizeFragment(ruleDirectoryName),
     sanitizeFragment(storyDirectoryName),
     sanitizeFragment(styleId),

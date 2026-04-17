@@ -705,6 +705,11 @@
       difficultyStandardPending: "标准（待开发）",
       gmArchitectureLabel: "主持架构",
       gmArchitectureHint: "为单 Agent / 多 Agent 主持预留统一入口。",
+      backgroundCompressionLabel: "背景压缩",
+      backgroundCompressionHint:
+        "仅对单 Agent Narrator 生效。开启后会使用压缩后的 context pack；关闭后会把完整公共上下文直接交给 Narrator。",
+      backgroundCompressionOn: "启用背景压缩功能",
+      backgroundCompressionOff: "关闭背景压缩，改用全量上下文",
       playModeLabel: "游戏模式",
       playModeHint: "当前阶段支持单人、故事模式、单人 + NPC 和多人入口。",
       modelModeLabel: "模型模式",

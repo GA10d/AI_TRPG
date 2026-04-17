@@ -138,6 +138,15 @@ function buildCastClause(
   );
 }
 
+function normalizePromptArtifacts(input: string): string {
+  return input
+    .replace(/\s+/gu, " ")
+    .replace(/\s+,/gu, ",")
+    .replace(/(?:,\s*){2,}/gu, ", ")
+    .replace(/^\s*,\s*|\s*,\s*$/gu, "")
+    .trim();
+}
+
 function buildFinalPrompt(
   request: ImageGenerationRequest,
   promptTemplateConfig: ImagePromptTemplateConfig
@@ -156,13 +165,12 @@ function buildFinalPrompt(
   const finalPrompt = triggerTemplate
     .replaceAll("{basePrompt}", request.prompt.trim())
     .replaceAll("{castClause}", castClause)
-    .replaceAll("{themeStyle}", themeStyle)
-    .replace(/\s+/gu, " ")
-    .trim();
+    .replaceAll("{themeStyle}", themeStyle);
+  const normalizedPrompt = normalizePromptArtifacts(finalPrompt);
 
   return negativePrompt
-    ? `${finalPrompt}\nAvoid the following: ${negativePrompt}`
-    : finalPrompt;
+    ? `${normalizedPrompt}\nAvoid the following: ${negativePrompt}`
+    : normalizedPrompt;
 }
 
 function buildMockSvg(prompt: string, theme: string): string {

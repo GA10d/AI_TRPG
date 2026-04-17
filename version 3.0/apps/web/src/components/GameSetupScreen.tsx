@@ -52,6 +52,7 @@ type GameSetupScreenProps = {
   locale: CreateSessionRequest["locale"];
   playMode: CreateSessionRequest["playMode"];
   gmArchitecture: CreateSessionRequest["gmArchitecture"];
+  backgroundCompressionEnabled: boolean;
   modelAccessMode: CreateSessionRequest["modelAccessMode"];
   modelProfileId: string;
   runtimeModelConfig: RuntimeModelConfigInput;
@@ -89,6 +90,7 @@ type GameSetupScreenProps = {
   onLocaleChange: (value: CreateSessionRequest["locale"]) => void;
   onPlayModeChange: (value: CreateSessionRequest["playMode"]) => void;
   onGmArchitectureChange: (value: CreateSessionRequest["gmArchitecture"]) => void;
+  onBackgroundCompressionEnabledChange: (value: boolean) => void;
   onModelAccessModeChange: (value: CreateSessionRequest["modelAccessMode"]) => void;
   onModelProfileIdChange: (value: string) => void;
   onAdvancedTextModelEnabledChange: (value: boolean) => void;
@@ -380,6 +382,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     locale,
     playMode,
     gmArchitecture,
+    backgroundCompressionEnabled,
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
@@ -415,6 +418,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onLocaleChange,
     onPlayModeChange,
     onGmArchitectureChange,
+    onBackgroundCompressionEnabledChange,
     onModelAccessModeChange,
     onModelProfileIdChange,
     onAdvancedTextModelEnabledChange,
@@ -1074,6 +1078,28 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
             ))}
           </select>
         </SettingField>
+
+        {gmArchitecture === "single_agent" ? (
+          <SettingField
+            label={setupText.fields.backgroundCompressionLabel}
+            hint={setupText.fields.backgroundCompressionHint}
+          >
+            <label className="toggle-row">
+              <input
+                checked={backgroundCompressionEnabled}
+                type="checkbox"
+                onChange={(event) =>
+                  onBackgroundCompressionEnabledChange(event.target.checked)
+                }
+              />
+              <span>
+                {backgroundCompressionEnabled
+                  ? setupText.fields.backgroundCompressionOn
+                  : setupText.fields.backgroundCompressionOff}
+              </span>
+            </label>
+          </SettingField>
+        ) : null}
 
         <SettingField
           label={setupText.fields.playModeLabel}

@@ -737,6 +737,11 @@ export const enUs = {
       difficultyStandardPending: "Standard (Coming later)",
       gmArchitectureLabel: "GM Architecture",
       gmArchitectureHint: "A shared entry point for single-agent and multi-agent hosting.",
+      backgroundCompressionLabel: "Background Compression",
+      backgroundCompressionHint:
+        "Only affects the single-agent Narrator path. When enabled, the Narrator receives the compressed context pack; when disabled, it receives the full public context directly.",
+      backgroundCompressionOn: "Enable background compression",
+      backgroundCompressionOff: "Disable compression and use full context",
       playModeLabel: "Play Mode",
       playModeHint: "This build keeps single-player, story mode, single + NPC, and multiplayer entry points visible.",
       modelModeLabel: "Model Mode",

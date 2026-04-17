@@ -149,6 +149,26 @@ function buildConversationContext(
     .join("\n\n");
 }
 
+function isNarratorBackgroundCompressionEnabled(session: Session): boolean {
+  return session.settings.backgroundCompressionEnabled ?? true;
+}
+
+function buildNarratorConversationContext(input: {
+  snapshot: SessionSnapshot;
+  latestPlayerInput: string;
+  round: number;
+}): string {
+  if (!isNarratorBackgroundCompressionEnabled(input.snapshot.session)) {
+    return buildConversationContext(input.snapshot.session, input.snapshot.messages);
+  }
+
+  return buildNarratorContextPack({
+    snapshot: input.snapshot,
+    latestPlayerInput: input.latestPlayerInput,
+    round: input.round
+  }).assembledText;
+}
+
 function buildPrivateThreadContext(
   session: Session,
   messages: Message[],
@@ -664,6 +684,7 @@ async function createSessionSnapshotInternal(
     companionParticipantIds: aiCompanions.map((companion) => companion.participantId),
     settings: {
       logViewMode: request.logViewMode ?? DEFAULT_LOG_VIEW_MODE,
+      backgroundCompressionEnabled: request.backgroundCompressionEnabled ?? true,
       debugEnabled: request.debugEnabled ?? true,
       promptDebugEnabled: request.promptDebugEnabled ?? false,
       modelProfileId: narratorModelProfileId
@@ -833,6 +854,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     locale: PHASE1_DEFAULTS.locale,
     playMode: PHASE1_DEFAULTS.playMode,
     gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
+    backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
     modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
     characterConcept: "",
     modelProfileId: PHASE1_DEFAULTS.modelProfileId,
@@ -1057,7 +1079,7 @@ export async function commitPreparedRound(
       ...playerMessages
     ]
   };
-  const narratorContextPack = buildNarratorContextPack({
+  const narratorConversationContext = buildNarratorConversationContext({
     snapshot: narratorInputSnapshot,
     latestPlayerInput: committedPartyInput,
     round: nextRound
@@ -1077,7 +1099,7 @@ export async function commitPreparedRound(
     storyTitle: current.contentSummary.storyTitle,
     playerInput: committedPartyInput,
     round: nextRound,
-    conversationContext: narratorContextPack.assembledText
+    conversationContext: narratorConversationContext
   });
   await emitTurnResolutionStage(
     options,
@@ -1703,7 +1725,7 @@ export async function submitTurn(
       playerMessage
     ]
   };
-  const narratorContextPack = buildNarratorContextPack({
+  const narratorConversationContext = buildNarratorConversationContext({
     snapshot: narratorInputSnapshot,
     latestPlayerInput: labeledPlayerInput,
     round: nextRound
@@ -1723,7 +1745,7 @@ export async function submitTurn(
     storyTitle: current.contentSummary.storyTitle,
     playerInput: labeledPlayerInput,
     round: nextRound,
-    conversationContext: narratorContextPack.assembledText
+    conversationContext: narratorConversationContext
   });
   await emitTurnResolutionStage(
     options,

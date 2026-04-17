@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "collectionId": "npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd",
+  "ruleDirectoryName": "VHS",
+  "storyDirectoryName": "The_Silence",
+  "styleId": "manga",
+  "styleName": "Manga",
+  "createdAt": "2026-04-16T13:44:17.011Z",
+  "updatedAt": "2026-04-16T13:44:17.024Z",
+  "npcs": [
+    {
+      "npcId": "哈罗德·贝恩",
+      "selectedPortraitId": "portrait_69a97c04-8def-4862-a1f1-604dddf13153",
+      "portraits": [
+        {
+          "portraitId": "portrait_69a97c04-8def-4862-a1f1-604dddf13153",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-16T13:44:17.014Z",
+          "prompt": "TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 哈罗德·贝恩. middle aged man, neat short hair, clean but cold face, serious expression, 1980s office shirt, trousers, holding keys, formal posture, dim office lighting, authoritative aura, analog film tone, slightly uncanny calm Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_26f683241a/id_26f683241a_portrait_69a97c04-8def-4862-a1f1-604dddf.svg",
+            "storagePath": "artifacts\\npc_portrait_prompt_validation\\npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd\\portraits\\id_26f683241a\\id_26f683241a_portrait_69a97c04-8def-4862-a1f1-604dddf.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd/portraits/id_26f683241a/id_26f683241a_portrait_69a97c04-8def-4862-a1f1-604dddf.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "简·卡特",
+      "selectedPortraitId": "portrait_065924b1-7c71-40f6-bfaf-64ae8f136cda",
+      "portraits": [
+        {
+          "portraitId": "portrait_065924b1-7c71-40f6-bfaf-64ae8f136cda",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-16T13:44:17.019Z",
+          "prompt": "TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 简·卡特. a young woman with long dark hair partially covering her face,dark skin, soft expression with slight delay in focus, wearing a long dark trench coat over a simple shirt her body slightly transparent with subtle VHS glitch distortion, scanlines and analog noise around edges, holding a worn notebook and broken headphones Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 简·卡特. a young woman with long dark hair partially covering her face,dark skin, soft expression with slight delay in focus, wearing a long dark trench coat over a simple shirt her body slightly transparent with subtle VHS glitch distortion, scanlines and analog noise around edges, holding a worn notebook and broken headphones Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_f23136a308/id_f23136a308_portrait_065924b1-7c71-40f6-bfaf-64ae8f1.svg",
+            "storagePath": "artifacts\\npc_portrait_prompt_validation\\npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd\\portraits\\id_f23136a308\\id_f23136a308_portrait_065924b1-7c71-40f6-bfaf-64ae8f1.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd/portraits/id_f23136a308/id_f23136a308_portrait_065924b1-7c71-40f6-bfaf-64ae8f1.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "莉莉·卡特",
+      "selectedPortraitId": "portrait_b5a5c57b-ced6-4709-a32c-3cbc0fd2846c",
+      "portraits": [
+        {
+          "portraitId": "portrait_b5a5c57b-ced6-4709-a32c-3cbc0fd2846c",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-16T13:44:17.021Z",
+          "prompt": "TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 莉莉·卡特. a young american sweetheart girl, blonde hair in a slightly messy high ponytail, soft freckles on nose and cheeks, pale skin, light blue eyes with subtle dark circles, exhausted but determined expression, wearing a light blue oversized hoodie layered under a faded denim jacket, slim dark jeans, dirty white sneakers, holding a polaroid camera hanging around her neck, gripping a flashlight Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 莉莉·卡特. a young american sweetheart girl, blonde hair in a slightly messy high ponytail, soft freckles on nose and cheeks, pale skin, light blue eyes with subtle dark circles, exhausted but determined expression, wearing a light blue oversized hoodie layered under a faded denim jacket, slim dark jeans, dirty white sneakers, holding a polaroid camera hanging around her neck, gripping a flashlight Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_1eceb112fd/id_1eceb112fd_portrait_b5a5c57b-ced6-4709-a32c-3cbc0fd.svg",
+            "storagePath": "artifacts\\npc_portrait_prompt_validation\\npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd\\portraits\\id_1eceb112fd\\id_1eceb112fd_portrait_b5a5c57b-ced6-4709-a32c-3cbc0fd.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd/portraits/id_1eceb112fd/id_1eceb112fd_portrait_b5a5c57b-ced6-4709-a32c-3cbc0fd.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    },
+    {
+      "npcId": "塔克·沃克",
+      "selectedPortraitId": "portrait_a95f6d48-7349-467c-96d4-9cd7e1909cfc",
+      "portraits": [
+        {
+          "portraitId": "portrait_a95f6d48-7349-467c-96d4-9cd7e1909cfc",
+          "source": "generated",
+          "provider": "image:mock",
+          "createdAt": "2026-04-16T13:44:17.023Z",
+          "prompt": "TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 塔克·沃克. 塔克·沃克 Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette.",
+          "revisedPrompt": "TRPG character portrait sheet, single character only, vertical composition, portrait orientation 2:3, full body, stable facial identity, consistent outfit cues, clean silhouette, TRPG story portrait direction. Genre and mood: horror, vhs, investigation, survival. Narrative tone: strong-guidance. Pacing feel: medium. Story scope: medium. Emotional caution cues: fire-death, suffocation, trauma. Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood. Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles. NPC name: 塔克·沃克. 塔克·沃克 Comic style reference: Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects. Single character portrait only. Preserve a stable face, outfit cues, props, and silhouette., no text, no watermark",
+          "image": {
+            "relativePath": "portraits/id_29053dbaac/id_29053dbaac_portrait_a95f6d48-7349-467c-96d4-9cd7e19.svg",
+            "storagePath": "artifacts\\npc_portrait_prompt_validation\\npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd\\portraits\\id_29053dbaac\\id_29053dbaac_portrait_a95f6d48-7349-467c-96d4-9cd7e19.svg",
+            "apiPath": "/api/npc-portrait-assets/npc_portraits_prompt_v2_VHS_The_Silence_manga_e132d002bd/portraits/id_29053dbaac/id_29053dbaac_portrait_a95f6d48-7349-467c-96d4-9cd7e19.svg",
+            "mimeType": "image/svg+xml"
+          }
+        }
+      ]
+    }
+  ]
+}

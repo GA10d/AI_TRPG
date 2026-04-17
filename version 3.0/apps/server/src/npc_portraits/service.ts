@@ -29,6 +29,7 @@ import {
 } from "./storage.ts";
 
 const STORY_ASSET_PORTRAIT_ID = "__story_asset__";
+const NPC_PORTRAIT_NEUTRAL_THEME = "__npc_portrait_neutral__";
 const PREPARE_IN_FLIGHT = new Map<string, Promise<PrepareNpcPortraitsResponse>>();
 
 function compactWhitespace(input: string): string {
@@ -99,23 +100,23 @@ async function resolveStoryPortraitPrompt(args: {
     args.ruleDirectoryName,
     args.storyDirectoryName
   );
-  const storyTitle =
-    story.manifest.title[story.manifest.defaultLocale] ?? story.manifest.id;
-  const intro = compactWhitespace(story.intro?.content ?? "");
-  const storyPreview = compactWhitespace(story.story.content).slice(0, 240);
   const tagText = story.manifest.tags.slice(0, 6).join(", ");
+  const warningText = story.manifest.contentWarnings.slice(0, 4).join(", ");
 
   return compactWhitespace(
     [
-      `TRPG story portrait direction for ${storyTitle}.`,
+      "TRPG story portrait direction.",
       tagText ? `Genre and mood: ${tagText}.` : "",
       story.manifest.gmStyle ? `Narrative tone: ${story.manifest.gmStyle}.` : "",
-      intro
-        ? `Opening atmosphere: ${intro.slice(0, 220)}.`
-        : storyPreview
-          ? `Story context: ${storyPreview}.`
-          : "",
-      "Keep costumes, props, and visual mood aligned with this story setting."
+      story.manifest.recommendedPacing
+        ? `Pacing feel: ${story.manifest.recommendedPacing}.`
+        : "",
+      story.manifest.recommendedLength
+        ? `Story scope: ${story.manifest.recommendedLength}.`
+        : "",
+      warningText ? `Emotional caution cues: ${warningText}.` : "",
+      "Use only high-level atmosphere and setting cues for costumes, props, lighting, and mood.",
+      "Do not quote story text or depict any written words, captions, title lettering, signage, or speech bubbles."
     ].join(" ")
   );
 }
@@ -246,12 +247,19 @@ async function generateNpcPortraitVariant(args: {
     npc: args.npc,
     style: args.style
   });
+  const promptTemplateConfig: ImagePromptTemplateConfig = {
+    ...args.promptTemplateConfig,
+    themes: {
+      ...args.promptTemplateConfig.themes,
+      [NPC_PORTRAIT_NEUTRAL_THEME]: ""
+    }
+  };
   const now = new Date().toISOString();
   const portraitId = `portrait_${randomUUID()}`;
   const generated = await generateImage({
     prompt,
     trigger: "character_portrait",
-    theme: args.promptTemplateConfig.defaultTheme,
+    theme: NPC_PORTRAIT_NEUTRAL_THEME,
     sceneId: [
       args.collection.ruleDirectoryName,
       args.collection.storyDirectoryName,
@@ -262,7 +270,7 @@ async function generateNpcPortraitVariant(args: {
     ].join(":"),
     imageProfileId: args.imageProfileId,
     runtimeImageModelConfig: args.runtimeImageModelConfig,
-    promptTemplateConfig: args.promptTemplateConfig,
+    promptTemplateConfig,
     allowFallback: true,
     characters: [
       {

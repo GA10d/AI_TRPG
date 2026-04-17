@@ -749,6 +749,11 @@ export const jaJp = {
       difficultyStandardPending: "標準（開発予定）",
       gmArchitectureLabel: "GM 構成",
       gmArchitectureHint: "単一 Agent / 複数 Agent 進行の共通入口です。",
+      backgroundCompressionLabel: "背景圧縮",
+      backgroundCompressionHint:
+        "単一 Agent Narrator にのみ適用されます。オンでは圧縮済み context pack を渡し、オフでは完全な公開コンテキストをそのまま Narrator に渡します。",
+      backgroundCompressionOn: "背景圧縮を有効化",
+      backgroundCompressionOff: "背景圧縮を無効化して全量コンテキストを使用",
       playModeLabel: "ゲームモード",
       playModeHint: "現行ビルドではシングル、ストーリーモード、シングル+NPC、マルチプレイ入口を表示します。",
       modelModeLabel: "モデルモード",

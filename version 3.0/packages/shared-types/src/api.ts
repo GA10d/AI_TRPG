@@ -85,6 +85,7 @@ export type CreateSessionRequest = {
   locale: LocaleCode;
   playMode: PlayMode;
   gmArchitecture: GmArchitecture;
+  backgroundCompressionEnabled?: boolean;
   modelAccessMode: ModelAccessMode;
   characterConcept?: string;
   modelProfileId?: string;
@@ -607,6 +608,7 @@ export type BootstrapResponse = {
     locale: LocaleCode;
     playMode: PlayMode;
     gmArchitecture: GmArchitecture;
+    backgroundCompressionEnabled: boolean;
     modelAccessMode: ModelAccessMode;
     modelProfileId: string;
     imageProfileId: string;

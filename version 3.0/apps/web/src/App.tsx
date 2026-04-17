@@ -711,6 +711,7 @@ export function App() {
     locale,
     playMode,
     gmArchitecture,
+    backgroundCompressionEnabled,
     modelAccessMode,
     modelProfileId,
     runtimeModelConfig,
@@ -732,6 +733,7 @@ export function App() {
     setLocale,
     setPlayMode,
     setGmArchitecture,
+    setBackgroundCompressionEnabled,
     setModelAccessMode,
     setModelProfileId,
     setProfileRuntimeConfig,
@@ -1225,6 +1227,7 @@ export function App() {
           locale,
           playMode,
           gmArchitecture,
+          backgroundCompressionEnabled,
           modelAccessMode,
           modelProfileId: effectiveNarratorSelection.modelProfileId,
           runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
@@ -1293,6 +1296,7 @@ export function App() {
     bootstrap,
     debugEnabled,
     gmArchitecture,
+    backgroundCompressionEnabled,
     locale,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -1708,6 +1712,7 @@ export function App() {
       locale,
       playMode,
       gmArchitecture,
+      backgroundCompressionEnabled,
       modelAccessMode,
       modelProfileId,
       runtimeModelConfig,
@@ -1734,6 +1739,7 @@ export function App() {
       locale,
       playMode,
       gmArchitecture,
+      backgroundCompressionEnabled,
       modelAccessMode,
       modelProfileId,
       runtimeModelConfig,
@@ -2014,6 +2020,7 @@ export function App() {
         playerParticipantId,
         settings: {
           logViewMode,
+          backgroundCompressionEnabled,
           debugEnabled,
           promptDebugEnabled: false,
           modelProfileId: effectiveNarratorSelection.modelProfileId
@@ -2548,6 +2555,7 @@ export function App() {
           locale,
           playMode,
           gmArchitecture,
+          backgroundCompressionEnabled,
           modelAccessMode,
           characterConcept,
           modelProfileId,
@@ -3146,6 +3154,7 @@ export function App() {
     setLocale(bootstrap.defaults.locale);
     setPlayMode(bootstrap.defaults.playMode);
     setGmArchitecture(bootstrap.defaults.gmArchitecture);
+    setBackgroundCompressionEnabled(bootstrap.defaults.backgroundCompressionEnabled);
     setModelAccessMode(bootstrap.defaults.modelAccessMode);
     setModelProfileId(bootstrap.defaults.modelProfileId);
     clearProfileRuntimeConfigs();
@@ -3363,6 +3372,7 @@ export function App() {
         locale,
         playMode,
         gmArchitecture,
+        backgroundCompressionEnabled,
         modelAccessMode,
         modelProfileId: effectiveNarratorSelection.modelProfileId,
         runtimeModelConfig: effectiveNarratorSelection.runtimeModelConfig,
@@ -3447,6 +3457,7 @@ export function App() {
           locale={locale}
           playMode={playMode}
           gmArchitecture={gmArchitecture}
+          backgroundCompressionEnabled={backgroundCompressionEnabled}
           modelAccessMode={modelAccessMode}
           modelProfileId={modelProfileId}
           runtimeModelConfig={runtimeModelConfig}
@@ -3479,6 +3490,7 @@ export function App() {
           onLocaleChange={setLocale}
           onPlayModeChange={setPlayMode}
           onGmArchitectureChange={setGmArchitecture}
+          onBackgroundCompressionEnabledChange={setBackgroundCompressionEnabled}
           onModelAccessModeChange={setModelAccessMode}
           onModelProfileIdChange={setModelProfileId}
           onAdvancedTextModelEnabledChange={setAdvancedTextModelEnabled}

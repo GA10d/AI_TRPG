@@ -170,6 +170,7 @@ export type RoundInputState = {
 
 export type SessionSettings = {
   logViewMode: "all" | "compact" | "hidden";
+  backgroundCompressionEnabled?: boolean;
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
   modelProfileId?: string;
