@@ -315,6 +315,7 @@ export const enUs = {
       "A text-first AI TRPG prototype. Start a new run, continue your latest progress, or adjust the current build's default model and language settings from here.",
     buttons: {
       newGame: "Start Game",
+      contentGenerator: "Content Generator",
       continue: "Continue",
       records: "Records",
       settings: "Settings",

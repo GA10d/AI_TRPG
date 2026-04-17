@@ -114,6 +114,107 @@ export type GenerateOpeningPreviewResponse = {
   meta?: AiGenerationMetadata | null;
 };
 
+export type ContentGeneratorMode =
+  | "rule_only"
+  | "story_only"
+  | "rule_and_story";
+
+export type ContentGeneratorSourceInput = {
+  fileName?: string | null;
+  content: string;
+};
+
+export type ContentGeneratorRequest = {
+  mode: ContentGeneratorMode;
+  locale: LocaleCode;
+  associatedRuleDirectoryName?: string | null;
+  ruleSource?: ContentGeneratorSourceInput | null;
+  storySource?: ContentGeneratorSourceInput | null;
+  generateImages?: boolean;
+  forceOverwrite?: boolean;
+  modelAccessMode: ModelAccessMode;
+  modelProfileId?: string;
+  runtimeModelConfig?: RuntimeModelConfigInput;
+  imageProfileId?: string;
+  runtimeImageModelConfig?: RuntimeImageModelConfigInput;
+};
+
+export type ContentGeneratorGeneratedFile = {
+  path: string;
+  kind: "json" | "markdown" | "text" | "image";
+  preview: string | null;
+  assetUrl?: string | null;
+};
+
+export type ContentGeneratorValidationResult = {
+  ok: boolean;
+  messages: string[];
+};
+
+export type ContentGeneratorRunMeta = {
+  task: string;
+  provider: string;
+  mode: ModelAccessMode;
+  meta?: AiGenerationMetadata | null;
+};
+
+export type ContentGeneratorPackageSummary = {
+  ruleDirectoryName: string;
+  ruleId: string;
+  ruleTitle: string;
+  ruleOutputPath: string;
+  storyDirectoryName?: string | null;
+  storyId?: string | null;
+  storyTitle?: string | null;
+  storyOutputPath?: string | null;
+};
+
+export type ContentGeneratorResponse = {
+  ok: true;
+  mode: ContentGeneratorMode;
+  summary: ContentGeneratorPackageSummary;
+  generatedFiles: ContentGeneratorGeneratedFile[];
+  validation: ContentGeneratorValidationResult;
+  warnings: string[];
+  generationRuns: ContentGeneratorRunMeta[];
+};
+
+export type ContentGeneratorProgressStepId =
+  | "load_existing_rule"
+  | "extract_rule"
+  | "generate_rule"
+  | "extract_story"
+  | "generate_story"
+  | "generate_supporting"
+  | "plan_assets"
+  | "write_package"
+  | "generate_assets"
+  | "validate_package"
+  | "commit_package"
+  | "cleanup_tmp";
+
+export type ContentGeneratorProgressStep = {
+  id: ContentGeneratorProgressStepId;
+  label: string;
+};
+
+export type ContentGeneratorStreamEvent =
+  | {
+      type: "stage";
+      stepId: ContentGeneratorProgressStepId;
+      label: string;
+      detail: string;
+      progress: number;
+    }
+  | {
+      type: "done";
+      result: ContentGeneratorResponse;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
 export type CharacterConceptAssistMode = "generate" | "complete";
 
 export type CharacterConceptAssistRequest = CreateSessionRequest & {

@@ -56,6 +56,7 @@ import { useBootstrapState } from "./hooks/useBootstrapState.ts";
 import { usePlaythroughGraph } from "./hooks/usePlaythroughGraph.ts";
 import { useStoredProgress } from "./hooks/useStoredProgress.ts";
 import { ContinuePage } from "./pages/ContinuePage.tsx";
+import { ContentGeneratorPage } from "./pages/ContentGeneratorPage.tsx";
 import { ExitPage } from "./pages/ExitPage.tsx";
 import { GameBootstrapPage } from "./pages/GameBootstrapPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
@@ -750,7 +751,8 @@ export function App() {
     setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
-    setMenuFontSize
+    setMenuFontSize,
+    refreshBootstrap
   } = useBootstrapState({
     onStatusChange: setStatus
   });
@@ -3444,6 +3446,27 @@ export function App() {
   let content: React.ReactNode;
 
   switch (view) {
+    case "content_generator":
+      content = (
+        <ContentGeneratorPage
+          bootstrap={bootstrap}
+          locale={locale}
+          modelAccessMode={modelAccessMode}
+          modelProfileId={modelProfileId}
+          runtimeModelConfig={runtimeModelConfig}
+          imageProfileId={imageProfileId}
+          runtimeImageModelConfig={runtimeImageModelConfig}
+          onBack={() => setView("menu")}
+          onClose={() => setView("menu")}
+          onGenerationComplete={async (result) => {
+            await refreshBootstrap({
+              preferredRuleDirectoryName: result.summary.ruleDirectoryName,
+              preferredStoryDirectoryName: result.summary.storyDirectoryName ?? undefined
+            });
+          }}
+        />
+      );
+      break;
     case "story_select":
       content = (
         <StorySelectPage
@@ -3715,6 +3738,7 @@ export function App() {
           modelProfileId={modelProfileId}
           onUiLocaleChange={handleUiLocaleChange}
           onOpenNewGame={handleOpenStorySelect}
+          onOpenContentGenerator={() => setView("content_generator")}
           onOpenContinue={() => setView("continue")}
           onOpenRecords={() => setView("records")}
           onOpenSettings={() => setView("settings")}

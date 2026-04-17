@@ -268,18 +268,22 @@ async function findCatalogAssets(
     "cover.jpg",
     "cover.jpeg",
     "cover.webp",
+    "cover.svg",
     "image.png",
     "image.jpg",
     "image.jpeg",
     "image.webp",
+    "image.svg",
     "art_assets/cover.png",
     "art_assets/cover.jpg",
     "art_assets/cover.jpeg",
     "art_assets/cover.webp",
+    "art_assets/cover.svg",
     "art_assets/image.png",
     "art_assets/image.jpg",
     "art_assets/image.jpeg",
-    "art_assets/image.webp"
+    "art_assets/image.webp",
+    "art_assets/image.svg"
   ];
 
   for (const relativePath of candidateFiles) {

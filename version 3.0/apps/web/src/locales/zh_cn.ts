@@ -306,6 +306,7 @@
       "以文字叙事为核心的 AI TRPG 原型。你可以从这里开始新游戏、继续最近进度，或调整当前版本的默认模型与语言配置。",
     buttons: {
       newGame: "开始游戏",
+      contentGenerator: "内容生成器",
       continue: "继续游戏",
       records: "记录",
       settings: "设置",

@@ -304,144 +304,165 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
   const [menuFontSize, setMenuFontSize] =
     useState<MenuFontSizePreset>("standard");
 
+  async function refreshBootstrap(args?: {
+    preferredRuleDirectoryName?: string;
+    preferredStoryDirectoryName?: string;
+  }): Promise<void> {
+    const data = await fetchBootstrap();
+    const storedDefaults = loadStoredWebDefaults();
+    const resolvedAccessMode = pickOption(
+      storedDefaults?.modelAccessMode,
+      data.modelAccessModes.map((item) => item.code),
+      data.defaults.modelAccessMode
+    );
+    const resolvedProfileId = resolveModelProfileId(
+      data,
+      resolvedAccessMode,
+      storedDefaults?.modelProfileId ?? data.defaults.modelProfileId
+    );
+    const storedProfileRuntimeConfigs = sanitizeProfileRuntimeConfigs(
+      storedDefaults?.profileRuntimeConfigs
+    );
+    const storedImageProfileRuntimeConfigs = sanitizeImageProfileRuntimeConfigs(
+      storedDefaults?.imageProfileRuntimeConfigs
+    );
+    const legacyRuntimeModelConfig = sanitizeRuntimeModelConfig(
+      storedDefaults?.runtimeModelConfig
+    );
+    const legacyRuntimeImageModelConfig = sanitizeRuntimeImageModelConfig(
+      storedDefaults?.runtimeImageModelConfig
+    );
+    const resolvedImageProfileId = resolveImageProfileId(
+      data,
+      storedDefaults?.imageProfileId ?? data.defaults.imageProfileId
+    );
+
+    if (
+      !isRuntimeModelConfigEmpty(legacyRuntimeModelConfig) &&
+      !storedProfileRuntimeConfigs[resolvedProfileId]
+    ) {
+      storedProfileRuntimeConfigs[resolvedProfileId] = legacyRuntimeModelConfig;
+    }
+
+    if (
+      !isRuntimeImageModelConfigEmpty(legacyRuntimeImageModelConfig) &&
+      !storedImageProfileRuntimeConfigs[resolvedImageProfileId]
+    ) {
+      storedImageProfileRuntimeConfigs[resolvedImageProfileId] = legacyRuntimeImageModelConfig;
+    }
+
+    const preferredRuleDirectoryName =
+      args?.preferredRuleDirectoryName?.trim() || ruleDirectoryName;
+    const nextRuleDirectoryName = data.catalog.some(
+      (item) => item.directoryName === preferredRuleDirectoryName
+    )
+      ? preferredRuleDirectoryName
+      : data.catalog[0]?.directoryName ?? "";
+    const nextStoryOptions =
+      data.catalog.find((item) => item.directoryName === nextRuleDirectoryName)?.stories ?? [];
+    const preferredStoryDirectoryName =
+      args?.preferredStoryDirectoryName?.trim() || storyDirectoryName;
+    const nextStoryDirectoryName = nextStoryOptions.some(
+      (item) => item.directoryName === preferredStoryDirectoryName
+    )
+      ? preferredStoryDirectoryName
+      : nextStoryOptions[0]?.directoryName ?? "";
+
+    setBootstrap(data);
+    setRuleDirectoryName(nextRuleDirectoryName);
+    setStoryDirectoryName(nextStoryDirectoryName);
+    setUiLocale(resolveUiLocaleCode(storedDefaults?.uiLocale ?? storedDefaults?.locale));
+    setLocale(
+      pickOption(
+        storedDefaults?.locale,
+        data.languages.map((item) => item.code),
+        data.defaults.locale
+      )
+    );
+    setPlayMode(
+      pickOption(
+        storedDefaults?.playMode,
+        playModeOptions.map((item) => item.value),
+        data.defaults.playMode
+      )
+    );
+    setDifficulty(
+      pickOption(
+        storedDefaults?.difficulty,
+        difficultyOptions.map((item) => item.value),
+        data.defaults.difficulty
+      )
+    );
+    setGmArchitecture(
+      pickOption(
+        storedDefaults?.gmArchitecture,
+        gmArchitectureOptions.map((item) => item.value),
+        data.defaults.gmArchitecture
+      )
+    );
+    setBackgroundCompressionEnabled(
+      storedDefaults?.backgroundCompressionEnabled ?? data.defaults.backgroundCompressionEnabled
+    );
+    setModelAccessMode(resolvedAccessMode);
+    setModelProfileId(resolvedProfileId);
+    setProfileRuntimeConfigs(storedProfileRuntimeConfigs);
+    setRuntimeModelConfigState(
+      storedProfileRuntimeConfigs[resolvedProfileId] ?? EMPTY_RUNTIME_MODEL_CONFIG
+    );
+    setImageProfileId(resolvedImageProfileId);
+    setImageProfileRuntimeConfigs(storedImageProfileRuntimeConfigs);
+    setRuntimeImageModelConfigState(
+      storedImageProfileRuntimeConfigs[resolvedImageProfileId] ??
+        EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
+    );
+    setComicStyleId(storedDefaults?.comicStyleId?.trim() ?? "");
+    setImagePromptTemplateConfig(
+      sanitizeImagePromptTemplateConfig(
+        data.imagePromptTemplateConfig,
+        storedDefaults?.imagePromptTemplateConfig
+      )
+    );
+    setDebugEnabled(storedDefaults?.debugEnabled ?? true);
+    setLogViewMode(
+      pickOption(
+        storedDefaults?.logViewMode,
+        logViewOptions.map((item) => item.value),
+        data.defaults.logViewMode
+      )
+    );
+    setOpeningPreviewDeliveryMode(
+      pickOption(
+        storedDefaults?.openingPreviewDeliveryMode,
+        openingPreviewDeliveryOptions.map((item) => item.value),
+        "stream"
+      )
+    );
+    setShowAiMetadata(storedDefaults?.showAiMetadata ?? true);
+    setMarkdownFontSize(
+      pickOption(
+        storedDefaults?.markdownFontSize,
+        markdownFontSizeOptions.map((item) => item.value),
+        "large"
+      )
+    );
+    setMenuFontSize(
+      pickOption(
+        storedDefaults?.menuFontSize,
+        menuFontSizeOptions.map((item) => item.value),
+        "standard"
+      )
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function load(): Promise<void> {
       try {
-        const data = await fetchBootstrap();
         if (cancelled) {
           return;
         }
-
-        const storedDefaults = loadStoredWebDefaults();
-        const resolvedAccessMode = pickOption(
-          storedDefaults?.modelAccessMode,
-          data.modelAccessModes.map((item) => item.code),
-          data.defaults.modelAccessMode
-        );
-        const resolvedProfileId = resolveModelProfileId(
-          data,
-          resolvedAccessMode,
-          storedDefaults?.modelProfileId ?? data.defaults.modelProfileId
-        );
-        const storedProfileRuntimeConfigs = sanitizeProfileRuntimeConfigs(
-          storedDefaults?.profileRuntimeConfigs
-        );
-        const storedImageProfileRuntimeConfigs = sanitizeImageProfileRuntimeConfigs(
-          storedDefaults?.imageProfileRuntimeConfigs
-        );
-        const legacyRuntimeModelConfig = sanitizeRuntimeModelConfig(
-          storedDefaults?.runtimeModelConfig
-        );
-        const legacyRuntimeImageModelConfig = sanitizeRuntimeImageModelConfig(
-          storedDefaults?.runtimeImageModelConfig
-        );
-        const resolvedImageProfileId = resolveImageProfileId(
-          data,
-          storedDefaults?.imageProfileId ?? data.defaults.imageProfileId
-        );
-
-        if (
-          !isRuntimeModelConfigEmpty(legacyRuntimeModelConfig) &&
-          !storedProfileRuntimeConfigs[resolvedProfileId]
-        ) {
-          storedProfileRuntimeConfigs[resolvedProfileId] = legacyRuntimeModelConfig;
-        }
-
-        if (
-          !isRuntimeImageModelConfigEmpty(legacyRuntimeImageModelConfig) &&
-          !storedImageProfileRuntimeConfigs[resolvedImageProfileId]
-        ) {
-          storedImageProfileRuntimeConfigs[resolvedImageProfileId] = legacyRuntimeImageModelConfig;
-        }
-
-        setBootstrap(data);
-        setRuleDirectoryName(data.catalog[0]?.directoryName ?? "");
-        setStoryDirectoryName(data.catalog[0]?.stories[0]?.directoryName ?? "");
-        setUiLocale(
-          resolveUiLocaleCode(storedDefaults?.uiLocale ?? storedDefaults?.locale)
-        );
-        setLocale(
-          pickOption(
-            storedDefaults?.locale,
-            data.languages.map((item) => item.code),
-            data.defaults.locale
-          )
-        );
-        setPlayMode(
-          pickOption(
-            storedDefaults?.playMode,
-            playModeOptions.map((item) => item.value),
-            data.defaults.playMode
-          )
-        );
-        setDifficulty(
-          pickOption(
-            storedDefaults?.difficulty,
-            difficultyOptions.map((item) => item.value),
-            data.defaults.difficulty
-          )
-        );
-        setGmArchitecture(
-          pickOption(
-            storedDefaults?.gmArchitecture,
-            gmArchitectureOptions.map((item) => item.value),
-            data.defaults.gmArchitecture
-          )
-        );
-        setBackgroundCompressionEnabled(
-          storedDefaults?.backgroundCompressionEnabled ?? data.defaults.backgroundCompressionEnabled
-        );
-        setModelAccessMode(resolvedAccessMode);
-        setModelProfileId(resolvedProfileId);
-        setProfileRuntimeConfigs(storedProfileRuntimeConfigs);
-        setRuntimeModelConfigState(
-          storedProfileRuntimeConfigs[resolvedProfileId] ?? EMPTY_RUNTIME_MODEL_CONFIG
-        );
-        setImageProfileId(resolvedImageProfileId);
-        setImageProfileRuntimeConfigs(storedImageProfileRuntimeConfigs);
-        setRuntimeImageModelConfigState(
-          storedImageProfileRuntimeConfigs[resolvedImageProfileId] ??
-            EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
-        );
-        setComicStyleId(storedDefaults?.comicStyleId?.trim() ?? "");
-        setImagePromptTemplateConfig(
-          sanitizeImagePromptTemplateConfig(
-            data.imagePromptTemplateConfig,
-            storedDefaults?.imagePromptTemplateConfig
-          )
-        );
-        setDebugEnabled(storedDefaults?.debugEnabled ?? true);
-        setLogViewMode(
-          pickOption(
-            storedDefaults?.logViewMode,
-            logViewOptions.map((item) => item.value),
-            data.defaults.logViewMode
-          )
-        );
-        setOpeningPreviewDeliveryMode(
-          pickOption(
-            storedDefaults?.openingPreviewDeliveryMode,
-            openingPreviewDeliveryOptions.map((item) => item.value),
-            "stream"
-          )
-        );
-        setShowAiMetadata(storedDefaults?.showAiMetadata ?? true);
-        setMarkdownFontSize(
-          pickOption(
-            storedDefaults?.markdownFontSize,
-            markdownFontSizeOptions.map((item) => item.value),
-            "large"
-          )
-        );
-        setMenuFontSize(
-          pickOption(
-            storedDefaults?.menuFontSize,
-            menuFontSizeOptions.map((item) => item.value),
-            "standard"
-          )
-        );
+        await refreshBootstrap();
       } catch (error) {
         if (cancelled) {
           return;
@@ -611,6 +632,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setOpeningPreviewDeliveryMode,
     setShowAiMetadata,
     setMarkdownFontSize,
-    setMenuFontSize
+    setMenuFontSize,
+    refreshBootstrap
   };
 }

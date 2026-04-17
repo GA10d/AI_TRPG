@@ -3,6 +3,9 @@ import type {
   CharacterConceptAssistRequest,
   CharacterConceptAssistResponse,
   CommitRoundRequest,
+  ContentGeneratorRequest,
+  ContentGeneratorResponse,
+  ContentGeneratorStreamEvent,
   ComicPromptPresetResponse,
   CreateSaveRequest,
   CreateSaveResponse,
@@ -589,6 +592,114 @@ export async function generateSceneImage(
     });
 
     return parseJson<ImageGenerationResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function generateContentPackage(
+  payload: ContentGeneratorRequest
+): Promise<ContentGeneratorResponse> {
+  try {
+    const response = await fetch("/api/content-generator/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return parseJson<ContentGeneratorResponse>(response);
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+}
+
+export async function streamGenerateContentPackage(
+  payload: ContentGeneratorRequest,
+  options?: {
+    signal?: AbortSignal;
+    onStage?: (event: Extract<ContentGeneratorStreamEvent, { type: "stage" }>) => void;
+  }
+): Promise<ContentGeneratorResponse> {
+  try {
+    const response = await fetch("/api/content-generator/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    if (!response.body) {
+      throw new Error("The content generation stream did not return readable data.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResult: ContentGeneratorResponse | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), {
+          stream: !done
+        });
+
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex >= 0) {
+          const rawLine = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          newlineIndex = buffer.indexOf("\n");
+
+          if (!rawLine) {
+            continue;
+          }
+
+          const event = JSON.parse(rawLine) as ContentGeneratorStreamEvent;
+          if (event.type === "stage") {
+            options?.onStage?.(event);
+            continue;
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message || "Content generation failed.");
+          }
+
+          finalResult = event.result;
+        }
+
+        if (done) {
+          break;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const trailing = buffer.trim();
+    if (trailing) {
+      const event = JSON.parse(trailing) as ContentGeneratorStreamEvent;
+      if (event.type === "stage") {
+        options?.onStage?.(event);
+      } else if (event.type === "error") {
+        throw new Error(event.message || "Content generation failed.");
+      } else {
+        finalResult = event.result;
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error("The content generation stream ended without a final payload.");
+    }
+
+    return finalResult;
   } catch (error) {
     throw normalizeNetworkError(error);
   }

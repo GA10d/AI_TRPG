@@ -2234,6 +2234,187 @@ pre {
   color: #912f23;
 }
 
+.content-generator-page {
+  display: grid;
+  gap: 20px;
+}
+
+.content-generator-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.content-generator-main,
+.content-generator-sidebar,
+.content-generator-results,
+.content-generator-card,
+.content-generator-rule-meta,
+.content-generator-runtime,
+.content-generator-file-list,
+.content-generator-file-card {
+  display: grid;
+  gap: 14px;
+}
+
+.content-generator-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(99, 63, 36, 0.12);
+}
+
+.content-generator-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.content-generator-mode-button {
+  min-height: 44px;
+}
+
+.content-generator-mode-button-active {
+  border-color: rgba(95, 33, 18, 0.28);
+  background: rgba(122, 50, 32, 0.12);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(122, 50, 32, 0.08);
+}
+
+.content-generator-card-head,
+.content-generator-file-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.content-generator-textarea {
+  min-height: 220px;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.68;
+}
+
+.content-generator-empty-inline {
+  padding: 14px 16px;
+}
+
+.content-generator-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.content-generator-checkbox input {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.content-generator-runtime,
+.content-generator-rule-meta {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.88);
+  border: 1px solid rgba(99, 63, 36, 0.08);
+}
+
+.content-generator-path {
+  word-break: break-word;
+}
+
+.content-generator-submit {
+  width: 100%;
+  min-height: 48px;
+}
+
+.content-generator-result-gap {
+  margin-top: 6px;
+}
+
+.content-generator-warning-block {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(156, 47, 36, 0.06);
+  border: 1px solid rgba(156, 47, 36, 0.14);
+}
+
+.content-generator-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.content-generator-progress-bar {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(122, 50, 32, 0.12);
+  border: 1px solid rgba(122, 50, 32, 0.08);
+}
+
+.content-generator-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent) 0%, #b98a77 100%);
+  transition: width 220ms ease;
+}
+
+.content-generator-progress-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.content-generator-progress-item {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.content-generator-progress-item-active {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.content-generator-progress-item-completed {
+  color: rgba(111, 90, 71, 0.82);
+}
+
+.content-generator-progress-item-completed .content-generator-progress-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.content-generator-file-list {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.content-generator-image-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 63, 36, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.content-generator-preview {
+  max-height: 280px;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid rgba(99, 63, 36, 0.08);
+}
+
 code {
   word-break: break-all;
 }
@@ -3527,7 +3708,8 @@ pre {
   .records-grid,
   .setup-layout,
   .menu-meta-strip,
-  .story-detail-matrix {
+  .story-detail-matrix,
+  .content-generator-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3769,5 +3951,20 @@ pre {
 
   .game-comic-lightbox-image {
     max-height: calc(100vh - 200px);
+  }
+}
+
+@media (max-width: 720px) {
+  .content-generator-card-head,
+  .content-generator-file-head {
+    flex-direction: column;
+  }
+
+  .content-generator-mode-row {
+    flex-direction: column;
+  }
+
+  .content-generator-mode-button {
+    width: 100%;
   }
 }

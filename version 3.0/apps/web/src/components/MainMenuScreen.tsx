@@ -29,6 +29,7 @@ type MainMenuScreenProps = {
   modelProfileId: string;
   onUiLocaleChange: (value: UiLocaleCode) => void;
   onOpenNewGame: () => void;
+  onOpenContentGenerator: () => void;
   onOpenContinue: () => void;
   onOpenRecords: () => void;
   onOpenSettings: () => void;
@@ -71,6 +72,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
     modelProfileId,
     onUiLocaleChange,
     onOpenNewGame,
+    onOpenContentGenerator,
     onOpenContinue,
     onOpenRecords,
     onOpenSettings,
@@ -182,6 +184,9 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
         <div className="menu-button-list">
           <button className="menu-button" onClick={onOpenNewGame} type="button">
             {text.mainMenu.buttons.newGame}
+          </button>
+          <button className="menu-button" onClick={onOpenContentGenerator} type="button">
+            {text.mainMenu.buttons.contentGenerator}
           </button>
           <button className="menu-button" onClick={onOpenContinue} type="button">
             {text.mainMenu.buttons.continue}

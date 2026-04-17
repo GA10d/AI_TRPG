@@ -14,6 +14,8 @@ import type {
   BootstrapResponse,
   CharacterConceptAssistRequest,
   CommitRoundRequest,
+  ContentGeneratorRequest,
+  ContentGeneratorStreamEvent,
   CreateSaveRequest,
   ComicMetadataGenerationRequest,
   ComicPageGenerationRequest,
@@ -109,6 +111,7 @@ import {
   saveBundleToDisk
 } from "./save_repository.ts";
 import { generateCharacterConcept } from "./text_completion/service.ts";
+import { generateContentPackage } from "./content_generator/index.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -149,6 +152,7 @@ type OpeningPreviewStreamEvent =
 
 type SessionCreateNdjsonEvent = SessionCreateStreamEvent;
 type TurnResolutionNdjsonEvent = TurnResolutionStreamEvent;
+type ContentGeneratorNdjsonEvent = ContentGeneratorStreamEvent;
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -201,6 +205,13 @@ function sendSessionCreateEvent(
 function sendTurnResolutionEvent(
   response: ServerResponse,
   event: TurnResolutionNdjsonEvent
+): void {
+  response.write(`${JSON.stringify(event)}\n`);
+}
+
+function sendContentGeneratorEvent(
+  response: ServerResponse,
+  event: ContentGeneratorNdjsonEvent
 ): void {
   response.write(`${JSON.stringify(event)}\n`);
 }
@@ -564,6 +575,61 @@ async function handleApiRequest(
       storyDirectoryName,
       assets
     });
+    return true;
+  }
+
+  if (url.pathname === "/api/content-generator/stream" && request.method === "POST") {
+    const payload = await readJsonBody<ContentGeneratorRequest>(request);
+
+    response.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    response.flushHeaders?.();
+
+    try {
+      const result = await generateContentPackage({
+        contentRoot,
+        request: payload,
+        onStage: async (event) => {
+          if (response.writableEnded || response.destroyed) {
+            return;
+          }
+
+          sendContentGeneratorEvent(response, event);
+        }
+      });
+
+      if (!response.writableEnded && !response.destroyed) {
+        sendContentGeneratorEvent(response, {
+          type: "done",
+          result
+        });
+        response.end();
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!response.writableEnded && !response.destroyed) {
+        sendContentGeneratorEvent(response, {
+          type: "error",
+          message
+        });
+        response.end();
+      }
+    }
+
+    return true;
+  }
+
+  if (url.pathname === "/api/content-generator/generate" && request.method === "POST") {
+    const payload = await readJsonBody<ContentGeneratorRequest>(request);
+    const result = await generateContentPackage({
+      contentRoot,
+      request: payload
+    });
+    sendJson(response, 200, result);
     return true;
   }
 

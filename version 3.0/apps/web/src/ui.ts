@@ -6,6 +6,7 @@ import { zhCn, type UiText } from "./locales/index.tsx";
 
 export type AppView =
   | "menu"
+  | "content_generator"
   | "story_select"
   | "game_setup"
   | "game_bootstrap"

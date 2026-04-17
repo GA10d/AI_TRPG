@@ -326,6 +326,7 @@ export const jaJp = {
       "テキスト叙述を中心にした AI TRPG プロトタイプです。ここから新しいゲームを始めたり、最近の進行を再開したり、既定のモデルや言語設定を調整できます。",
     buttons: {
       newGame: "ゲーム開始",
+      contentGenerator: "コンテンツ生成",
       continue: "続きから",
       records: "記録",
       settings: "設定",
