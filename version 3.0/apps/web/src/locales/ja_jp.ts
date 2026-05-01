@@ -207,7 +207,7 @@ export const jaJp = {
       commitRoundLogFailed: (reason: string) => `ラウンド送信に失敗しました: ${reason}`,
       autoModeSubmitLocked: "自動進行中のため、手動送信はできません。",
       reasonerTimeoutHint:
-        "このセッションは DeepSeek Reasoner を使っています。タイムアウトが続く場合は TRPG_DEEPSEEK_REASONER_TIMEOUT_MS または TRPG_SERVER_PROXY_TIMEOUT_MS を上げてください。",
+        "このセッションは DeepSeek Standard を使っています。タイムアウトが続く場合は TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS または TRPG_SERVER_PROXY_TIMEOUT_MS を上げてください。",
       privateChatAutoModeUnavailable:
         "自動進行中は個別チャットを使えません。先にプレイヤー介入へ切り替えてください。",
       turnComplete: "このターンは完了しました。",

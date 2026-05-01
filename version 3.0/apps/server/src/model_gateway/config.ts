@@ -137,7 +137,11 @@ function resolveTimeoutMs(profile: ModelProfileDefinition): number {
 
   if (profile.id === "deepseek-reasoner") {
     return parseNumberOrDefault(
-      envFirst("TRPG_DEEPSEEK_REASONER_TIMEOUT_MS", "TRPG_SERVER_PROXY_TIMEOUT_MS"),
+      envFirst(
+        "TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS",
+        "TRPG_DEEPSEEK_REASONER_TIMEOUT_MS",
+        "TRPG_SERVER_PROXY_TIMEOUT_MS"
+      ),
       defaultTimeoutMs
     );
   }

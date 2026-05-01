@@ -30,13 +30,13 @@ export const DEFAULT_MODEL_PROFILES = [
   },
   {
     id: "deepseek-chat",
-    label: "DeepSeek Chat",
+    label: "DeepSeek Fast",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible"
   },
   {
     id: "deepseek-reasoner",
-    label: "DeepSeek Reasoner",
+    label: "DeepSeek Standard",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible"
   },

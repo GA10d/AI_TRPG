@@ -115,6 +115,31 @@ type ChatCompletionResult = {
   usage: AiGenerationUsage;
 };
 
+function applyOpenAiCompatibleChatOptions(
+  payload: Record<string, unknown>,
+  config: ServerProxyConfig,
+  temperature: number
+): void {
+  if (config.profileCode !== "deepseek") {
+    payload.temperature = temperature;
+    return;
+  }
+
+  if (config.profileId === "deepseek-chat") {
+    payload.temperature = temperature;
+    payload.thinking = { type: "disabled" };
+    return;
+  }
+
+  if (config.profileId === "deepseek-reasoner") {
+    payload.thinking = { type: "enabled" };
+    payload.reasoning_effort = "high";
+    return;
+  }
+
+  payload.temperature = temperature;
+}
+
 type UploadedGeminiFile = {
   name: string;
   uri: string;
@@ -503,9 +528,9 @@ async function callChatCompletion(
   try {
     const payload: Record<string, unknown> = {
       model: config.model,
-      messages,
-      temperature: config.temperature
+      messages
     };
+    applyOpenAiCompatibleChatOptions(payload, config, config.temperature);
 
     if (config.maxTokens !== null) {
       payload.max_tokens = config.maxTokens;
@@ -567,12 +592,12 @@ async function callChatCompletionStream(
     const payload: Record<string, unknown> = {
       model: config.model,
       messages,
-      temperature: config.temperature,
       stream: true,
       stream_options: {
         include_usage: true
       }
     };
+    applyOpenAiCompatibleChatOptions(payload, config, config.temperature);
 
     if (config.maxTokens !== null) {
       payload.max_tokens = config.maxTokens;

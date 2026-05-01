@@ -114,15 +114,15 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
   {
     id: "deepseek-chat",
     order: 20,
-    name: "DeepSeek Chat",
+    name: "DeepSeek Fast",
     code: "deepseek",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible",
     dependence: "OpenAI",
-    description: "使用 DeepSeek 的 OpenAI-compatible 文本接口。",
+    description: "使用 DeepSeek-V4-Flash 的 OpenAI-compatible 文本接口。",
     urlRequirements: true,
     baseUrl: "https://api.deepseek.com",
-    baseModel: "deepseek-chat",
+    baseModel: "deepseek-v4-flash",
     chargeUrl: "https://platform.deepseek.com/usage",
     docsUrl: "https://api-docs.deepseek.com/zh-cn/",
     envKeyCandidates: ["DEEPSEEK_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
@@ -139,18 +139,18 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
       mini_version: { supported: false, model: null, url: null },
       deep_think: {
         supported: true,
-        model: "deepseek-reasoner",
-        url: "https://api-docs.deepseek.com/guides/thinking_mode"
+        model: "deepseek-v4-flash",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/thinking_mode"
       },
       json_output: {
         supported: true,
-        model: "deepseek-chat",
-        url: "https://api.deepseek.com"
+        model: "deepseek-v4-flash",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/json_mode/"
       },
       tool_calls: {
         supported: true,
-        model: "deepseek-chat",
-        url: "https://api.deepseek.com"
+        model: "deepseek-v4-flash",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/function_calling"
       },
       file_upload: { supported: false, model: null, url: null }
     }
@@ -158,39 +158,46 @@ export const MODEL_PROFILES: ModelProfileDefinition[] = [
   {
     id: "deepseek-reasoner",
     order: 21,
-    name: "DeepSeek Reasoner",
+    name: "DeepSeek Standard",
     code: "deepseek",
     accessMode: "server_proxy",
     providerFamily: "openai-compatible",
     dependence: "OpenAI",
-    description: "浣跨敤 DeepSeek Reasoner 鐨?OpenAI-compatible 鏂囨湰鎺ュ彛銆?",
+    description: "使用 DeepSeek-V4-Pro 的 OpenAI-compatible 文本接口。",
     urlRequirements: true,
     baseUrl: "https://api.deepseek.com",
-    baseModel: "deepseek-reasoner",
+    baseModel: "deepseek-v4-pro",
     chargeUrl: "https://platform.deepseek.com/usage",
     docsUrl: "https://api-docs.deepseek.com/zh-cn/",
     envKeyCandidates: ["DEEPSEEK_API_KEY", "TRPG_SERVER_PROXY_API_KEY"],
-    modelEnvKeyCandidates: ["TRPG_DEEPSEEK_REASONER_MODEL"],
+    modelEnvKeyCandidates: [
+      "TRPG_DEEPSEEK_STANDARD_MODEL",
+      "TRPG_DEEPSEEK_REASONER_MODEL"
+    ],
     baseUrlEnvKeyCandidates: ["TRPG_DEEPSEEK_BASE_URL", "TRPG_SERVER_PROXY_BASE_URL"],
     allowsCustomApiKey: true,
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
     features: {
-      mini_version: { supported: false, model: null, url: null },
+      mini_version: {
+        supported: true,
+        model: "deepseek-v4-flash",
+        url: "https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
+      },
       deep_think: {
         supported: true,
-        model: "deepseek-reasoner",
-        url: "https://api-docs.deepseek.com/guides/thinking_mode"
+        model: "deepseek-v4-pro",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/thinking_mode"
       },
       json_output: {
         supported: true,
-        model: "deepseek-reasoner",
-        url: "https://api-docs.deepseek.com/guides/reasoning_model"
+        model: "deepseek-v4-pro",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/json_mode/"
       },
       tool_calls: {
-        supported: false,
-        model: null,
-        url: "https://api-docs.deepseek.com/guides/reasoning_model"
+        supported: true,
+        model: "deepseek-v4-pro",
+        url: "https://api-docs.deepseek.com/zh-cn/guides/function_calling"
       },
       file_upload: { supported: false, model: null, url: null }
     }
@@ -369,7 +376,12 @@ export function listModelProfiles(): ModelProfileDefinition[] {
 }
 
 export function getModelProfile(profileId: string): ModelProfileDefinition | null {
-  const normalizedProfileId = profileId === "deepseek" ? "deepseek-chat" : profileId;
+  const normalizedProfileId =
+    profileId === "deepseek" || profileId === "deepseek-fast"
+      ? "deepseek-chat"
+      : profileId === "deepseek-standard"
+        ? "deepseek-reasoner"
+        : profileId;
   return MODEL_PROFILES.find((item) => item.id === normalizedProfileId) ?? null;
 }
 

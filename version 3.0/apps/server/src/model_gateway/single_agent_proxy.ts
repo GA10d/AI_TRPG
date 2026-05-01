@@ -132,6 +132,31 @@ type TextCompletionResult = {
   usage: AiGenerationUsage;
 };
 
+function applyOpenAiCompatibleChatOptions(
+  payload: Record<string, unknown>,
+  config: ServerProxyConfig,
+  temperature: number
+): void {
+  if (config.profileCode !== "deepseek") {
+    payload.temperature = temperature;
+    return;
+  }
+
+  if (config.profileId === "deepseek-chat") {
+    payload.temperature = temperature;
+    payload.thinking = { type: "disabled" };
+    return;
+  }
+
+  if (config.profileId === "deepseek-reasoner") {
+    payload.thinking = { type: "enabled" };
+    payload.reasoning_effort = "high";
+    return;
+  }
+
+  payload.temperature = temperature;
+}
+
 type ChatCompletionResponseFormat =
   | {
       type: "json_object";
@@ -160,7 +185,7 @@ function normalizeGatewayError(
   if (isAbortError(error)) {
     const timeoutHint =
       config.profileId === "deepseek-reasoner"
-        ? "You can raise TRPG_DEEPSEEK_REASONER_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS if needed."
+        ? "You can raise TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS, TRPG_DEEPSEEK_REASONER_TIMEOUT_MS, or TRPG_SERVER_PROXY_TIMEOUT_MS if needed."
         : "You can raise TRPG_SERVER_PROXY_TIMEOUT_MS if needed.";
 
     return new Error(
@@ -285,9 +310,13 @@ async function callChatCompletion(
   try {
     const payload: Record<string, unknown> = {
       model: config.model,
-      messages,
-      temperature: options?.temperature ?? config.temperature
+      messages
     };
+    applyOpenAiCompatibleChatOptions(
+      payload,
+      config,
+      options?.temperature ?? config.temperature
+    );
 
     if (config.maxTokens !== null) {
       payload.max_tokens = config.maxTokens;

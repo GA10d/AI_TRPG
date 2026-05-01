@@ -200,7 +200,7 @@
       commitRoundLogFailed: (reason: string) => `本轮提交失败：${reason}`,
       autoModeSubmitLocked: "当前处于自动进行模式，无需手动提交。",
       reasonerTimeoutHint:
-        "当前使用的是 DeepSeek Reasoner。若仍频繁超时，可提高 TRPG_DEEPSEEK_REASONER_TIMEOUT_MS 或 TRPG_SERVER_PROXY_TIMEOUT_MS。",
+        "当前使用的是 DeepSeek Standard。若仍频繁超时，可提高 TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS 或 TRPG_SERVER_PROXY_TIMEOUT_MS。",
       privateChatAutoModeUnavailable: "自动进行模式下不可发起私聊，请先切换到玩家介入。",
       turnComplete: "本轮行动已完成。",
       turnCompleteEnded: "本轮行动已完成，并且本局已进入结局。",

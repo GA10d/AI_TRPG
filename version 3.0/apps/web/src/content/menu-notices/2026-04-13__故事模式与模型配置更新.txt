@@ -3,4 +3,4 @@
 1. 故事模式下，“玩家介入 / 自动进行”的切换逻辑继续修正，AI 队友生成完草稿后不再把界面强制切回自动进行。
 2. 本地存档已经改为保存到电脑目录，首次保存时可直接选择文件夹，后续也可以在设置里修改保存位置。
 3. 结局判断、结算页和世界线树状回溯继续推进，结局后的追问与复盘链路可继续使用。
-4. 默认文本模型配置已更新，当前预设为 OpenAI `gpt-5.4`、DeepSeek `deepseek-chat`、Gemini `gemini-3-pro-preview`、Doubao `doubao-seed-2-0-pro-260215`。
+4. 默认文本模型配置已更新，当前预设为 OpenAI `gpt-5.4`、DeepSeek Fast `deepseek-v4-flash`、DeepSeek Standard `deepseek-v4-pro`、Gemini `gemini-3-pro-preview`、Doubao `doubao-seed-2-0-pro-260215`。

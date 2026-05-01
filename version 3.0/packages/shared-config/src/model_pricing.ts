@@ -132,28 +132,29 @@ const MODEL_PRICING_CATALOG: ModelPricingCatalogEntry[] = [
     }
   },
   {
-    modelNames: ["deepseek-chat"],
+    modelNames: ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
     pricing: {
       kind: "flat",
       currency: "USD",
-      inputPerMillion: 0.28,
+      inputPerMillion: 0.14,
       cachedInputPerMillion: 0.028,
-      outputPerMillion: 0.42,
+      outputPerMillion: 0.28,
       sourceUrl: DEEPSEEK_PRICING_URL,
-      note: "If DeepSeek does not return cache-hit tokens, the estimate assumes cache miss."
+      note:
+        "Deprecated deepseek-chat and deepseek-reasoner currently route to deepseek-v4-flash non-thinking/thinking modes. If DeepSeek does not return cache-hit tokens, the estimate assumes cache miss."
     }
   },
   {
-    modelNames: ["deepseek-reasoner"],
+    modelNames: ["deepseek-v4-pro"],
     pricing: {
       kind: "flat",
       currency: "USD",
-      inputPerMillion: 0.28,
-      cachedInputPerMillion: 0.028,
-      outputPerMillion: 0.42,
+      inputPerMillion: 0.435,
+      cachedInputPerMillion: 0.03625,
+      outputPerMillion: 0.87,
       sourceUrl: DEEPSEEK_PRICING_URL,
       note:
-        "The current official Models & Pricing page lists DeepSeek-V3.2 pricing as a shared rate for deepseek-chat and deepseek-reasoner. If cache-hit tokens are unavailable, the estimate assumes cache miss."
+        "Uses DeepSeek's limited-time 75% discount for deepseek-v4-pro through 2026-05-05 15:59 UTC. List prices are $1.74 input, $0.145 cached input, and $3.48 output per 1M tokens."
     }
   },
   {

@@ -928,9 +928,12 @@ export function App() {
         }
 
         const normalizedProfileId =
-          normalizedRole.modelProfileId === "deepseek"
+          normalizedRole.modelProfileId === "deepseek" ||
+          normalizedRole.modelProfileId === "deepseek-fast"
             ? "deepseek-chat"
-            : normalizedRole.modelProfileId;
+            : normalizedRole.modelProfileId === "deepseek-standard"
+              ? "deepseek-reasoner"
+              : normalizedRole.modelProfileId;
         const resolvedProfileId =
           normalizedProfileId &&
           availableTextProfiles.some((profile) => profile.id === normalizedProfileId)

@@ -172,7 +172,11 @@ function resolveModelProfileId(
   preferredProfileId: string | undefined
 ): string {
   const normalizedPreferredProfileId =
-    preferredProfileId === "deepseek" ? "deepseek-chat" : preferredProfileId;
+    preferredProfileId === "deepseek" || preferredProfileId === "deepseek-fast"
+      ? "deepseek-chat"
+      : preferredProfileId === "deepseek-standard"
+        ? "deepseek-reasoner"
+        : preferredProfileId;
   const matchingProfiles = bootstrap.modelProfiles.filter(
     (item) => item.accessMode === accessMode
   );

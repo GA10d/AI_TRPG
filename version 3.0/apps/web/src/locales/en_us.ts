@@ -205,7 +205,7 @@ export const enUs = {
       commitRoundLogFailed: (reason: string) => `Round submission failed: ${reason}`,
       autoModeSubmitLocked: "Auto play is active, so manual submission is disabled.",
       reasonerTimeoutHint:
-        "This session is using DeepSeek Reasoner. If timeouts continue, raise TRPG_DEEPSEEK_REASONER_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS.",
+        "This session is using DeepSeek Standard. If timeouts continue, raise TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS.",
       privateChatAutoModeUnavailable:
         "Private chat is unavailable during auto play. Switch back to player intervene first.",
       turnComplete: "This turn has been completed.",
