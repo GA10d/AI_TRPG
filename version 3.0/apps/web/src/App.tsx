@@ -1905,6 +1905,22 @@ export function App() {
     persistStoredSnapshot(nextSnapshot);
   }
 
+  async function handleRefreshActiveSession(): Promise<void> {
+    if (!snapshot) {
+      return;
+    }
+
+    try {
+      const nextSnapshot = await fetchSession(snapshot.session.id);
+      commitSnapshot(nextSnapshot);
+    } catch (error) {
+      setStatus({
+        message: error instanceof Error ? error.message : String(error),
+        tone: "error"
+      });
+    }
+  }
+
   function clearStagedOpeningReveal(): void {
     if (stagedOpeningRevealTimerRef.current !== null) {
       window.clearInterval(stagedOpeningRevealTimerRef.current);
@@ -3712,6 +3728,7 @@ export function App() {
           onTurnInputChange={setTurnInput}
           onDismissEnding={handleDismissEnding}
           onOpenSettlement={() => setView("settlement")}
+          onRefreshSession={handleRefreshActiveSession}
           onSubmitTurn={handleSubmitTurn}
         />
       );

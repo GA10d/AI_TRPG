@@ -11,6 +11,7 @@ import type {
   AiGenerationMetadata,
   ImagePromptTemplateConfig,
   Message,
+  MultiAgentAgentOutput,
   NpcPortraitVariant,
   NpcRosterEntry,
   PersistedComicProject,
@@ -108,12 +109,14 @@ type GameScreenProps = {
   onTurnInputChange: (value: string) => void;
   onDismissEnding: () => Promise<void>;
   onOpenSettlement: () => void;
+  onRefreshSession: () => Promise<void>;
   onSubmitTurn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
 type SidePanelMode =
   | "history"
   | "round"
+  | "multi_agent"
   | "comics"
   | "art_assets"
   | "worldline"
@@ -132,6 +135,15 @@ type ReasoningRecord = {
   reasoningContent: string;
   createdAt: string | null;
   aiMetadata: AiGenerationMetadata;
+};
+
+type MultiAgentResponseRecord = {
+  id: string;
+  roleName: string;
+  round: number;
+  output: MultiAgentAgentOutput | null;
+  statusLabel: string;
+  emptyText: string;
 };
 
 function clampPanelSize(value: number, min: number, max: number): number {
@@ -283,6 +295,7 @@ export function GameScreen(props: GameScreenProps) {
     onTurnInputChange,
     onDismissEnding,
     onOpenSettlement,
+    onRefreshSession,
     onSubmitTurn
   } = props;
   const text = useUiText();
@@ -381,6 +394,62 @@ export function GameScreen(props: GameScreenProps) {
   const roundInputState = snapshot?.session.gameState.roundInputState ?? null;
   const roundDrafts = roundInputState?.drafts ?? [];
   const primaryDraft = roundDrafts.find((draft) => draft.isPrimary) ?? null;
+  const isMultiAgentMode =
+    snapshot?.session.gmArchitecture === "multi_agent" ||
+    Boolean(snapshot?.session.gameState.multiAgent);
+  const multiAgentState = snapshot?.session.gameState.multiAgent ?? null;
+  const multiAgentRoundNumber = snapshot?.session.currentRound ?? 0;
+  const currentMultiAgentRound =
+    multiAgentState?.rounds.find((round) => round.round === multiAgentRoundNumber) ?? null;
+  const currentDirectorTask =
+    multiAgentState?.directorTask?.round === multiAgentRoundNumber
+      ? multiAgentState.directorTask
+      : null;
+  const directorStatusLabel = currentMultiAgentRound?.director
+    ? text.gameScreen.multiAgentAgentReady
+    : currentDirectorTask?.status === "queued"
+      ? text.gameScreen.multiAgentDirectorQueued
+      : currentDirectorTask?.status === "running"
+        ? text.gameScreen.multiAgentDirectorRunning
+        : currentDirectorTask?.status === "failed"
+          ? text.gameScreen.multiAgentDirectorFailed
+          : text.gameScreen.multiAgentAgentPending;
+  const multiAgentResponseRecords: MultiAgentResponseRecord[] = [
+    {
+      id: "dicer",
+      roleName: text.gameScreen.multiAgentRoleDicer,
+      round: multiAgentRoundNumber,
+      output: currentMultiAgentRound?.dicer ?? null,
+      statusLabel: currentMultiAgentRound?.dicer
+        ? text.gameScreen.multiAgentAgentReady
+        : text.gameScreen.multiAgentAgentPending,
+      emptyText: text.gameScreen.multiAgentAgentEmpty
+    },
+    {
+      id: "npc-manager",
+      roleName: text.gameScreen.multiAgentRoleNpcManager,
+      round: multiAgentRoundNumber,
+      output: currentMultiAgentRound?.npcManager ?? null,
+      statusLabel: currentMultiAgentRound?.npcManager
+        ? text.gameScreen.multiAgentAgentReady
+        : text.gameScreen.multiAgentAgentPending,
+      emptyText: text.gameScreen.multiAgentAgentEmpty
+    },
+    {
+      id: "director",
+      roleName: text.gameScreen.multiAgentRoleDirector,
+      round: multiAgentRoundNumber,
+      output: currentMultiAgentRound?.director ?? null,
+      statusLabel: directorStatusLabel,
+      emptyText:
+        currentDirectorTask?.status === "failed" && currentDirectorTask.error
+          ? currentDirectorTask.error
+          : text.gameScreen.multiAgentDirectorEmpty
+    }
+  ];
+  const readyMultiAgentResponseCount = multiAgentResponseRecords.filter(
+    (record) => record.output
+  ).length;
   const composerDisabled =
     actionLocked ||
     isPreparingRound ||
@@ -601,6 +670,8 @@ export function GameScreen(props: GameScreenProps) {
   const sidePanelEyebrow =
     sidePanelMode === "round"
       ? text.gameScreen.roundDraftsEyebrow
+      : sidePanelMode === "multi_agent"
+        ? text.gameScreen.multiAgentRepliesEyebrow
       : sidePanelMode === "comics"
         ? text.gameScreen.comicEyebrow
         : sidePanelMode === "art_assets"
@@ -615,6 +686,8 @@ export function GameScreen(props: GameScreenProps) {
   const sidePanelTitle =
     sidePanelMode === "round"
       ? text.gameScreen.roundRepliesTitle
+      : sidePanelMode === "multi_agent"
+        ? text.gameScreen.multiAgentRepliesTitle
       : sidePanelMode === "comics"
         ? text.gameScreen.comicTitle
         : sidePanelMode === "art_assets"
@@ -631,6 +704,11 @@ export function GameScreen(props: GameScreenProps) {
       ? roundDrafts.length
         ? text.gameScreen.roundDraftCount(roundDrafts.length)
         : text.gameScreen.roundDraftsEmpty
+      : sidePanelMode === "multi_agent"
+        ? text.gameScreen.multiAgentRepliesCount(
+            readyMultiAgentResponseCount,
+            multiAgentResponseRecords.length
+          )
       : sidePanelMode === "comics"
         ? isComicLoading
           ? text.common.loading
@@ -687,7 +765,11 @@ export function GameScreen(props: GameScreenProps) {
     if (!supportsReasoningPanel && sidePanelMode === "reasoning") {
       setSidePanelMode("history");
     }
-  }, [sidePanelMode, supportsReasoningPanel]);
+
+    if (!isMultiAgentMode && sidePanelMode === "multi_agent") {
+      setSidePanelMode("history");
+    }
+  }, [isMultiAgentMode, sidePanelMode, supportsReasoningPanel]);
 
   useEffect(() => {
     if (!isActivityStageTimingActive) {
@@ -1574,6 +1656,20 @@ export function GameScreen(props: GameScreenProps) {
             >
               {text.gameScreen.roundRepliesTab}
             </button>
+            {isMultiAgentMode ? (
+              <button
+                className={`game-panel-toggle ${
+                  sidePanelMode === "multi_agent" ? "game-panel-toggle-active" : ""
+                }`}
+                onClick={() => {
+                  setSidePanelMode("multi_agent");
+                  void onRefreshSession();
+                }}
+                type="button"
+              >
+                {text.gameScreen.multiAgentRepliesTab}
+              </button>
+            ) : null}
             <button
               className={`game-panel-toggle ${
                 sidePanelMode === "comics" ? "game-panel-toggle-active" : ""
@@ -1704,6 +1800,57 @@ export function GameScreen(props: GameScreenProps) {
                       : text.gameScreen.roundDraftsDescription
                     : text.gameScreen.roundRepliesEmpty}
                 </div>
+              )
+            ) : sidePanelMode === "multi_agent" ? (
+              isMultiAgentMode ? (
+                <div className="game-agent-response-list">
+                  {multiAgentResponseRecords.map((record) => (
+                    <article className="game-agent-response-item" key={record.id}>
+                      <div className="game-agent-response-head">
+                        <div>
+                          <div className="summary-title">{record.roleName}</div>
+                          <div className="summary-text">
+                            {text.gameScreen.multiAgentRoundLabel(record.round)}
+                          </div>
+                        </div>
+                        <div className="game-draft-item-flags">
+                          <span className="badge">{record.statusLabel}</span>
+                        </div>
+                      </div>
+
+                      {record.output ? (
+                        <>
+                          <div className="game-history-meta">
+                            <span>{formatDateTime(record.output.createdAt)}</span>
+                            <span>
+                              {record.output.meta?.model ??
+                                record.output.meta?.provider ??
+                                record.output.provider}
+                            </span>
+                          </div>
+
+                          <MarkdownBlock
+                            className="story-markdown-block message-body message-body-markdown game-agent-response-body"
+                            content={record.output.content}
+                            fontSizePreset={markdownFontSize}
+                          />
+
+                          {showAiMetadata && record.output.meta ? (
+                            <div className="ai-meta-line">
+                              {formatAiGenerationMeta(record.output.meta, text)}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="summary-text game-agent-response-empty">
+                          {record.emptyText}
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">{text.gameScreen.multiAgentRepliesEmpty}</div>
               )
             ) : sidePanelMode === "comics" ? (
               hasComicEntries ? (

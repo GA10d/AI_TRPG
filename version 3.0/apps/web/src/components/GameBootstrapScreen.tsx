@@ -28,25 +28,26 @@ export function GameBootstrapScreen(props: GameBootstrapScreenProps) {
   const { snapshot, sessionBootstrapState } = props;
   const text = useUiText();
   const tips = text.gameBootstrapScreen.tips;
+  const tipCount = tips.length + 1;
   const [tipIndex, setTipIndex] = useState(0);
 
   useEffect(() => {
     setTipIndex(0);
-  }, [snapshot?.session.id, snapshot?.contentSummary.storyTitle, tips.length]);
+  }, [snapshot?.session.id, snapshot?.contentSummary.storyTitle, tipCount]);
 
   useEffect(() => {
-    if (tips.length <= 1) {
+    if (tipCount <= 1) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      setTipIndex((current) => (current + 1) % tips.length);
+      setTipIndex((current) => (current + 1) % tipCount);
     }, 3000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [tips]);
+  }, [tipCount]);
 
   const storyTitle =
     snapshot?.contentSummary.storyTitle?.trim() || text.gameBootstrapScreen.fallbackStoryTitle;
@@ -56,12 +57,13 @@ export function GameBootstrapScreen(props: GameBootstrapScreenProps) {
   );
   const loadingTitle =
     sessionBootstrapState?.activeLabel ?? text.app.bootstrapStages.entered_game.label;
-  const loadingDetail =
-    sessionBootstrapState?.activeDetail ?? text.app.bootstrapStages.waiting_first_reply.detail;
   const loadingHint =
     sessionBootstrapState?.loadingHint?.trim() ||
     text.gameBootstrapScreen.defaultLoadingHint(storyTitle);
-  const activeTip = tips[tipIndex] ?? text.gameBootstrapScreen.waitHint;
+  const activeTip =
+    tipIndex === 0
+      ? text.gameBootstrapScreen.waitHint
+      : tips[tipIndex - 1] ?? text.gameBootstrapScreen.waitHint;
 
   return (
     <section className="bootstrap-screen">
@@ -84,13 +86,12 @@ export function GameBootstrapScreen(props: GameBootstrapScreenProps) {
         </div>
 
         <div className="bootstrap-screen-copy">
-          <div className="bootstrap-screen-story-label">{storyTitle}</div>
-          <h1 className="bootstrap-screen-title">{loadingTitle}</h1>
+          <h1 className="bootstrap-screen-title">{storyTitle}</h1>
           <p className="bootstrap-screen-hint">{loadingHint}</p>
 
           <div className="bootstrap-screen-progress-block">
             <div className="bootstrap-screen-progress-meta">
-              <span>{text.gameBootstrapScreen.progressTitle}</span>
+              <span>{loadingTitle}</span>
               <span>{text.gameBootstrapScreen.progressLabel(progressPercent)}</span>
             </div>
             <div
@@ -103,11 +104,6 @@ export function GameBootstrapScreen(props: GameBootstrapScreenProps) {
               />
             </div>
           </div>
-
-          <p aria-live="polite" className="bootstrap-screen-detail">
-            {loadingDetail}
-          </p>
-          <p className="bootstrap-screen-wait">{text.gameBootstrapScreen.waitHint}</p>
 
           <div aria-live="polite" className="bootstrap-screen-tip-block">
             <div className="bootstrap-screen-tip-label">{text.gameBootstrapScreen.tipLabel}</div>

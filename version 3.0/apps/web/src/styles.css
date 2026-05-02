@@ -3015,14 +3015,16 @@ pre {
   overflow-wrap: anywhere;
 }
 
-.game-reasoning-list {
+.game-reasoning-list,
+.game-agent-response-list {
   min-height: 0;
   display: grid;
   gap: 12px;
   align-content: start;
 }
 
-.game-reasoning-item {
+.game-reasoning-item,
+.game-agent-response-item {
   display: grid;
   gap: 10px;
   padding: 14px 16px;
@@ -3031,11 +3033,18 @@ pre {
   background: rgba(255, 251, 246, 0.94);
 }
 
-.game-reasoning-head {
+.game-reasoning-head,
+.game-agent-response-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.game-agent-response-body,
+.game-agent-response-empty {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .game-reasoning-text {
