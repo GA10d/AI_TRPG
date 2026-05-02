@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "FIRE_EMBER_CASE",
+  "version": "0.1.0",
+  "ruleId": "DET",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "**案件名称**：《火塘余烬》"
+  },
+  "playerCount": {
+    "min": 2,
+    "max": 4
+  },
+  "supportsModes": [
+    "single_player",
+    "multiplayer"
+  ],
+  "coverQuote": {
+    "zh-CN": "**核心矛盾**：部落权力斗争 + 生存资源争夺 ---"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "medium",
+  "gmStyle": "atmospheric-guidance",
+  "tags": [
+    "investigation",
+    "survival"
+  ],
+  "contentWarnings": [],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "SCENE_STORAGE_CAVE"
+}
