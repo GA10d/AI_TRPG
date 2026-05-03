@@ -78,6 +78,7 @@ export const PHASE1_DEFAULTS = {
   difficulty: "easy",
   gmArchitecture: "single_agent",
   backgroundCompressionEnabled: true,
+  comicGenerationInterval: 3,
   modelAccessMode: "mock",
   modelProfileId: getDefaultModelProfileId("mock"),
   imageProfileId: getDefaultImageProfileId(),

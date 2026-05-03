@@ -807,6 +807,9 @@ export const jaJp = {
         "漫画画風プリセットを今は読み込めませんでした。このまま開始すると、バックエンド既定の画風にフォールバックします。",
       comicStyleLoadingOption: "画風プリセットを読み込み中...",
       comicStyleUnavailableOption: "画風プリセットを利用できません",
+      comicIntervalLabel: "漫画生成間隔",
+      comicIntervalHint:
+        "第 1 ラウンドでは必ず 1 ページ生成し、その後は指定ラウンドごとに生成します。終了ラウンドでは追加で生成します。",
       logViewLabel: "ログ表示",
       logViewHint: "遊ぶ時にも調査時にも使いやすいよう、ログ粒度を調整します。",
       previewDeliveryLabel: "開場伝送",
@@ -848,6 +851,7 @@ export const jaJp = {
       accessMode: (value: string) => `入口: ${value}`,
       profile: (value: string) => `プロファイル: ${value}`,
       comicStyle: (value: string) => `漫画画風: ${value}`,
+      comicInterval: (value: number) => `漫画ペース: ${value} ラウンドごと`,
       resolvedModel: (value: string) => `実際のモデル: ${value}`,
       status: (value: string) => `状態: ${value}`,
       message: (value: string) => `説明: ${value}`,

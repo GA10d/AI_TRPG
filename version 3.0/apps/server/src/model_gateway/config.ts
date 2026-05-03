@@ -121,9 +121,12 @@ function parseOptionalNumber(rawValue: string | undefined): number | null {
 }
 
 function resolveDefaultTimeoutMs(profileId: string): number {
+  if (profileId === "deepseek-reasoner") {
+    return 420_000;
+  }
+
   if (
     profileId === "doubao" ||
-    profileId === "deepseek-reasoner" ||
     profileId === "qwen"
   ) {
     return 180_000;

@@ -1,0 +1,10 @@
+Generate one single-line image prompt for this NPC portrait.
+Character name: {{CHARACTER_NAME}}
+Character type: {{CHARACTER_TYPE}}
+Age range: {{AGE_RANGE}}
+Gender presentation: {{GENDER_PRESENTATION}}
+Visible appearance: {{VISIBLE_APPEARANCE}}
+Surface impression: {{SURFACE_IMPRESSION}}
+Props: {{PROPS}}
+Story tones: {{STORY_TONES}}
+Worldview/style context: {{WORLDVIEW_STYLE_CONTEXT}}

@@ -9,6 +9,10 @@ import type {
 } from "../../../../packages/shared-types/src/index.ts";
 import { fetchBootstrap } from "../lib/trpgApiClient.ts";
 import {
+  DEFAULT_COMIC_GENERATION_INTERVAL,
+  normalizeComicGenerationInterval
+} from "../comicSchedule.ts";
+import {
   getOpeningPreviewDeliveryOptions,
   type OpeningPreviewDeliveryMode
 } from "../openingPreviewPreferences.ts";
@@ -295,6 +299,9 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     Record<string, RuntimeImageModelConfigInput>
   >({});
   const [comicStyleId, setComicStyleId] = useState("");
+  const [comicGenerationInterval, setComicGenerationInterval] = useState(
+    DEFAULT_COMIC_GENERATION_INTERVAL
+  );
   const [imagePromptTemplateConfig, setImagePromptTemplateConfig] =
     useState<ImagePromptTemplateConfig | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(true);
@@ -420,6 +427,11 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
         EMPTY_RUNTIME_IMAGE_MODEL_CONFIG
     );
     setComicStyleId(storedDefaults?.comicStyleId?.trim() ?? "");
+    setComicGenerationInterval(
+      normalizeComicGenerationInterval(
+        storedDefaults?.comicGenerationInterval ?? data.defaults.comicGenerationInterval
+      )
+    );
     setImagePromptTemplateConfig(
       sanitizeImagePromptTemplateConfig(
         data.imagePromptTemplateConfig,
@@ -605,6 +617,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     runtimeImageModelConfig,
     imageProfileRuntimeConfigs,
     comicStyleId,
+    comicGenerationInterval,
     imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
@@ -630,6 +643,7 @@ export function useBootstrapState(args: UseBootstrapStateArgs) {
     setImageProfileRuntimeConfig,
     clearImageProfileRuntimeConfigs,
     setComicStyleId,
+    setComicGenerationInterval,
     setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,

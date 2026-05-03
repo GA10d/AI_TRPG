@@ -173,6 +173,7 @@ export type SessionSettings = {
   logViewMode: "all" | "compact" | "hidden";
   difficulty?: Difficulty;
   backgroundCompressionEnabled?: boolean;
+  comicGenerationInterval?: number;
   debugEnabled?: boolean;
   promptDebugEnabled?: boolean;
   modelProfileId?: string;
@@ -413,6 +414,32 @@ export type MultiAgentDirectorTaskStatus =
   | "ready"
   | "failed";
 
+export type MultiAgentDirectorTaskDiagnostics = {
+  sessionId?: string;
+  round?: number;
+  phase?: string;
+  ruleId?: string;
+  storyId?: string;
+  worldlineId?: string | null;
+  accessMode?: ModelAccessMode;
+  modelProfileId?: string | null;
+  runtimeModel?: string | null;
+  provider?: string | null;
+  locale?: LocaleCode;
+  difficulty?: Difficulty;
+  queuedAt?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  elapsedMs?: number | null;
+  systemPromptChars?: number | null;
+  userPromptChars?: number | null;
+  sharedPublicContextChars?: number | null;
+  directorHistoryChars?: number | null;
+  errorKind?: string | null;
+  errorName?: string | null;
+  errorMessage?: string | null;
+};
+
 export type MultiAgentDirectorTaskState = {
   round: number;
   status: MultiAgentDirectorTaskStatus;
@@ -420,6 +447,7 @@ export type MultiAgentDirectorTaskState = {
   startedAt?: string | null;
   completedAt?: string | null;
   error?: string | null;
+  diagnostics?: MultiAgentDirectorTaskDiagnostics | null;
 };
 
 export type MultiAgentState = {
@@ -429,6 +457,7 @@ export type MultiAgentState = {
 
 export type SaveRuntimeConfig = {
   modelProfileId?: string;
+  comicGenerationInterval?: number;
   runtimeModelConfig?: {
     apiKey?: string;
     baseUrl?: string;

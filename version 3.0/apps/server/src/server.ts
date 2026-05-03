@@ -116,6 +116,10 @@ import {
   generateContentPackage,
   getContentGeneratorJob
 } from "./content_generator/index.ts";
+import {
+  buildRuntimeOperationId,
+  logRuntimeEvent
+} from "./runtime_logging.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
@@ -127,6 +131,14 @@ const defaultNpcPortraitRoot = join(projectRoot, "local_data", "npc_portraits");
 const localSettingsPath = join(projectRoot, "local_data", "settings.json");
 const store = new InMemorySessionStore();
 const port = Number(process.env.PORT ?? 4316);
+
+type HttpRequestLogContext = {
+  requestId: string;
+  method: string;
+  path: string;
+  route: string;
+  startedAt: number;
+};
 
 const mimeTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -220,6 +232,109 @@ function sendContentGeneratorEvent(
   response.write(`${JSON.stringify(event)}\n`);
 }
 
+function buildHttpRequestLogContext(request: IncomingMessage): HttpRequestLogContext {
+  const method = request.method ?? "UNKNOWN";
+  let path = request.url ?? "";
+
+  try {
+    path = request.url ? new URL(request.url, `http://127.0.0.1:${port}`).pathname : "";
+  } catch {
+    path = request.url ?? "";
+  }
+
+  return {
+    requestId: buildRuntimeOperationId("http"),
+    method,
+    path,
+    route: `${method} ${path}`,
+    startedAt: Date.now()
+  };
+}
+
+function summarizeHttpRequest(request: IncomingMessage): Record<string, unknown> {
+  return {
+    contentLength: request.headers["content-length"] ?? null,
+    contentType: request.headers["content-type"] ?? null,
+    accept: request.headers.accept ?? null,
+    userAgent: request.headers["user-agent"] ?? null
+  };
+}
+
+function logHttpRequestStart(context: HttpRequestLogContext, request: IncomingMessage): void {
+  void logRuntimeEvent(projectRoot, {
+    event: "http.request.start",
+    source: "http",
+    requestId: context.requestId,
+    route: context.route,
+    method: context.method,
+    path: context.path,
+    details: summarizeHttpRequest(request)
+  });
+}
+
+function logHttpRequestEnd(
+  context: HttpRequestLogContext,
+  response: ServerResponse,
+  event = "http.request.finish"
+): void {
+  const statusCode = response.statusCode || null;
+  const level = event === "http.request.aborted" || (statusCode && statusCode >= 500) ? "warn" : "info";
+  void logRuntimeEvent(projectRoot, {
+    event,
+    level,
+    source: "http",
+    requestId: context.requestId,
+    route: context.route,
+    method: context.method,
+    path: context.path,
+    statusCode,
+    durationMs: Date.now() - context.startedAt
+  });
+}
+
+function logHttpRequestError(context: HttpRequestLogContext, error: unknown): void {
+  void logRuntimeEvent(projectRoot, {
+    event: "http.request.error",
+    level: "error",
+    source: "http",
+    requestId: context.requestId,
+    route: context.route,
+    method: context.method,
+    path: context.path,
+    durationMs: Date.now() - context.startedAt,
+    error
+  });
+}
+
+function logApiWorkflowEvent(args: {
+  event: string;
+  source: string;
+  httpLogContext?: HttpRequestLogContext;
+  operationId?: string | null;
+  sessionId?: string | null;
+  jobId?: string | null;
+  level?: "debug" | "info" | "warn" | "error";
+  durationMs?: number | null;
+  details?: Record<string, unknown>;
+  error?: unknown;
+}): void {
+  void logRuntimeEvent(projectRoot, {
+    event: args.event,
+    level: args.level ?? "info",
+    source: args.source,
+    requestId: args.httpLogContext?.requestId ?? null,
+    operationId: args.operationId ?? args.httpLogContext?.requestId ?? null,
+    sessionId: args.sessionId ?? null,
+    jobId: args.jobId ?? null,
+    route: args.httpLogContext?.route ?? null,
+    method: args.httpLogContext?.method ?? null,
+    path: args.httpLogContext?.path ?? null,
+    durationMs: args.durationMs ?? null,
+    details: args.details ?? null,
+    error: args.error
+  });
+}
+
 async function serveAbsoluteFile(
   response: ServerResponse,
   absolutePath: string,
@@ -281,6 +396,7 @@ async function buildBootstrapResponse(
       difficulty: PHASE1_DEFAULTS.difficulty,
       gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
       backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
+      comicGenerationInterval: PHASE1_DEFAULTS.comicGenerationInterval,
       modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
       modelProfileId: PHASE1_DEFAULTS.modelProfileId,
       imageProfileId: PHASE1_DEFAULTS.imageProfileId,
@@ -310,7 +426,8 @@ async function buildBootstrapResponse(
 
 async function handleApiRequest(
   request: IncomingMessage,
-  response: ServerResponse
+  response: ServerResponse,
+  httpLogContext?: HttpRequestLogContext
 ): Promise<boolean> {
   if (!request.url) {
     return false;
@@ -376,12 +493,44 @@ async function handleApiRequest(
   if (url.pathname === "/api/sessions" && request.method === "POST") {
     const payload = await readJsonBody<CreateSessionRequest>(request);
     const snapshot = await createSessionSnapshot(contentRoot, payload, store);
+    logApiWorkflowEvent({
+      event: "session.create.completed",
+      source: "session",
+      httpLogContext,
+      sessionId: snapshot.session.id,
+      details: {
+        ruleDirectoryName: payload.ruleDirectoryName,
+        storyDirectoryName: payload.storyDirectoryName,
+        playMode: payload.playMode,
+        gmArchitecture: payload.gmArchitecture,
+        modelAccessMode: payload.modelAccessMode,
+        modelProfileId: payload.modelProfileId ?? null,
+        currentRound: snapshot.session.currentRound,
+        status: snapshot.session.status
+      }
+    });
     sendJson(response, 201, snapshot);
     return true;
   }
 
   if (url.pathname === "/api/sessions/stream" && request.method === "POST") {
     const payload = await readJsonBody<CreateSessionRequest>(request);
+    const operationId = buildRuntimeOperationId("session_create");
+    const operationStartedAt = Date.now();
+    logApiWorkflowEvent({
+      event: "session.create.started",
+      source: "session",
+      httpLogContext,
+      operationId,
+      details: {
+        ruleDirectoryName: payload.ruleDirectoryName,
+        storyDirectoryName: payload.storyDirectoryName,
+        playMode: payload.playMode,
+        gmArchitecture: payload.gmArchitecture,
+        modelAccessMode: payload.modelAccessMode,
+        modelProfileId: payload.modelProfileId ?? null
+      }
+    });
 
     response.writeHead(200, {
       "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -394,6 +543,14 @@ async function handleApiRequest(
     try {
       const snapshot = await createSessionSnapshotWithProgress(contentRoot, payload, store, {
         onStage: async (event) => {
+          logApiWorkflowEvent({
+            event: "session.create.stage",
+            source: "session",
+            httpLogContext,
+            operationId,
+            details: event
+          });
+
           if (response.writableEnded || response.destroyed) {
             return;
           }
@@ -406,6 +563,19 @@ async function handleApiRequest(
       });
 
       if (!response.writableEnded && !response.destroyed) {
+        logApiWorkflowEvent({
+          event: "session.create.completed",
+          source: "session",
+          httpLogContext,
+          operationId,
+          sessionId: snapshot.session.id,
+          durationMs: Date.now() - operationStartedAt,
+          details: {
+            currentRound: snapshot.session.currentRound,
+            status: snapshot.session.status,
+            storyTitle: snapshot.contentSummary.storyTitle
+          }
+        });
         sendSessionCreateEvent(response, {
           type: "done",
           snapshot
@@ -414,6 +584,15 @@ async function handleApiRequest(
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      logApiWorkflowEvent({
+        event: "session.create.failed",
+        source: "session",
+        httpLogContext,
+        operationId,
+        level: "error",
+        durationMs: Date.now() - operationStartedAt,
+        error
+      });
       if (!response.writableEnded && !response.destroyed) {
         sendSessionCreateEvent(response, {
           type: "error",
@@ -612,11 +791,11 @@ async function handleApiRequest(
           result
         });
         response.end();
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!response.writableEnded && !response.destroyed) {
-        sendContentGeneratorEvent(response, {
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!response.writableEnded && !response.destroyed) {
+      sendContentGeneratorEvent(response, {
           type: "error",
           message
         });
@@ -931,6 +1110,7 @@ async function handleApiRequest(
   ) {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/rounds/prepare", "");
     const payload = await readJsonBody<PrepareRoundRequest>(request);
+    const operationStartedAt = Date.now();
     const snapshot = await prepareRound(sessionId, payload, store);
 
     if (!snapshot) {
@@ -941,6 +1121,18 @@ async function handleApiRequest(
       return true;
     }
 
+    logApiWorkflowEvent({
+      event: "session.round.prepare.completed",
+      source: "session",
+      httpLogContext,
+      sessionId,
+      durationMs: Date.now() - operationStartedAt,
+      details: {
+        playerInputChars: payload.playerInput?.length ?? 0,
+        currentRound: snapshot.session.currentRound,
+        status: snapshot.session.status
+      }
+    });
     sendJson(response, 200, snapshot);
     return true;
   }
@@ -954,6 +1146,18 @@ async function handleApiRequest(
       .replace("/api/sessions/", "")
       .replace("/rounds/commit/stream", "");
     const payload = await readJsonBody<CommitRoundRequest>(request);
+    const operationId = buildRuntimeOperationId("session_round_commit");
+    const operationStartedAt = Date.now();
+    logApiWorkflowEvent({
+      event: "session.round.commit.started",
+      source: "session",
+      httpLogContext,
+      operationId,
+      sessionId,
+      details: {
+        playerInputChars: payload.playerInput?.length ?? 0
+      }
+    });
 
     response.writeHead(200, {
       "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -966,6 +1170,15 @@ async function handleApiRequest(
     try {
       const snapshot = await commitPreparedRound(sessionId, payload, store, contentRoot, {
         onStage: async (event) => {
+          logApiWorkflowEvent({
+            event: "session.round.commit.stage",
+            source: "session",
+            httpLogContext,
+            operationId,
+            sessionId,
+            details: event
+          });
+
           if (response.writableEnded || response.destroyed) {
             return;
           }
@@ -978,6 +1191,18 @@ async function handleApiRequest(
       });
 
       if (!snapshot) {
+        logApiWorkflowEvent({
+          event: "session.round.commit.failed",
+          source: "session",
+          httpLogContext,
+          operationId,
+          sessionId,
+          level: "warn",
+          durationMs: Date.now() - operationStartedAt,
+          details: {
+            reason: "SESSION_NOT_FOUND"
+          }
+        });
         if (!response.writableEnded && !response.destroyed) {
           sendTurnResolutionEvent(response, {
             type: "error",
@@ -989,6 +1214,19 @@ async function handleApiRequest(
       }
 
       if (!response.writableEnded && !response.destroyed) {
+        logApiWorkflowEvent({
+          event: "session.round.commit.completed",
+          source: "session",
+          httpLogContext,
+          operationId,
+          sessionId,
+          durationMs: Date.now() - operationStartedAt,
+          details: {
+            currentRound: snapshot.session.currentRound,
+            status: snapshot.session.status,
+            endingReached: Boolean(snapshot.session.gameState.endingState)
+          }
+        });
         sendTurnResolutionEvent(response, {
           type: "done",
           snapshot
@@ -997,6 +1235,16 @@ async function handleApiRequest(
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      logApiWorkflowEvent({
+        event: "session.round.commit.failed",
+        source: "session",
+        httpLogContext,
+        operationId,
+        sessionId,
+        level: "error",
+        durationMs: Date.now() - operationStartedAt,
+        error
+      });
       if (!response.writableEnded && !response.destroyed) {
         sendTurnResolutionEvent(response, {
           type: "error",
@@ -1016,6 +1264,7 @@ async function handleApiRequest(
   ) {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/rounds/commit", "");
     const payload = await readJsonBody<CommitRoundRequest>(request);
+    const operationStartedAt = Date.now();
     const snapshot = await commitPreparedRound(sessionId, payload, store, contentRoot);
 
     if (!snapshot) {
@@ -1026,6 +1275,19 @@ async function handleApiRequest(
       return true;
     }
 
+    logApiWorkflowEvent({
+      event: "session.round.commit.completed",
+      source: "session",
+      httpLogContext,
+      sessionId,
+      durationMs: Date.now() - operationStartedAt,
+      details: {
+        playerInputChars: payload.playerInput?.length ?? 0,
+        currentRound: snapshot.session.currentRound,
+        status: snapshot.session.status,
+        endingReached: Boolean(snapshot.session.gameState.endingState)
+      }
+    });
     sendJson(response, 200, snapshot);
     return true;
   }
@@ -1116,6 +1378,7 @@ async function handleApiRequest(
   if (url.pathname.startsWith("/api/sessions/") && url.pathname.endsWith("/turns") && request.method === "POST") {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns", "");
     const payload = await readJsonBody<SubmitTurnRequest>(request);
+    const operationStartedAt = Date.now();
     const snapshot = await submitTurn(sessionId, payload, store, contentRoot);
 
     if (!snapshot) {
@@ -1126,6 +1389,19 @@ async function handleApiRequest(
       return true;
     }
 
+    logApiWorkflowEvent({
+      event: "session.turn.completed",
+      source: "session",
+      httpLogContext,
+      sessionId,
+      durationMs: Date.now() - operationStartedAt,
+      details: {
+        playerInputChars: payload.playerInput?.length ?? 0,
+        currentRound: snapshot.session.currentRound,
+        status: snapshot.session.status,
+        endingReached: Boolean(snapshot.session.gameState.endingState)
+      }
+    });
     sendJson(response, 200, snapshot);
     return true;
   }
@@ -1137,6 +1413,18 @@ async function handleApiRequest(
   ) {
     const sessionId = url.pathname.replace("/api/sessions/", "").replace("/turns/stream", "");
     const payload = await readJsonBody<SubmitTurnRequest>(request);
+    const operationId = buildRuntimeOperationId("session_turn");
+    const operationStartedAt = Date.now();
+    logApiWorkflowEvent({
+      event: "session.turn.started",
+      source: "session",
+      httpLogContext,
+      operationId,
+      sessionId,
+      details: {
+        playerInputChars: payload.playerInput?.length ?? 0
+      }
+    });
 
     response.writeHead(200, {
       "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -1149,6 +1437,15 @@ async function handleApiRequest(
     try {
       const snapshot = await submitTurn(sessionId, payload, store, contentRoot, {
         onStage: async (event) => {
+          logApiWorkflowEvent({
+            event: "session.turn.stage",
+            source: "session",
+            httpLogContext,
+            operationId,
+            sessionId,
+            details: event
+          });
+
           if (response.writableEnded || response.destroyed) {
             return;
           }
@@ -1161,6 +1458,18 @@ async function handleApiRequest(
       });
 
       if (!snapshot) {
+        logApiWorkflowEvent({
+          event: "session.turn.failed",
+          source: "session",
+          httpLogContext,
+          operationId,
+          sessionId,
+          level: "warn",
+          durationMs: Date.now() - operationStartedAt,
+          details: {
+            reason: "SESSION_NOT_FOUND"
+          }
+        });
         if (!response.writableEnded && !response.destroyed) {
           sendTurnResolutionEvent(response, {
             type: "error",
@@ -1172,6 +1481,19 @@ async function handleApiRequest(
       }
 
       if (!response.writableEnded && !response.destroyed) {
+        logApiWorkflowEvent({
+          event: "session.turn.completed",
+          source: "session",
+          httpLogContext,
+          operationId,
+          sessionId,
+          durationMs: Date.now() - operationStartedAt,
+          details: {
+            currentRound: snapshot.session.currentRound,
+            status: snapshot.session.status,
+            endingReached: Boolean(snapshot.session.gameState.endingState)
+          }
+        });
         sendTurnResolutionEvent(response, {
           type: "done",
           snapshot
@@ -1180,6 +1502,16 @@ async function handleApiRequest(
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      logApiWorkflowEvent({
+        event: "session.turn.failed",
+        source: "session",
+        httpLogContext,
+        operationId,
+        sessionId,
+        level: "error",
+        durationMs: Date.now() - operationStartedAt,
+        error
+      });
       if (!response.writableEnded && !response.destroyed) {
         sendTurnResolutionEvent(response, {
           type: "error",
@@ -1332,8 +1664,23 @@ async function handleApiRequest(
 }
 
 const server = createServer(async (request, response) => {
+  const httpLogContext = buildHttpRequestLogContext(request);
+  let didLogHttpEnd = false;
+
+  logHttpRequestStart(httpLogContext, request);
+  response.once("finish", () => {
+    didLogHttpEnd = true;
+    logHttpRequestEnd(httpLogContext, response);
+  });
+  response.once("close", () => {
+    if (!didLogHttpEnd) {
+      didLogHttpEnd = true;
+      logHttpRequestEnd(httpLogContext, response, "http.request.aborted");
+    }
+  });
+
   try {
-    const handledByApi = await handleApiRequest(request, response);
+    const handledByApi = await handleApiRequest(request, response, httpLogContext);
     if (handledByApi) {
       return;
     }
@@ -1355,14 +1702,31 @@ const server = createServer(async (request, response) => {
 
     sendText(response, 404, "Not Found");
   } catch (error: unknown) {
+    logHttpRequestError(httpLogContext, error);
     const message = error instanceof Error ? error.message : String(error);
-    sendJson(response, 500, {
-      error: "INTERNAL_SERVER_ERROR",
-      message
-    });
+    if (!response.headersSent && !response.writableEnded && !response.destroyed) {
+      sendJson(response, 500, {
+        error: "INTERNAL_SERVER_ERROR",
+        message
+      });
+      return;
+    }
+
+    if (!response.writableEnded && !response.destroyed) {
+      response.end();
+    }
   }
 });
 
 server.listen(port, () => {
   console.log(`Phase 2 transition server is running at http://127.0.0.1:${port}`);
+  void logRuntimeEvent(projectRoot, {
+    event: "server.listen",
+    source: "server",
+    details: {
+      port,
+      contentRoot,
+      webDistRoot
+    }
+  });
 });

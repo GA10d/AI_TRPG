@@ -3,6 +3,7 @@ import type {
   PersistedComicProject,
   SaveBundle
 } from "../../../../packages/shared-types/src/index.ts";
+import { normalizeComicGenerationInterval } from "../comicSchedule.ts";
 
 type ExportParticipantMap = Map<string, string>;
 
@@ -361,9 +362,19 @@ export function buildCombinedComicExportSegments(
     return segments;
   }
 
-  for (let roundStart = 2; roundStart <= maxRound; roundStart += 3) {
-    const roundEnd = Math.min(roundStart + 2, maxRound);
-    const comicPageNumber = 2 + Math.floor((roundStart - 2) / 3);
+  const comicGenerationInterval = normalizeComicGenerationInterval(
+    saveBundle.session.settings.comicGenerationInterval ??
+      saveBundle.runtimeConfig?.comicGenerationInterval
+  );
+
+  for (
+    let roundStart = 2;
+    roundStart <= maxRound;
+    roundStart += comicGenerationInterval
+  ) {
+    const roundEnd = Math.min(roundStart + comicGenerationInterval - 1, maxRound);
+    const comicPageNumber =
+      2 + Math.floor((roundStart - 2) / comicGenerationInterval);
     const comicPage = pagesByNumber.get(comicPageNumber) ?? null;
 
     segments.push({

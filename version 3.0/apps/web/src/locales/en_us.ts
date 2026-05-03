@@ -795,6 +795,9 @@ export const enUs = {
         "Comic style presets could not be loaded right now. If you start anyway, the backend will fall back to its default style.",
       comicStyleLoadingOption: "Loading comic styles...",
       comicStyleUnavailableOption: "Comic styles unavailable",
+      comicIntervalLabel: "Comic Interval",
+      comicIntervalHint:
+        "The first round still creates one page; after that, a page is generated every N rounds, with an extra page on the ending round.",
       logViewLabel: "Log View",
       logViewHint: "Adjust log detail for play or debugging.",
       previewDeliveryLabel: "Opening Delivery",
@@ -835,6 +838,7 @@ export const enUs = {
       accessMode: (value: string) => `Access: ${value}`,
       profile: (value: string) => `Profile: ${value}`,
       comicStyle: (value: string) => `Comic style: ${value}`,
+      comicInterval: (value: number) => `Comic pace: every ${value} rounds`,
       resolvedModel: (value: string) => `Actual model: ${value}`,
       status: (value: string) => `Status: ${value}`,
       message: (value: string) => `Notes: ${value}`,

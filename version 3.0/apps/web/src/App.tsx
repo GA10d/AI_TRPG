@@ -61,6 +61,7 @@ import { ExitPage } from "./pages/ExitPage.tsx";
 import { GameBootstrapPage } from "./pages/GameBootstrapPage.tsx";
 import { GamePage } from "./pages/GamePage.tsx";
 import { GameSetupPage } from "./pages/GameSetupPage.tsx";
+import { normalizeComicGenerationInterval } from "./comicSchedule.ts";
 import {
   UiTextProvider,
   getUiTextByLocale,
@@ -601,6 +602,9 @@ function buildWorldlineComicPlan(
     return null;
   }
 
+  const comicGenerationInterval = normalizeComicGenerationInterval(
+    snapshot.session.settings.comicGenerationInterval
+  );
   const endingRound = snapshot.session.gameState.endingState?.confirmedAtRound ?? null;
   const isEndingRound = endingRound !== null && endingRound === currentRound;
 
@@ -611,10 +615,13 @@ function buildWorldlineComicPlan(
     pageIndex = 0;
     roundStart = 0;
   } else if (isEndingRound) {
-    pageIndex = 1 + Math.floor(Math.max(currentRound - 2, 0) / 3);
-  } else if ((currentRound - 1) % 3 === 0) {
-    pageIndex = 1 + Math.floor((currentRound - 4) / 3);
-    roundStart = Math.max(2, currentRound - 2);
+    pageIndex =
+      1 + Math.floor(Math.max(currentRound - 2, 0) / comicGenerationInterval);
+    roundStart = Math.max(2, 2 + (pageIndex - 1) * comicGenerationInterval);
+  } else if ((currentRound - 1) % comicGenerationInterval === 0) {
+    pageIndex =
+      1 + Math.floor((currentRound - 2) / comicGenerationInterval);
+    roundStart = Math.max(2, currentRound - comicGenerationInterval + 1);
   }
 
   if (pageIndex === null) {
@@ -722,6 +729,7 @@ export function App() {
     runtimeImageModelConfig,
     imageProfileRuntimeConfigs,
     comicStyleId,
+    comicGenerationInterval,
     imagePromptTemplateConfig,
     debugEnabled,
     logViewMode,
@@ -747,6 +755,7 @@ export function App() {
     setImageProfileRuntimeConfig,
     clearImageProfileRuntimeConfigs,
     setComicStyleId,
+    setComicGenerationInterval,
     setImagePromptTemplateConfig,
     setDebugEnabled,
     setLogViewMode,
@@ -1537,6 +1546,7 @@ export function App() {
 
     return {
       modelProfileId: profileIdOverride ?? modelProfileId,
+      comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
       runtimeModelConfig: normalizeRuntimeConfig(runtimeModelConfig),
       roleModelConfigs:
         roleModelConfigs.narrator || roleModelConfigs.participants
@@ -1554,6 +1564,9 @@ export function App() {
         profileIdOverride ??
         currentSnapshot?.session.settings.modelProfileId ??
         modelProfileId,
+      comicGenerationInterval:
+        currentSnapshot?.session.settings.comicGenerationInterval ??
+        normalizeComicGenerationInterval(comicGenerationInterval),
       runtimeModelConfig: currentSnapshot
         ? undefined
         : normalizeRuntimeConfig(runtimeModelConfig)
@@ -1733,6 +1746,7 @@ export function App() {
       runtimeImageModelConfig,
       imageProfileRuntimeConfigs,
       comicStyleId: resolvedComicStyleId ?? comicStyleId,
+      comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
       imagePromptTemplateConfig:
         imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
       debugEnabled,
@@ -1761,6 +1775,7 @@ export function App() {
       runtimeImageModelConfig,
       imageProfileRuntimeConfigs,
       comicStyleId: resolvedComicStyleId ?? comicStyleId,
+      comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
       imagePromptTemplateConfig:
         imagePromptTemplateConfig ?? bootstrap?.imagePromptTemplateConfig,
       debugEnabled,
@@ -2051,6 +2066,7 @@ export function App() {
           logViewMode,
           difficulty,
           backgroundCompressionEnabled,
+          comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
           debugEnabled,
           promptDebugEnabled: false,
           modelProfileId: effectiveNarratorSelection.modelProfileId
@@ -2587,6 +2603,7 @@ export function App() {
           difficulty,
           gmArchitecture,
           backgroundCompressionEnabled,
+          comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
           modelAccessMode,
           characterConcept,
           modelProfileId,
@@ -3193,6 +3210,9 @@ export function App() {
     setImageProfileId(bootstrap.defaults.imageProfileId);
     clearImageProfileRuntimeConfigs();
     setComicStyleId(resolveComicStyleId(availableComicStyles, undefined) ?? "");
+    setComicGenerationInterval(
+      normalizeComicGenerationInterval(bootstrap.defaults.comicGenerationInterval)
+    );
     setImagePromptTemplateConfig(bootstrap.imagePromptTemplateConfig);
     setLogViewMode(bootstrap.defaults.logViewMode);
     setOpeningPreviewDeliveryMode("stream");
@@ -3529,6 +3549,9 @@ export function App() {
           comicStyles={availableComicStyles}
           comicStylesLoading={comicPromptPresetsLoading}
           comicStylesError={comicPromptPresetsError}
+          comicGenerationInterval={normalizeComicGenerationInterval(
+            comicGenerationInterval
+          )}
           debugEnabled={debugEnabled}
           logViewMode={logViewMode}
           openingPreviewDeliveryMode={openingPreviewDeliveryMode}
@@ -3567,6 +3590,9 @@ export function App() {
           onImageProfileIdChange={setImageProfileId}
           onImageProfileRuntimeConfigChange={setImageProfileRuntimeConfig}
           onComicStyleIdChange={setComicStyleId}
+          onComicGenerationIntervalChange={(value) =>
+            setComicGenerationInterval(normalizeComicGenerationInterval(value))
+          }
           onDebugEnabledChange={setDebugEnabled}
           onLogViewModeChange={setLogViewMode}
           onRegenerateOpeningPreview={handleRegenerateOpeningPreview}

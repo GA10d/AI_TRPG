@@ -12,6 +12,11 @@ import type {
   RuntimeImageModelConfigInput
 } from "../../../../packages/shared-types/src/index.ts";
 import { getImageProviderConfig } from "./config.ts";
+import type { ImageProviderConfig } from "./config.ts";
+import {
+  buildRuntimeOperationId,
+  logRuntimeEvent
+} from "../runtime_logging.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../../..");
@@ -779,6 +784,71 @@ async function buildGeminiParts(
   return parts;
 }
 
+function summarizeImageGenerationRequest(
+  request: ImageGenerationRequest,
+  finalPrompt: string,
+  providerConfig: ImageProviderConfig
+): Record<string, unknown> {
+  return {
+    trigger: request.trigger,
+    sceneId: request.sceneId ?? null,
+    theme: request.theme ?? null,
+    basePromptChars: request.prompt.trim().length,
+    finalPromptChars: finalPrompt.length,
+    hasNegativePrompt: Boolean(request.negativePrompt?.trim()),
+    characterCount: request.characters?.length ?? 0,
+    referenceImageCount: request.referenceImages?.length ?? 0,
+    allowFallback: request.allowFallback !== false,
+    imageProfileId: request.imageProfileId ?? providerConfig.profileId,
+    providerProfileId: providerConfig.profileId,
+    providerProfileCode: providerConfig.profileCode,
+    providerDependence: providerConfig.dependence,
+    providerLabel: providerConfig.providerLabel,
+    model: providerConfig.model,
+    baseUrl: providerConfig.baseUrl,
+    configured: Boolean(
+      providerConfig.dependence === "Mock" ||
+        (providerConfig.baseUrl && providerConfig.apiKey && providerConfig.model)
+    ),
+    runtimeOptions: {
+      imageSize: pickRuntimeImageString(request.runtimeImageModelConfig, "imageSize") ?? null,
+      aspectRatio: pickRuntimeImageString(request.runtimeImageModelConfig, "aspectRatio") ?? null,
+      quality: pickRuntimeImageString(request.runtimeImageModelConfig, "quality") ?? null,
+      outputFormat: pickRuntimeImageString(request.runtimeImageModelConfig, "outputFormat") ?? null,
+      watermark: pickRuntimeImageBoolean(request.runtimeImageModelConfig, "watermark") ?? null
+    }
+  };
+}
+
+function logImageGenerationEvent(args: {
+  operationId: string;
+  event: string;
+  level?: "debug" | "info" | "warn" | "error";
+  startedAt: number;
+  request: ImageGenerationRequest;
+  finalPrompt: string;
+  providerConfig: ImageProviderConfig;
+  details?: Record<string, unknown>;
+  error?: unknown;
+}): void {
+  void logRuntimeEvent(projectRoot, {
+    event: args.event,
+    level: args.level ?? "info",
+    source: "image_generation",
+    operationId: args.operationId,
+    durationMs: Date.now() - args.startedAt,
+    details: {
+      request: summarizeImageGenerationRequest(
+        args.request,
+        args.finalPrompt,
+        args.providerConfig
+      ),
+      ...args.details
+    },
+    error: args.error
+  });
+}
+
 export async function generateImage(
   request: ImageGenerationRequest
 ): Promise<ImageGenerationResponse> {
@@ -796,6 +866,19 @@ export async function generateImage(
     runtimeImageModelConfig: request.runtimeImageModelConfig
   });
   const cacheKey = buildCacheKey(request, finalPrompt, providerConfig.model);
+  const operationId = buildRuntimeOperationId("image");
+  const startedAt = Date.now();
+  let providerError: unknown = null;
+
+  logImageGenerationEvent({
+    operationId,
+    event: "image_generation.start",
+    level: "debug",
+    startedAt,
+    request,
+    finalPrompt,
+    providerConfig
+  });
 
   try {
     if (
@@ -815,7 +898,7 @@ export async function generateImage(
         aspectRatio: pickRuntimeImageString(request.runtimeImageModelConfig, "aspectRatio")
       });
 
-      return {
+      const response: ImageGenerationResponse = {
         imageUrl: generated.imageUrl,
         revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
         provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
@@ -823,6 +906,20 @@ export async function generateImage(
         mimeType: generated.mimeType,
         outputPath: null
       };
+      logImageGenerationEvent({
+        operationId,
+        event: "image_generation.success",
+        startedAt,
+        request,
+        finalPrompt,
+        providerConfig,
+        details: {
+          provider: response.provider,
+          mimeType: response.mimeType,
+          revisedPromptChars: response.revisedPrompt.length
+        }
+      });
+      return response;
     }
 
     if (
@@ -856,7 +953,7 @@ export async function generateImage(
               )
             });
 
-      return {
+      const response: ImageGenerationResponse = {
         imageUrl: generated.imageUrl,
         revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
         provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
@@ -864,6 +961,20 @@ export async function generateImage(
         mimeType: generated.mimeType,
         outputPath: null
       };
+      logImageGenerationEvent({
+        operationId,
+        event: "image_generation.success",
+        startedAt,
+        request,
+        finalPrompt,
+        providerConfig,
+        details: {
+          provider: response.provider,
+          mimeType: response.mimeType,
+          revisedPromptChars: response.revisedPrompt.length
+        }
+      });
+      return response;
     }
 
     if (
@@ -882,7 +993,7 @@ export async function generateImage(
         watermark: pickRuntimeImageBoolean(request.runtimeImageModelConfig, "watermark")
       });
 
-      return {
+      const response: ImageGenerationResponse = {
         imageUrl: generated.imageUrl,
         revisedPrompt: generated.revisedPrompt?.trim() || finalPrompt,
         provider: `${providerConfig.providerLabel}:${providerConfig.model}`,
@@ -890,15 +1001,41 @@ export async function generateImage(
         mimeType: generated.mimeType,
         outputPath: null
       };
+      logImageGenerationEvent({
+        operationId,
+        event: "image_generation.success",
+        startedAt,
+        request,
+        finalPrompt,
+        providerConfig,
+        details: {
+          provider: response.provider,
+          mimeType: response.mimeType,
+          revisedPromptChars: response.revisedPrompt.length
+        }
+      });
+      return response;
     }
   } catch (error) {
+    providerError = error;
+    logImageGenerationEvent({
+      operationId,
+      event: "image_generation.provider_error",
+      level: request.allowFallback === false ? "error" : "warn",
+      startedAt,
+      request,
+      finalPrompt,
+      providerConfig,
+      error
+    });
+
     if (request.allowFallback === false) {
       throw error;
     }
   }
 
   const fallbackTheme = request.theme?.trim() || promptTemplateConfig.defaultTheme;
-  return {
+  const response: ImageGenerationResponse = {
     imageUrl: buildMockSvg(finalPrompt, fallbackTheme),
     revisedPrompt: finalPrompt,
     provider:
@@ -909,4 +1046,22 @@ export async function generateImage(
     mimeType: "image/svg+xml",
     outputPath: null
   };
+  logImageGenerationEvent({
+    operationId,
+    event: providerConfig.dependence === "Mock" ? "image_generation.mock" : "image_generation.fallback",
+    level: providerConfig.dependence === "Mock" ? "info" : "warn",
+    startedAt,
+    request,
+    finalPrompt,
+    providerConfig,
+    details: {
+      provider: response.provider,
+      mimeType: response.mimeType,
+      fallbackTheme,
+      fallbackReason:
+        providerError instanceof Error ? providerError.message : providerError ? String(providerError) : null
+    },
+    error: providerError
+  });
+  return response;
 }

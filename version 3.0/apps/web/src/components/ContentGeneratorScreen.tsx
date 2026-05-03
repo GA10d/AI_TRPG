@@ -256,9 +256,14 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
   const result = activeJob?.result ?? null;
   const isJobActive = activeJob?.status === "queued" || activeJob?.status === "running";
   const displayError = error || (activeJob?.status === "failed" ? activeJob.error ?? "" : "");
+  const isStoryAssetsOnlyMode = mode === "story_assets_only";
+  const isExistingRuleStoryMode = mode === "story_only" || isStoryAssetsOnlyMode;
+  const isStoryInputMode =
+    mode === "story_only" || mode === "rule_and_story" || isStoryAssetsOnlyMode;
+  const effectiveGenerateImages = isStoryAssetsOnlyMode ? true : generateImages;
 
   useEffect(() => {
-    if (mode === "story_only") {
+    if (isExistingRuleStoryMode) {
       if (!associatedRuleDirectoryName && ruleOptions[0]?.directoryName) {
         setAssociatedRuleDirectoryName(ruleOptions[0].directoryName);
       }
@@ -268,7 +273,7 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
     if (mode === "rule_only") {
       setAssociatedRuleDirectoryName("");
     }
-  }, [associatedRuleDirectoryName, mode, ruleOptions]);
+  }, [associatedRuleDirectoryName, isExistingRuleStoryMode, mode, ruleOptions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -374,12 +379,12 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
   }, [activeJob, onGenerationComplete]);
 
   const guessedRuleDirectoryName = useMemo(() => {
-    if (mode === "story_only") {
+    if (isExistingRuleStoryMode) {
       return associatedRuleDirectoryName || "<请选择规则>";
     }
 
     return guessDirectoryName(ruleSource?.fileName, "AUTO_RULE");
-  }, [associatedRuleDirectoryName, mode, ruleSource?.fileName]);
+  }, [associatedRuleDirectoryName, isExistingRuleStoryMode, ruleSource?.fileName]);
 
   const guessedStoryDirectoryName = useMemo(
     () => guessDirectoryName(storySource?.fileName, "AUTO_STORY"),
@@ -391,12 +396,12 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
       return `content/${guessedRuleDirectoryName}/rule/`;
     }
 
-    if (mode === "story_only") {
+    if (isExistingRuleStoryMode) {
       return `content/${guessedRuleDirectoryName}/story/${guessedStoryDirectoryName}/`;
     }
 
     return `content/${guessedRuleDirectoryName}/story/${guessedStoryDirectoryName}/`;
-  }, [guessedRuleDirectoryName, guessedStoryDirectoryName, mode]);
+  }, [guessedRuleDirectoryName, guessedStoryDirectoryName, isExistingRuleStoryMode, mode]);
 
   function updateRuntimeModelConfig(
     patch: Partial<RuntimeModelConfigInput>
@@ -438,7 +443,7 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
       return;
     }
 
-    if (mode === "story_only") {
+    if (isExistingRuleStoryMode) {
       if (!storySource?.content.trim()) {
         setError("请先上传故事文件。");
         return;
@@ -465,10 +470,10 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
       mode,
       locale,
       associatedRuleDirectoryName:
-        mode === "story_only" ? associatedRuleDirectoryName : undefined,
+        isExistingRuleStoryMode ? associatedRuleDirectoryName : undefined,
       ruleSource,
       storySource,
-      generateImages,
+      generateImages: effectiveGenerateImages,
       forceOverwrite,
       modelAccessMode,
       modelProfileId,
@@ -495,7 +500,7 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
     <section className="panel page-panel content-generator-page">
       <ScreenHeader
         title="内容生成器"
-        description="上传规则文件、故事文件，自动生成 version 3.0 所需内容包。支持单独上传规则、单独上传故事，以及规则与故事同时上传。"
+        description="上传规则文件、故事文件，自动生成 version 3.0 所需内容包。支持单独上传规则、单独上传故事、同时上传规则与故事，以及只为现有剧本补齐素材。"
         onBack={onBack}
         onClose={onClose}
       />
@@ -508,7 +513,8 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
               {[
                 { value: "rule_only", label: "上传规则" },
                 { value: "story_only", label: "上传故事" },
-                { value: "rule_and_story", label: "同时上传规则与故事" }
+                { value: "rule_and_story", label: "同时上传规则与故事" },
+                { value: "story_assets_only", label: "补齐素材" }
               ].map((option) => (
                 <button
                   className={`ghost-button content-generator-mode-button ${
@@ -517,6 +523,9 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
                   key={option.value}
                   onClick={() => {
                     setMode(option.value as ContentGeneratorMode);
+                    if (option.value === "story_assets_only") {
+                      setGenerateImages(true);
+                    }
                     setError("");
                   }}
                   type="button"
@@ -560,12 +569,16 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
             </div>
           ) : null}
 
-          {(mode === "story_only" || mode === "rule_and_story") ? (
+          {isStoryInputMode ? (
             <div className="content-generator-card">
               <div className="content-generator-card-head">
                 <div>
                   <div className="eyebrow">故事文件</div>
-                  <div className="summary-text">支持上传旧版剧本文本，系统会自动拆成 3.0 所需文件。</div>
+                  <div className="summary-text">
+                    {isStoryAssetsOnlyMode
+                      ? "上传现有剧本，正文会原样写入 story.md，只补齐封面、美术素材和运行所需文件。"
+                      : "支持上传旧版剧本文本，系统会自动拆成 3.0 所需文件。"}
+                  </div>
                 </div>
                 <div className="record-tag">{storySource?.fileName ?? "未上传"}</div>
               </div>
@@ -593,11 +606,13 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
             </div>
           ) : null}
 
-          {mode === "story_only" ? (
+          {isExistingRuleStoryMode ? (
             <div className="content-generator-card">
               <div className="eyebrow">关联规则</div>
               <div className="summary-text">
-                单独上传故事时，必须明确它要挂到哪套规则下面。
+                {isStoryAssetsOnlyMode
+                  ? "补齐素材时，必须明确这个剧本要挂到哪套规则下面。"
+                  : "单独上传故事时，必须明确它要挂到哪套规则下面。"}
               </div>
               {ruleOptions.length > 0 ? (
                 <select
@@ -632,12 +647,18 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
             <div className="eyebrow">生成选项</div>
             <label className="content-generator-checkbox">
               <input
-                checked={generateImages}
+                checked={effectiveGenerateImages}
+                disabled={isStoryAssetsOnlyMode}
                 onChange={(event) => setGenerateImages(event.currentTarget.checked)}
                 type="checkbox"
               />
               生成封面图与 other 图
             </label>
+            {isStoryAssetsOnlyMode ? (
+              <div className="summary-text">
+                补齐素材模式会固定开启图片生成，并保留上传剧本文本不改写。
+              </div>
+            ) : null}
             <label className="content-generator-checkbox">
               <input
                 checked={forceOverwrite}
@@ -838,7 +859,9 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
             <div className="eyebrow">目标输出路径</div>
             <div className="summary-title content-generator-path">{targetPathPreview}</div>
             <div className="summary-text">
-              单独上传故事时，路径会固定落到你选择的规则目录下。
+              {isStoryAssetsOnlyMode
+                ? "补齐素材会把上传剧本原样写入目标故事目录，只补齐 manifest、intro、开场、NPC prompt 和 art_assets。"
+                : "单独上传故事时，路径会固定落到你选择的规则目录下。"}
             </div>
           </div>
 
@@ -846,7 +869,7 @@ export function ContentGeneratorScreen(props: ContentGeneratorScreenProps) {
             <div className="eyebrow">操作</div>
             <button
               className="primary-button content-generator-submit"
-              disabled={isSubmittingJob || isJobActive || (mode === "story_only" && ruleOptions.length === 0)}
+              disabled={isSubmittingJob || isJobActive || (isExistingRuleStoryMode && ruleOptions.length === 0)}
               onClick={() => void handleGenerate()}
               type="button"
             >

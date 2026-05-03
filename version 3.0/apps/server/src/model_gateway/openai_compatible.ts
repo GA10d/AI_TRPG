@@ -403,6 +403,44 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   }
 }
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    error.name === "AbortError" ||
+    message.includes("operation was aborted")
+  );
+}
+
+function normalizeServerProxyError(
+  error: unknown,
+  config: ServerProxyConfig,
+  operationLabel: string
+): Error {
+  if (!isAbortError(error)) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  const timeoutHint =
+    config.profileId === "deepseek-reasoner"
+      ? "Raise TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS, TRPG_DEEPSEEK_REASONER_TIMEOUT_MS, or TRPG_SERVER_PROXY_TIMEOUT_MS if this model needs more time."
+      : "Raise TRPG_SERVER_PROXY_TIMEOUT_MS if this model needs more time.";
+  const provider = `${config.providerLabel}:${config.model}`;
+
+  return new Error(
+    `${config.profileName} ${operationLabel} timed out after ${Math.round(
+      config.timeoutMs / 1000
+    )}s (profile=${config.profileId}, provider=${provider}). ${timeoutHint}`
+  );
+}
+
 async function emitTextAsChunks(
   text: string,
   options?: StreamTextOptions
@@ -564,6 +602,8 @@ async function callChatCompletion(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeServerProxyError(error, config, "chat completion request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -779,6 +819,8 @@ async function callOpenAiResponsesWithFiles(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeServerProxyError(error, config, "responses request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -878,6 +920,8 @@ async function callOpenAiResponsesWithInlineFiles(
       durationMs: Date.now() - startedAt,
       usage: buildOpenAiUsage(data)
     };
+  } catch (error) {
+    throw normalizeServerProxyError(error, config, "inline responses request");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -1266,6 +1310,8 @@ async function callGeminiGenerateContentWithFiles(
       durationMs: Date.now() - startedAt,
       usage: buildGeminiUsage(data)
     };
+  } catch (error) {
+    throw normalizeServerProxyError(error, config, "Gemini generateContent request");
   } finally {
     clearTimeout(timeoutHandle);
   }

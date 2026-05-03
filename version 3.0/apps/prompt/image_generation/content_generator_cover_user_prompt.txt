@@ -1,0 +1,9 @@
+Story title: {{STORY_TITLE}}
+Cover quote: {{COVER_QUOTE}}
+Story intro: {{STORY_INTRO_PREVIEW}}
+Story tones: {{STORY_TONES}}
+Rule context: {{RULE_CONTEXT_PREVIEW}}
+Asset purpose: {{ASSET_PURPOSE}}
+Visual focus: {{VISUAL_FOCUS}}
+Aspect ratio requirement: 16:9 horizontal widescreen cover art.
+Output exactly one English prompt line.

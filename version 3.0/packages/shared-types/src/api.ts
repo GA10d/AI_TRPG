@@ -94,6 +94,7 @@ export type CreateSessionRequest = {
   modelProfileId?: string;
   runtimeModelConfig?: RuntimeModelConfigInput;
   advancedTextModelConfig?: AdvancedTextModelConfigInput;
+  comicGenerationInterval?: number;
   primaryPlayerDisplayName?: string;
   primaryPlayerPersonalityTagIds?: string[];
   primaryPlayerAppearanceTagIds?: string[];
@@ -117,7 +118,8 @@ export type GenerateOpeningPreviewResponse = {
 export type ContentGeneratorMode =
   | "rule_only"
   | "story_only"
-  | "rule_and_story";
+  | "rule_and_story"
+  | "story_assets_only";
 
 export type ContentGeneratorSourceInput = {
   fileName?: string | null;
@@ -739,6 +741,7 @@ export type BootstrapResponse = {
     difficulty: Difficulty;
     gmArchitecture: GmArchitecture;
     backgroundCompressionEnabled: boolean;
+    comicGenerationInterval: number;
     modelAccessMode: ModelAccessMode;
     modelProfileId: string;
     imageProfileId: string;

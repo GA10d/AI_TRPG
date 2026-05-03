@@ -1,0 +1,3 @@
+Please output assetPlan.
+
+{{STORY_CONTEXT_JSON}}

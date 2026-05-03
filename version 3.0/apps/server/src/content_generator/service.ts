@@ -29,6 +29,7 @@ import { getModelGateway } from "../model_gateway/index.ts";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(currentDir, "../../../../..");
+const contentGeneratorImagePromptDir = join(workspaceRoot, "apps", "prompt", "image_generation");
 const ruleTemplatePath = join(workspaceRoot, "规则范式.md");
 const storyTemplatePath = join(workspaceRoot, "剧本范式.md");
 
@@ -206,6 +207,18 @@ function pickProgressCopy(
   return prefersChineseCopy(locale) ? chineseText : englishText;
 }
 
+function isStoryUploadMode(mode: ContentGeneratorMode): boolean {
+  return mode === "story_only" || mode === "rule_and_story" || mode === "story_assets_only";
+}
+
+function requiresExistingRule(mode: ContentGeneratorMode): boolean {
+  return mode === "story_only" || mode === "story_assets_only";
+}
+
+function shouldGenerateImageAssets(request: ContentGeneratorRequest): boolean {
+  return request.mode === "story_assets_only" || request.generateImages !== false;
+}
+
 function getContentGeneratorStepLabel(
   stepId: ContentGeneratorProgressStepId,
   locale: LocaleCode
@@ -246,7 +259,7 @@ export function buildContentGeneratorProgressPlan(
 ): ContentGeneratorProgressStep[] {
   const stepIds: ContentGeneratorProgressStepId[] = [];
 
-  if (request.mode === "story_only") {
+  if (requiresExistingRule(request.mode)) {
     stepIds.push("load_existing_rule");
   }
 
@@ -254,10 +267,16 @@ export function buildContentGeneratorProgressPlan(
     stepIds.push("extract_rule", "generate_rule");
   }
 
-  if (request.mode === "story_only" || request.mode === "rule_and_story") {
-    stepIds.push("extract_story", "generate_story", "generate_supporting");
+  if (isStoryUploadMode(request.mode)) {
+    stepIds.push("extract_story");
 
-    if (request.generateImages !== false) {
+    if (request.mode !== "story_assets_only") {
+      stepIds.push("generate_story");
+    }
+
+    stepIds.push("generate_supporting");
+
+    if (shouldGenerateImageAssets(request)) {
       stepIds.push("plan_assets");
     }
   }
@@ -265,8 +284,8 @@ export function buildContentGeneratorProgressPlan(
   stepIds.push("write_package");
 
   if (
-    (request.mode === "story_only" || request.mode === "rule_and_story") &&
-    request.generateImages !== false
+    isStoryUploadMode(request.mode) &&
+    shouldGenerateImageAssets(request)
   ) {
     stepIds.push("generate_assets");
   }
@@ -288,6 +307,7 @@ function buildStageProgress(index: number, totalSteps: number): number {
 }
 
 const templateCache = new Map<"rule" | "story", string>();
+const promptTemplateCache = new Map<string, string>();
 
 function clipPreview(content: string | null | undefined, limit = 280): string {
   const normalized = (content ?? "").replace(/\r\n/g, "\n").trim();
@@ -911,6 +931,26 @@ async function loadTemplate(kind: "rule" | "story"): Promise<string> {
   const content = (await readFile(filePath, "utf8")).trim();
   templateCache.set(kind, content);
   return content;
+}
+
+async function loadPromptTemplate(fileName: string, fallbackContent: string): Promise<string> {
+  const cached = promptTemplateCache.get(fileName);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const content = (await readFile(join(contentGeneratorImagePromptDir, fileName), "utf8")).trim();
+    const resolvedContent = content || fallbackContent.trim();
+    promptTemplateCache.set(fileName, resolvedContent);
+    return resolvedContent;
+  } catch {
+    return fallbackContent.trim();
+  }
+}
+
+function renderPromptTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/gu, (match, key: string) => values[key] ?? match);
 }
 
 function buildStructuredTaskRun(task: string, provider: string, mode: ContentGeneratorRequest["modelAccessMode"], meta?: AiGenerationMetadata | null): ContentGeneratorRunMeta {
@@ -1841,14 +1881,14 @@ async function generateNpcPrompt(
   storySpec: StorySpec,
   rulePackage: GeneratedRulePackage | ExistingRuleContext
 ): Promise<string> {
-  const fallbackText = buildNpcPromptFallback(entity, storySpec);
-  const systemPrompt = [
+  const fallbackImagePrompt = buildNpcPromptFallback(entity, storySpec);
+  const fallbackSystemPrompt = [
     "You are a character visual prompt writer.",
     "Return exactly one single-line English prompt for an image model.",
     "Describe only visible appearance and immediate vibe.",
     "Do not reveal plot twists or hidden backstory."
   ].join("\n");
-  const userPrompt = [
+  const fallbackUserPrompt = [
     "Generate one single-line image prompt for this NPC portrait.",
     `Character name: ${entity.name}`,
     `Character type: ${entity.type}`,
@@ -1860,6 +1900,25 @@ async function generateNpcPrompt(
     `Story tones: ${storySpec.tones.join(", ")}`,
     `Worldview/style context: ${clipPreview(rulePackage.ruleText, 500)}`
   ].join("\n");
+  const promptValues = {
+    CHARACTER_NAME: entity.name,
+    CHARACTER_TYPE: entity.type,
+    AGE_RANGE: entity.ageRange,
+    GENDER_PRESENTATION: entity.genderPresentation,
+    VISIBLE_APPEARANCE: entity.appearance,
+    SURFACE_IMPRESSION: entity.surfaceImpression,
+    PROPS: entity.props,
+    STORY_TONES: storySpec.tones.join(", "),
+    WORLDVIEW_STYLE_CONTEXT: clipPreview(rulePackage.ruleText, 500)
+  };
+  const [fallbackTemplate, systemTemplate, userTemplate] = await Promise.all([
+    loadPromptTemplate("content_generator_npc_portrait_fallback_prompt.txt", fallbackImagePrompt),
+    loadPromptTemplate("content_generator_npc_portrait_system_prompt.txt", fallbackSystemPrompt),
+    loadPromptTemplate("content_generator_npc_portrait_user_prompt.txt", fallbackUserPrompt)
+  ]);
+  const fallbackText = renderPromptTemplate(fallbackTemplate, promptValues);
+  const systemPrompt = renderPromptTemplate(systemTemplate, promptValues);
+  const userPrompt = renderPromptTemplate(userTemplate, promptValues);
 
   return runPromptedTextTask(generationContext, {
     task: `generate_npc_prompt:${entity.id}`,
@@ -1875,7 +1934,7 @@ async function planAssets(
   storySpec: StorySpec
 ): Promise<AssetPlan> {
   const fallbackPlan = buildAssetPlanFallback(storySpec);
-  const systemPrompt = [
+  const fallbackSystemPrompt = [
     "你是叙事美术规划师。",
     buildLanguageSystemPrompt(generationContext.locale),
     "请为剧本生成一个小而实用的美术资产规划。",
@@ -1901,12 +1960,37 @@ async function planAssets(
     )
   ].join("\n");
 
+  const storyContextJson = JSON.stringify(
+    {
+      title: storySpec.title,
+      intro: storySpec.intro,
+      tags: storySpec.tags,
+      tones: storySpec.tones,
+      mainProgressAxis: storySpec.mainProgressAxis,
+      scenes: storySpec.scenes.slice(0, 6),
+      entities: storySpec.entities.slice(0, 6),
+      informationUnits: storySpec.informationUnits.slice(0, 8)
+    },
+    null,
+    2
+  );
+  const promptValues = {
+    LANGUAGE_SYSTEM_PROMPT: buildLanguageSystemPrompt(generationContext.locale),
+    STORY_CONTEXT_JSON: storyContextJson
+  };
+  const [systemTemplate, userTemplate] = await Promise.all([
+    loadPromptTemplate("content_generator_asset_plan_system_prompt.txt", fallbackSystemPrompt),
+    loadPromptTemplate("content_generator_asset_plan_user_prompt.txt", userPrompt)
+  ]);
+  const systemPrompt = renderPromptTemplate(systemTemplate, promptValues);
+  const renderedUserPrompt = renderPromptTemplate(userTemplate, promptValues);
+
   const data = await runStructuredTask(generationContext, {
     task: "plan_assets",
     schemaName: "content_generator_asset_plan",
     outputSchema: buildAssetPlanSchema(),
     systemPrompt,
-    userPrompt
+    userPrompt: renderedUserPrompt
   });
 
   if (!data) {
@@ -1948,22 +2032,23 @@ async function generateCoverPrompt(
   storySpec: StorySpec,
   assetPlan: AssetPlan
 ): Promise<string> {
-  const fallbackText = [
+  const fallbackImagePrompt = [
     storySpec.title,
     storySpec.coverQuote,
     storySpec.tones.join(", "),
     assetPlan.cover.visualFocus,
-    "cinematic key art, atmospheric, no text, no watermark"
+    "16:9 horizontal widescreen composition, cinematic key art, atmospheric, no text, no watermark"
   ]
     .filter(Boolean)
     .join(", ");
 
-  const systemPrompt = [
+  const fallbackSystemPrompt = [
     "You are a key art prompt designer for narrative games.",
     "Return one single-line image prompt in English.",
+    "The cover image must be composed as a 16:9 horizontal widescreen key art.",
     "Focus on atmosphere, place, symbolic objects, and avoid endgame spoilers."
   ].join("\n");
-  const userPrompt = [
+  const fallbackUserPrompt = [
     `Story title: ${storySpec.title}`,
     `Cover quote: ${storySpec.coverQuote}`,
     `Story intro: ${clipPreview(storySpec.intro, 700)}`,
@@ -1971,8 +2056,26 @@ async function generateCoverPrompt(
     `Rule context: ${clipPreview(rulePackage.ruleText, 500)}`,
     `Asset purpose: ${assetPlan.cover.purpose}`,
     `Visual focus: ${assetPlan.cover.visualFocus}`,
+    "Aspect ratio requirement: 16:9 horizontal widescreen cover art.",
     "Output exactly one English prompt line."
   ].join("\n");
+  const promptValues = {
+    STORY_TITLE: storySpec.title,
+    COVER_QUOTE: storySpec.coverQuote,
+    STORY_INTRO_PREVIEW: clipPreview(storySpec.intro, 700),
+    STORY_TONES: storySpec.tones.join(", "),
+    RULE_CONTEXT_PREVIEW: clipPreview(rulePackage.ruleText, 500),
+    ASSET_PURPOSE: assetPlan.cover.purpose,
+    VISUAL_FOCUS: assetPlan.cover.visualFocus
+  };
+  const [fallbackTemplate, systemTemplate, userTemplate] = await Promise.all([
+    loadPromptTemplate("content_generator_cover_fallback_prompt.txt", fallbackImagePrompt),
+    loadPromptTemplate("content_generator_cover_system_prompt.txt", fallbackSystemPrompt),
+    loadPromptTemplate("content_generator_cover_user_prompt.txt", fallbackUserPrompt)
+  ]);
+  const fallbackText = renderPromptTemplate(fallbackTemplate, promptValues);
+  const systemPrompt = renderPromptTemplate(systemTemplate, promptValues);
+  const userPrompt = renderPromptTemplate(userTemplate, promptValues);
 
   return runPromptedTextTask(generationContext, {
     task: "generate_cover_prompt",
@@ -1990,7 +2093,7 @@ async function generateOtherAssetPrompt(
 ): Promise<string> {
   const relevantScenes = storySpec.scenes.slice(0, 4).map((scene) => scene.name).join(", ");
   const relevantEntities = storySpec.entities.slice(0, 4).map((entity) => entity.name).join(", ");
-  const fallbackText = [
+  const fallbackImagePrompt = [
     asset.fileName,
     asset.visualFocus,
     storySpec.tones.join(", "),
@@ -2001,12 +2104,12 @@ async function generateOtherAssetPrompt(
     .filter(Boolean)
     .join(", ");
 
-  const systemPrompt = [
+  const fallbackSystemPrompt = [
     "You are an auxiliary narrative asset prompt designer.",
     "Return one single-line image prompt in English.",
     "The prompt must match the asset type and avoid late-game spoilers."
   ].join("\n");
-  const userPrompt = [
+  const fallbackUserPrompt = [
     `Asset fileName: ${asset.fileName}`,
     `Asset purpose: ${asset.purpose}`,
     `Visual focus: ${asset.visualFocus}`,
@@ -2015,6 +2118,22 @@ async function generateOtherAssetPrompt(
     `Relevant entities: ${relevantEntities}`,
     "Output exactly one English prompt line."
   ].join("\n");
+  const promptValues = {
+    ASSET_FILE_NAME: asset.fileName,
+    ASSET_PURPOSE: asset.purpose,
+    VISUAL_FOCUS: asset.visualFocus,
+    STORY_TONES: storySpec.tones.join(", "),
+    RELEVANT_SCENES: relevantScenes,
+    RELEVANT_ENTITIES: relevantEntities
+  };
+  const [fallbackTemplate, systemTemplate, userTemplate] = await Promise.all([
+    loadPromptTemplate("content_generator_support_asset_fallback_prompt.txt", fallbackImagePrompt),
+    loadPromptTemplate("content_generator_support_asset_system_prompt.txt", fallbackSystemPrompt),
+    loadPromptTemplate("content_generator_support_asset_user_prompt.txt", fallbackUserPrompt)
+  ]);
+  const fallbackText = renderPromptTemplate(fallbackTemplate, promptValues);
+  const systemPrompt = renderPromptTemplate(systemTemplate, promptValues);
+  const userPrompt = renderPromptTemplate(userTemplate, promptValues);
 
   return runPromptedTextTask(generationContext, {
     task: `generate_asset_prompt:${asset.fileName}`,
@@ -2076,6 +2195,10 @@ function extensionFromMimeType(mimeType: string): string {
   }
 }
 
+function isPlaceholderImageProvider(provider: string): boolean {
+  return provider === "image:mock" || provider.includes(":fallback");
+}
+
 async function writeImageAsset(
   generationContext: GenerationContext,
   args: {
@@ -2106,6 +2229,12 @@ async function writeImageAsset(
       meta: null
     });
 
+    if (isPlaceholderImageProvider(generated.provider)) {
+      generationContext.warnings.push(
+        `Image asset ${args.relativeDir}/${args.fileStem} used placeholder output from ${generated.provider}. Select a real image profile and check API key/base URL/model settings if you expected a production cover.`
+      );
+    }
+
     const { bytes, mimeType } = await decodeImageResult(generated.imageUrl);
     const extension = extensionFromMimeType(generated.mimeType || mimeType);
     const relativePath = join(args.relativeDir, `${args.fileStem}.${extension}`);
@@ -2123,7 +2252,7 @@ async function writeImageAsset(
     };
   } catch (error) {
     generationContext.warnings.push(
-      `生成图片 ${args.relativeDir}/${args.fileStem} 失败：${
+      `Image asset ${args.relativeDir}/${args.fileStem} failed: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
@@ -2232,7 +2361,7 @@ function assertRequestValidity(request: ContentGeneratorRequest): void {
     throw new Error("上传规则模式需要提供规则文件内容。");
   }
 
-  if (request.mode === "story_only") {
+  if (request.mode === "story_only" || request.mode === "story_assets_only") {
     if (!(request.storySource?.content.trim().length ?? 0)) {
       throw new Error("上传故事模式需要提供剧本文件内容。");
     }
@@ -2284,14 +2413,21 @@ async function writeStoryPackage(
   contentRoot: string,
   ruleDirectoryName: string,
   storyPackage: GeneratedStoryPackage,
-  locale: LocaleCode
+  locale: LocaleCode,
+  options?: {
+    preserveStoryMarkdown?: boolean;
+  }
 ): Promise<ContentGeneratorGeneratedFile[]> {
   const storyDir = join(contentRoot, ruleDirectoryName, "story", storyPackage.directoryName);
   await mkdir(join(storyDir, "npc_prompt"), { recursive: true });
   await mkdir(join(storyDir, "text_assets"), { recursive: true });
   await writeFile(join(storyDir, "manifest.json"), `${JSON.stringify(storyPackage.manifest, null, 2)}\n`, "utf8");
   await writeFile(join(storyDir, "intro.txt"), `${storyPackage.introText.trim()}\n`, "utf8");
-  await writeFile(join(storyDir, "story.md"), `${storyPackage.storyMarkdown.trim()}\n`, "utf8");
+  await writeFile(
+    join(storyDir, "story.md"),
+    options?.preserveStoryMarkdown ? storyPackage.storyMarkdown : `${storyPackage.storyMarkdown.trim()}\n`,
+    "utf8"
+  );
   await writeFile(
     join(storyDir, "text_assets", `beginning.${locale}.md`),
     `${storyPackage.beginningMarkdown.trim()}\n`,
@@ -2547,13 +2683,14 @@ export async function generateContentPackage(args: {
     );
   }
 
-  if (args.request.mode === "story_only" || args.request.mode === "rule_and_story") {
+  if (isStoryUploadMode(args.request.mode)) {
     await reportStage(
       "extract_story",
       "正在解析故事文本，抽取场景、角色、线索与结局结构。",
       "Parsing the story text and extracting scenes, characters, clues, and endings."
     );
-    const storySourceText = args.request.storySource?.content.trim() ?? "";
+    const uploadedStoryText = args.request.storySource?.content ?? "";
+    const storySourceText = uploadedStoryText.trim();
     const storySpec = await extractStorySpec(
       generationContext,
       storySourceText,
@@ -2569,18 +2706,28 @@ export async function generateContentPackage(args: {
       );
     }
 
-    await reportStage(
-      "generate_story",
+    let storyIntro = "";
+    let storyMarkdown = uploadedStoryText;
+
+    if (args.request.mode === "story_assets_only") {
+      storyIntro = await generateStoryIntro(generationContext, storySpec);
+      generationContext.warnings.push(
+        "Story body was copied from the uploaded file without rewriting."
+      );
+    } else {
+      await reportStage(
+        "generate_story",
       "正在生成剧本简介与剧本主文档。",
       "Generating the story intro and the main story document."
     );
-    const storyIntro = await generateStoryIntro(generationContext, storySpec);
-    const storyMarkdown = await generateStoryMarkdown(
+      storyIntro = await generateStoryIntro(generationContext, storySpec);
+      storyMarkdown = await generateStoryMarkdown(
       generationContext,
       storySpec,
       storySourceText,
       linkedRule!
-    );
+      );
+    }
 
     const provisionalStoryPackage: GeneratedStoryPackage = {
       directoryName: storyDirectoryName,
@@ -2624,7 +2771,7 @@ export async function generateContentPackage(args: {
       });
     }
 
-    if (args.request.generateImages !== false) {
+    if (shouldGenerateImageAssets(args.request)) {
       await reportStage(
         "plan_assets",
         "正在规划封面图和 other 图需要表现的内容。",
@@ -2681,7 +2828,10 @@ export async function generateContentPackage(args: {
           tempPaths.stagedContentRoot,
           linkedRule.directoryName,
           storyPackage,
-          locale
+          locale,
+          {
+            preserveStoryMarkdown: args.request.mode === "story_assets_only"
+          }
         ))
       );
 

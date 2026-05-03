@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { dirname } from "node:path";
 
 import {
   DEFAULT_LOCALE,
@@ -15,6 +16,7 @@ import {
   buildContentGeneratorProgressPlan,
   generateContentPackage
 } from "./service.ts";
+import { logRuntimeEvent } from "../runtime_logging.ts";
 
 type ContentGeneratorJobRecord = {
   jobId: string;
@@ -37,6 +39,70 @@ let contentGeneratorChain: Promise<void> = Promise.resolve();
 
 const FINISHED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_FINISHED_JOBS = 30;
+
+function summarizeContentGeneratorRequest(
+  request: ContentGeneratorRequest
+): Record<string, unknown> {
+  return {
+    mode: request.mode,
+    locale: request.locale ?? null,
+    associatedRuleDirectoryName: request.associatedRuleDirectoryName ?? null,
+    generateImages: request.generateImages !== false,
+    forceOverwrite: request.forceOverwrite ?? false,
+    modelAccessMode: request.modelAccessMode,
+    modelProfileId: request.modelProfileId ?? null,
+    imageProfileId: request.imageProfileId ?? null,
+    hasRuntimeModelOverride: Boolean(
+      request.runtimeModelConfig?.baseUrl ||
+        request.runtimeModelConfig?.model ||
+        request.runtimeModelConfig?.apiKey
+    ),
+    hasRuntimeImageModelOverride: Boolean(
+      request.runtimeImageModelConfig?.baseUrl ||
+        request.runtimeImageModelConfig?.model ||
+        request.runtimeImageModelConfig?.apiKey
+    ),
+    ruleSource: request.ruleSource
+      ? {
+          fileName: request.ruleSource.fileName,
+          chars: request.ruleSource.content.length
+        }
+      : null,
+    storySource: request.storySource
+      ? {
+          fileName: request.storySource.fileName,
+          chars: request.storySource.content.length
+        }
+      : null
+  };
+}
+
+function logContentGeneratorJobEvent(
+  contentRoot: string,
+  record: ContentGeneratorJobRecord,
+  input: {
+    event: string;
+    level?: "info" | "warn" | "error";
+    details?: Record<string, unknown>;
+    error?: unknown;
+  }
+): void {
+  void logRuntimeEvent(dirname(contentRoot), {
+    event: input.event,
+    level: input.level ?? "info",
+    source: "content_generator",
+    jobId: record.jobId,
+    operationId: record.jobId,
+    durationMs: record.startedAt ? Date.now() - Date.parse(record.startedAt) : null,
+    details: {
+      status: record.status,
+      progress: record.progress,
+      currentStepId: record.currentStepId ?? null,
+      ...input.details
+    },
+    error: input.error
+  });
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -131,6 +197,13 @@ async function runContentGeneratorJob(
     normalizeLocaleCode(record.request.locale || DEFAULT_LOCALE).toLowerCase().startsWith("zh")
       ? "任务已开始执行，当前内容会先生成到临时目录，再校验并提交。"
       : "The job is now running. Output will be staged in tmp, validated, and then committed.";
+  logContentGeneratorJobEvent(contentRoot, record, {
+    event: "content_generator.job.started",
+    details: {
+      request: summarizeContentGeneratorRequest(record.request),
+      progressPlan: record.progressPlan.map((step) => step.id)
+    }
+  });
 
   try {
     const result = await generateContentPackage({
@@ -147,6 +220,14 @@ async function runContentGeneratorJob(
         latest.currentStepId = event.stepId;
         latest.currentStepLabel = event.label;
         latest.currentDetail = event.detail;
+        logContentGeneratorJobEvent(contentRoot, latest, {
+          event: "content_generator.job.stage",
+          details: {
+            stepId: event.stepId,
+            label: event.label,
+            detail: event.detail
+          }
+        });
       }
     });
 
@@ -164,6 +245,17 @@ async function runContentGeneratorJob(
       normalizeLocaleCode(latest.request.locale || DEFAULT_LOCALE).toLowerCase().startsWith("zh")
         ? "后台生成已完成，可以查看结果、预览文件，或继续创建下一包内容。"
         : "Background generation completed. You can now inspect the generated files and results.";
+    logContentGeneratorJobEvent(contentRoot, latest, {
+      event: "content_generator.job.completed",
+      details: {
+        summary: result.summary,
+        generatedFileCount: result.generatedFiles.length,
+        generatedImages: result.generatedFiles.filter((file) => file.kind === "image").length,
+        warningCount: result.warnings.length,
+        warnings: result.warnings,
+        generationRuns: result.generationRuns
+      }
+    });
   } catch (error: unknown) {
     const latest = jobRecords.get(jobId);
     if (!latest) {
@@ -174,6 +266,14 @@ async function runContentGeneratorJob(
     latest.completedAt = nowIso();
     latest.error = error instanceof Error ? error.message : String(error);
     latest.currentDetail = latest.error;
+    logContentGeneratorJobEvent(contentRoot, latest, {
+      event: "content_generator.job.failed",
+      level: "error",
+      details: {
+        request: summarizeContentGeneratorRequest(latest.request)
+      },
+      error
+    });
   } finally {
     pruneFinishedJobs();
   }
@@ -206,6 +306,14 @@ export function createContentGeneratorJob(args: {
     error: null
   };
   jobRecords.set(jobId, record);
+  logContentGeneratorJobEvent(args.contentRoot, record, {
+    event: "content_generator.job.queued",
+    details: {
+      request: summarizeContentGeneratorRequest(args.request),
+      progressPlan: progressPlan.map((step) => step.id),
+      queuePosition: getQueuedJobPosition(jobId)
+    }
+  });
 
   const queuedRun = contentGeneratorChain
     .catch(() => {})

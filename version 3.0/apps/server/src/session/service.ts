@@ -70,6 +70,22 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const DEFAULT_COMIC_GENERATION_INTERVAL = PHASE1_DEFAULTS.comicGenerationInterval;
+const MIN_COMIC_GENERATION_INTERVAL = 1;
+const MAX_COMIC_GENERATION_INTERVAL = 12;
+
+function normalizeComicGenerationInterval(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_COMIC_GENERATION_INTERVAL;
+  }
+
+  const roundedValue = Math.round(value);
+  return Math.min(
+    MAX_COMIC_GENERATION_INTERVAL,
+    Math.max(MIN_COMIC_GENERATION_INTERVAL, roundedValue)
+  );
+}
+
 function buildFallbackContentSummary(session: Session): SessionContentSummary {
   return {
     ruleTitle: session.ruleId,
@@ -703,6 +719,9 @@ function buildCreateSessionRuntimeConfig(input: {
 
   return {
     modelProfileId: globalModelProfileId,
+    comicGenerationInterval: normalizeComicGenerationInterval(
+      input.request.comicGenerationInterval
+    ),
     runtimeModelConfig: globalRuntimeConfig,
     roleModelConfigs
   };
@@ -866,6 +885,9 @@ async function createSessionSnapshotInternal(
       logViewMode: request.logViewMode ?? DEFAULT_LOG_VIEW_MODE,
       difficulty: request.difficulty,
       backgroundCompressionEnabled: request.backgroundCompressionEnabled ?? true,
+      comicGenerationInterval: normalizeComicGenerationInterval(
+        request.comicGenerationInterval
+      ),
       debugEnabled: request.debugEnabled ?? true,
       promptDebugEnabled: request.promptDebugEnabled ?? false,
       modelProfileId: narratorModelProfileId
@@ -1044,6 +1066,7 @@ export function buildDefaultCreateSessionRequest(): CreateSessionRequest {
     difficulty: PHASE1_DEFAULTS.difficulty,
     gmArchitecture: PHASE1_DEFAULTS.gmArchitecture,
     backgroundCompressionEnabled: PHASE1_DEFAULTS.backgroundCompressionEnabled,
+    comicGenerationInterval: PHASE1_DEFAULTS.comicGenerationInterval,
     modelAccessMode: PHASE1_DEFAULTS.modelAccessMode,
     characterConcept: "",
     modelProfileId: PHASE1_DEFAULTS.modelProfileId,
@@ -1276,6 +1299,111 @@ function markDirectorTaskReady(
   });
 }
 
+type DirectorTaskDiagnostics = NonNullable<
+  NonNullable<MultiAgentState["directorTask"]>["diagnostics"]
+>;
+
+function calculateElapsedMs(startAt: string | null | undefined, endAt: string): number | null {
+  if (!startAt) {
+    return null;
+  }
+
+  const startMs = Date.parse(startAt);
+  const endMs = Date.parse(endAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return null;
+  }
+
+  return Math.max(0, endMs - startMs);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function classifyDirectorTaskError(message: string): string {
+  const normalizedMessage = message.toLowerCase();
+  if (
+    normalizedMessage.includes("timed out") ||
+    normalizedMessage.includes("operation was aborted") ||
+    normalizedMessage.includes("aborterror")
+  ) {
+    return "timeout_or_abort";
+  }
+
+  if (normalizedMessage.includes("401") || normalizedMessage.includes("api key")) {
+    return "auth";
+  }
+
+  if (
+    normalizedMessage.includes("enotfound") ||
+    normalizedMessage.includes("econnrefused") ||
+    normalizedMessage.includes("network") ||
+    normalizedMessage.includes("fetch failed")
+  ) {
+    return "network";
+  }
+
+  if (normalizedMessage.includes("429") || normalizedMessage.includes("rate limit")) {
+    return "rate_limit";
+  }
+
+  if (normalizedMessage.includes("5") && normalizedMessage.includes("http")) {
+    return "provider_http_5xx";
+  }
+
+  return "unknown";
+}
+
+function formatDiagnosticValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "n/a";
+  }
+
+  return String(value);
+}
+
+function buildDirectorTaskErrorMessage(diagnostics: DirectorTaskDiagnostics): string {
+  return [
+    `Director generation failed (${formatDiagnosticValue(diagnostics.errorKind)})`,
+    `error=${formatDiagnosticValue(diagnostics.errorMessage)}`,
+    `session=${formatDiagnosticValue(diagnostics.sessionId)}`,
+    `round=${formatDiagnosticValue(diagnostics.round)}`,
+    `elapsedMs=${formatDiagnosticValue(diagnostics.elapsedMs)}`,
+    `accessMode=${formatDiagnosticValue(diagnostics.accessMode)}`,
+    `modelProfile=${formatDiagnosticValue(diagnostics.modelProfileId)}`,
+    `runtimeModel=${formatDiagnosticValue(diagnostics.runtimeModel)}`,
+    `provider=${formatDiagnosticValue(diagnostics.provider)}`,
+    `promptChars=${formatDiagnosticValue(diagnostics.userPromptChars)}`,
+    `systemPromptChars=${formatDiagnosticValue(diagnostics.systemPromptChars)}`,
+    `queuedAt=${formatDiagnosticValue(diagnostics.queuedAt)}`,
+    `startedAt=${formatDiagnosticValue(diagnostics.startedAt)}`,
+    `completedAt=${formatDiagnosticValue(diagnostics.completedAt)}`
+  ].join(" | ");
+}
+
+function logDirectorTaskDiagnostics(
+  level: "info" | "error",
+  event: string,
+  diagnostics: DirectorTaskDiagnostics
+): void {
+  const line = `[multi-agent-director] ${JSON.stringify({
+    event,
+    ...diagnostics
+  })}`;
+
+  if (level === "error") {
+    console.error(line);
+    return;
+  }
+
+  console.info(line);
+}
+
 function queueDirectorGeneration(
   sessionId: string,
   targetRound: number,
@@ -1308,13 +1436,23 @@ function queueDirectorGeneration(
   }
 
   const queuedAt = nowIso();
+  let latestDiagnostics: DirectorTaskDiagnostics = {
+    sessionId,
+    round: targetRound,
+    phase: "queued",
+    queuedAt,
+    startedAt: null,
+    completedAt: null,
+    elapsedMs: null
+  };
   setDirectorTaskState(sessionId, store, {
     round: targetRound,
     status: "queued",
     queuedAt,
     startedAt: null,
     completedAt: null,
-    error: null
+    error: null,
+    diagnostics: latestDiagnostics
   });
 
   const previous = directorGenerationChains.get(sessionId) ?? Promise.resolve();
@@ -1336,21 +1474,37 @@ function queueDirectorGeneration(
         return;
       }
 
+      const runtimeConfig = store.getRuntimeConfig(sessionId);
+      const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+        beforeRun.session,
+        runtimeConfig
+      );
       const startedAt = nowIso();
+      latestDiagnostics = {
+        ...latestDiagnostics,
+        phase: "running",
+        ruleId: beforeRun.session.ruleId,
+        storyId: beforeRun.session.storyId,
+        worldlineId: beforeRun.session.worldlineId ?? null,
+        accessMode: beforeRun.session.modelAccessMode,
+        modelProfileId: narratorRuntimeSelection.modelProfileId ?? null,
+        runtimeModel: narratorRuntimeSelection.runtimeModelConfig?.model ?? null,
+        locale: beforeRun.session.locale,
+        difficulty: beforeRun.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty,
+        startedAt,
+        completedAt: null,
+        elapsedMs: null
+      };
       setDirectorTaskState(sessionId, store, {
         round: targetRound,
         status: "running",
         queuedAt,
         startedAt,
         completedAt: null,
-        error: null
+        error: null,
+        diagnostics: latestDiagnostics
       });
 
-      const runtimeConfig = store.getRuntimeConfig(sessionId);
-      const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
-        beforeRun.session,
-        runtimeConfig
-      );
       const modelGateway = getModelGateway(beforeRun.session.modelAccessMode);
       const bundle = await loadSessionContentBundle(contentRoot, beforeRun);
       const sharedPublicContext = buildMultiAgentSharedPublicContext({
@@ -1363,29 +1517,50 @@ function queueDirectorGeneration(
         "director",
         targetRound - 1
       );
+      const directorSystemPrompt = await buildMultiAgentSystemPrompt(
+        "director",
+        beforeRun.session.locale,
+        beforeRun.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
+      );
+      const directorUserPrompt = buildDirectorUserPrompt({
+        bundle,
+        locale: beforeRun.session.locale,
+        round: targetRound,
+        sharedPublicContext,
+        ownHistory: directorHistory
+      });
+      latestDiagnostics = {
+        ...latestDiagnostics,
+        systemPromptChars: directorSystemPrompt.length,
+        userPromptChars: directorUserPrompt.length,
+        sharedPublicContextChars: sharedPublicContext.length,
+        directorHistoryChars: directorHistory.length
+      };
+      logDirectorTaskDiagnostics("info", "director_generation_start", latestDiagnostics);
       const directorResult = await modelGateway.generatePromptedText({
         accessMode: beforeRun.session.modelAccessMode,
         modelProfileId: narratorRuntimeSelection.modelProfileId,
         runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
         locale: beforeRun.session.locale,
-        systemPrompt: await buildMultiAgentSystemPrompt(
-          "director",
-          beforeRun.session.locale,
-          beforeRun.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty
-        ),
-        userPrompt: buildDirectorUserPrompt({
-          bundle,
-          locale: beforeRun.session.locale,
-          round: targetRound,
-          sharedPublicContext,
-          ownHistory: directorHistory
-        })
+        systemPrompt: directorSystemPrompt,
+        userPrompt: directorUserPrompt
       });
       const output = buildStoredAgentOutput({
         content: directorResult.text,
         provider: directorResult.provider,
         meta: directorResult.meta
       });
+      latestDiagnostics = {
+        ...latestDiagnostics,
+        phase: "ready",
+        provider: directorResult.provider,
+        completedAt: output.createdAt,
+        elapsedMs: calculateElapsedMs(latestDiagnostics.startedAt ?? queuedAt, output.createdAt),
+        errorKind: null,
+        errorName: null,
+        errorMessage: null
+      };
+      logDirectorTaskDiagnostics("info", "director_generation_success", latestDiagnostics);
 
       store.update(sessionId, (current) => ({
         ...current,
@@ -1400,7 +1575,8 @@ function queueDirectorGeneration(
                 queuedAt,
                 startedAt,
                 completedAt: output.createdAt,
-                error: null
+                error: null,
+                diagnostics: latestDiagnostics
               }),
               round: targetRound,
               role: "director",
@@ -1411,13 +1587,27 @@ function queueDirectorGeneration(
       }));
     })
     .catch((error) => {
+      const completedAt = nowIso();
+      const errorMessage = getErrorMessage(error);
+      latestDiagnostics = {
+        ...latestDiagnostics,
+        phase: "failed",
+        completedAt,
+        elapsedMs: calculateElapsedMs(latestDiagnostics.startedAt ?? queuedAt, completedAt),
+        errorKind: classifyDirectorTaskError(errorMessage),
+        errorName: getErrorName(error),
+        errorMessage
+      };
+      const failureMessage = buildDirectorTaskErrorMessage(latestDiagnostics);
+      logDirectorTaskDiagnostics("error", "director_generation_failed", latestDiagnostics);
       setDirectorTaskState(sessionId, store, {
         round: targetRound,
         status: "failed",
         queuedAt,
-        startedAt: null,
-        completedAt: nowIso(),
-        error: error instanceof Error ? error.message : String(error)
+        startedAt: latestDiagnostics.startedAt ?? null,
+        completedAt,
+        error: failureMessage,
+        diagnostics: latestDiagnostics
       });
       throw error;
     })
@@ -3119,6 +3309,9 @@ export function loadSessionFromSaveBundle(
   store.save(snapshot, {
     modelProfileId:
       saveBundle.runtimeConfig?.modelProfileId ?? saveBundle.session.settings.modelProfileId,
+    comicGenerationInterval:
+      saveBundle.runtimeConfig?.comicGenerationInterval ??
+      saveBundle.session.settings.comicGenerationInterval,
     runtimeModelConfig: saveBundle.runtimeConfig?.runtimeModelConfig,
     roleModelConfigs: saveBundle.runtimeConfig?.roleModelConfigs
   });

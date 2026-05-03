@@ -38,6 +38,11 @@ import {
 } from "../openingPreviewPreferences.ts";
 import { useUiText } from "../locales/index.tsx";
 import {
+  MAX_COMIC_GENERATION_INTERVAL,
+  MIN_COMIC_GENERATION_INTERVAL,
+  normalizeComicGenerationInterval
+} from "../comicSchedule.ts";
+import {
   deleteAiCompanionPreset,
   loadAiCompanionPresets,
   storeAiCompanionPreset,
@@ -66,6 +71,7 @@ type GameSetupScreenProps = {
   comicStyles: ComicStylePreset[];
   comicStylesLoading: boolean;
   comicStylesError: string | null;
+  comicGenerationInterval: number;
   debugEnabled: boolean;
   logViewMode: NonNullable<CreateSessionRequest["logViewMode"]>;
   openingPreviewDeliveryMode: OpeningPreviewDeliveryMode;
@@ -109,6 +115,7 @@ type GameSetupScreenProps = {
     value: RuntimeImageModelConfigInput
   ) => void;
   onComicStyleIdChange: (value: string) => void;
+  onComicGenerationIntervalChange: (value: number) => void;
   onDebugEnabledChange: (value: boolean) => void;
   onLogViewModeChange: (
     value: NonNullable<CreateSessionRequest["logViewMode"]>
@@ -422,6 +429,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     comicStyles,
     comicStylesLoading,
     comicStylesError,
+    comicGenerationInterval,
     debugEnabled,
     logViewMode,
     openingPreviewDeliveryMode,
@@ -457,6 +465,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onImageProfileIdChange,
     onImageProfileRuntimeConfigChange,
     onComicStyleIdChange,
+    onComicGenerationIntervalChange,
     onDebugEnabledChange,
     onLogViewModeChange,
     onOpeningPreviewDeliveryModeChange,
@@ -1582,6 +1591,24 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                 ))
               )}
             </select>
+          </SettingField>
+
+          <SettingField
+            label={setupText.fields.comicIntervalLabel}
+            hint={setupText.fields.comicIntervalHint}
+          >
+            <input
+              max={MAX_COMIC_GENERATION_INTERVAL}
+              min={MIN_COMIC_GENERATION_INTERVAL}
+              step={1}
+              type="number"
+              value={normalizeComicGenerationInterval(comicGenerationInterval)}
+              onChange={(event) =>
+                onComicGenerationIntervalChange(
+                  normalizeComicGenerationInterval(event.currentTarget.valueAsNumber)
+                )
+              }
+            />
           </SettingField>
 
           <SettingField
@@ -2718,6 +2745,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               )}
             </div>
             <div className="summary-text">
+              {setupText.model.comicInterval(
+                normalizeComicGenerationInterval(comicGenerationInterval)
+              )}
+            </div>
+            <div className="summary-text">
               {setupText.model.resolvedModel(resolvedImageModelName)}
             </div>
             <div className="summary-text">
@@ -2886,6 +2918,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                       <div className="summary-text">
                         {setupText.model.comicStyle(
                           selectedComicStyle?.name ?? setupText.model.notConfigured
+                        )}
+                      </div>
+                      <div className="summary-text">
+                        {setupText.model.comicInterval(
+                          normalizeComicGenerationInterval(comicGenerationInterval)
                         )}
                       </div>
                       <div className="summary-text">

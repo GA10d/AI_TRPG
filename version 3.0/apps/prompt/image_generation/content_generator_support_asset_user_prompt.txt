@@ -1,0 +1,7 @@
+Asset fileName: {{ASSET_FILE_NAME}}
+Asset purpose: {{ASSET_PURPOSE}}
+Visual focus: {{VISUAL_FOCUS}}
+Story tones: {{STORY_TONES}}
+Relevant scenes: {{RELEVANT_SCENES}}
+Relevant entities: {{RELEVANT_ENTITIES}}
+Output exactly one English prompt line.

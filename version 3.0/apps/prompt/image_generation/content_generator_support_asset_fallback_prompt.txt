@@ -1,0 +1,1 @@
+{{ASSET_FILE_NAME}}, {{VISUAL_FOCUS}}, {{STORY_TONES}}, {{RELEVANT_SCENES}}, {{RELEVANT_ENTITIES}}, TRPG support asset, readable composition, no text, no watermark

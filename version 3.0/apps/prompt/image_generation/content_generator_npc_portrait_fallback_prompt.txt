@@ -1,0 +1,1 @@
+TRPG NPC portrait, {{CHARACTER_NAME}}, {{VISIBLE_APPEARANCE}}, {{SURFACE_IMPRESSION}}, {{PROPS}}, {{STORY_TONES}}, no text, no watermark
