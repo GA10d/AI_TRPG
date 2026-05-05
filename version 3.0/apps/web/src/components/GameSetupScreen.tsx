@@ -104,6 +104,9 @@ type GameSetupScreenProps = {
   onModelProfileIdChange: (value: string) => void;
   onAdvancedTextModelEnabledChange: (value: boolean) => void;
   onAdvancedNarratorTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
+  onAdvancedDicerTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
+  onAdvancedNpcManagerTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
+  onAdvancedDirectorTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
   onAdvancedPrimaryPlayerTextModelConfigChange: (value: RoleTextModelConfigInput | null) => void;
   onAdvancedCompanionTextModelConfigChange: (
     index: number,
@@ -409,6 +412,7 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const logViewOptions = getLogViewOptions(text);
   const markdownFontSizeOptions = getMarkdownFontSizeOptions(text);
   const openingPreviewDeliveryOptions = getOpeningPreviewDeliveryOptions(text);
+  const [openingPreviewInverted, setOpeningPreviewInverted] = useState(false);
   const {
     bootstrap,
     ruleDirectoryName,
@@ -460,6 +464,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     onModelProfileIdChange,
     onAdvancedTextModelEnabledChange,
     onAdvancedNarratorTextModelConfigChange,
+    onAdvancedDicerTextModelConfigChange,
+    onAdvancedNpcManagerTextModelConfigChange,
+    onAdvancedDirectorTextModelConfigChange,
     onAdvancedPrimaryPlayerTextModelConfigChange,
     onAdvancedCompanionTextModelConfigChange,
     onImageProfileIdChange,
@@ -653,6 +660,10 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     }));
   }
 
+  function handleToggleOpeningPreviewInverted(): void {
+    setOpeningPreviewInverted((current) => !current);
+  }
+
   function handleOpenSettingsDetail(tab: SetupDetailTab): void {
     setActiveDetailTab(tab);
     setIsSettingsDetailOpen(true);
@@ -836,9 +847,13 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
   const personalityTags = bootstrap?.personalityTags ?? [];
   const appearanceTags = bootstrap?.appearanceTags ?? [];
   const isStoryMode = playMode === "story_mode";
+  const isMultiAgentMode = gmArchitecture === "multi_agent";
   const normalizedAdvancedTextModelConfig = advancedTextModelEnabled
     ? {
         narrator: normalizeRoleTextModelConfig(advancedTextModelConfig?.narrator),
+        dicer: normalizeRoleTextModelConfig(advancedTextModelConfig?.dicer),
+        npcManager: normalizeRoleTextModelConfig(advancedTextModelConfig?.npcManager),
+        director: normalizeRoleTextModelConfig(advancedTextModelConfig?.director),
         primaryPlayer: normalizeRoleTextModelConfig(advancedTextModelConfig?.primaryPlayer),
         companionOverrides: (advancedTextModelConfig?.companionOverrides ?? []).map((item) =>
           normalizeRoleTextModelConfig(item)
@@ -847,6 +862,9 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
     : null;
   const advancedModelOverrideCount =
     (normalizedAdvancedTextModelConfig?.narrator ? 1 : 0) +
+    (isMultiAgentMode && normalizedAdvancedTextModelConfig?.dicer ? 1 : 0) +
+    (isMultiAgentMode && normalizedAdvancedTextModelConfig?.npcManager ? 1 : 0) +
+    (isMultiAgentMode && normalizedAdvancedTextModelConfig?.director ? 1 : 0) +
     (isStoryMode && normalizedAdvancedTextModelConfig?.primaryPlayer ? 1 : 0) +
     (normalizedAdvancedTextModelConfig?.companionOverrides ?? [])
       .slice(0, aiCompanions.length)
@@ -1239,12 +1257,16 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
 
   const advancedModelReady =
     !advancedTextModelEnabled ||
-    isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.narrator) &&
+    (isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.narrator) &&
+      (!isMultiAgentMode ||
+        (isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.dicer) &&
+          isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.npcManager) &&
+          isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.director))) &&
       (!isStoryMode ||
         isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig?.primaryPlayer)) &&
       (normalizedAdvancedTextModelConfig?.companionOverrides ?? [])
         .slice(0, aiCompanions.length)
-        .every((item) => isAdvancedRoleTextModelReady(item));
+        .every((item) => isAdvancedRoleTextModelReady(item)));
   const narratorModelReady =
     normalizedAdvancedTextModelConfig?.narrator
       ? isAdvancedRoleTextModelReady(normalizedAdvancedTextModelConfig.narrator)
@@ -1396,6 +1418,34 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
               roleConfig: normalizedAdvancedTextModelConfig?.narrator,
               onChange: onAdvancedNarratorTextModelConfigChange
             })}
+
+            {isMultiAgentMode ? (
+              <div className="setup-advanced-model-group">
+                <div className="setup-advanced-model-group-title">
+                  {setupText.advancedModel.multiAgentGroupTitle}
+                </div>
+                <div className="setup-advanced-model-stack">
+                  {renderAdvancedRoleModelCard({
+                    title: setupText.advancedModel.dicerTitle,
+                    description: setupText.advancedModel.dicerDescription,
+                    roleConfig: normalizedAdvancedTextModelConfig?.dicer,
+                    onChange: onAdvancedDicerTextModelConfigChange
+                  })}
+                  {renderAdvancedRoleModelCard({
+                    title: setupText.advancedModel.npcManagerTitle,
+                    description: setupText.advancedModel.npcManagerDescription,
+                    roleConfig: normalizedAdvancedTextModelConfig?.npcManager,
+                    onChange: onAdvancedNpcManagerTextModelConfigChange
+                  })}
+                  {renderAdvancedRoleModelCard({
+                    title: setupText.advancedModel.directorTitle,
+                    description: setupText.advancedModel.directorDescription,
+                    roleConfig: normalizedAdvancedTextModelConfig?.director,
+                    onChange: onAdvancedDirectorTextModelConfigChange
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {isStoryMode
               ? renderAdvancedRoleModelCard({
@@ -2809,6 +2859,18 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
         backLabel={setupText.backLabel}
         onClose={onClose}
         closeLabel={setupText.closeLabel}
+        actions={
+          <button
+            aria-pressed={openingPreviewInverted}
+            className="ghost-button"
+            onClick={handleToggleOpeningPreviewInverted}
+            type="button"
+          >
+            {openingPreviewInverted
+              ? setupText.preview.restoreColors
+              : setupText.preview.invertColors}
+          </button>
+        }
       />
 
       <form className="setup-form" onSubmit={onSubmit}>
@@ -3037,7 +3099,11 @@ export function GameSetupScreen(props: GameSetupScreenProps) {
                   )}
                 </div>
 
-                <div className="opening-block setup-preview-copy">
+                <div
+                  className={`opening-block setup-preview-copy ${
+                    openingPreviewInverted ? "opening-block-inverted" : ""
+                  }`}
+                >
                   {openingPreviewLoading && !hasPreviewText ? (
                     <p>{setupText.preview.generatingText}</p>
                   ) : (

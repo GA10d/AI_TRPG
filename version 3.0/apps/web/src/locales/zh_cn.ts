@@ -198,6 +198,14 @@
       commitRoundLogWait: "正在等待主持人回复与结局判定返回。",
       commitRoundLogDone: (round: number) => `第 ${round} 轮提交完成。`,
       commitRoundLogFailed: (reason: string) => `本轮提交失败：${reason}`,
+      directorGenerationQueued: (round: number) =>
+        `Director 已排队生成第 ${round} 轮后台指导。`,
+      directorGenerationRunning: (round: number) =>
+        `Director 正在生成第 ${round} 轮后台指导。`,
+      directorGenerationReady: (round: number) =>
+        `Director 第 ${round} 轮后台指导已生成。`,
+      directorGenerationFailed: (round: number, reason: string) =>
+        `Director 第 ${round} 轮后台指导生成失败：${reason}`,
       autoModeSubmitLocked: "当前处于自动进行模式，无需手动提交。",
       reasonerTimeoutHint:
         "当前使用的是 DeepSeek Standard。若仍频繁超时，可提高 TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS 或 TRPG_SERVER_PROXY_TIMEOUT_MS。",
@@ -817,19 +825,26 @@
     advancedModel: {
       title: "进阶配置",
       description:
-        "默认所有 AI 都跟随上面的全局文字模型；打开后可以分别指定主持人、AI 主角和每名 AI 队友的模型档案。",
+        "默认所有 AI 和多 Agent 单元都跟随上面的全局文字模型；打开后可以分别指定主持人、Dicer、NPC Manager、Director、AI 主角和每名 AI 队友的模型档案。",
       enabled: "已开启",
       disabled: "已关闭",
       enabledSummary: (count: number) =>
         count > 0
-          ? `已为 ${count} 个角色单独指定模型。`
-          : "已开启，但当前所有角色仍跟随全局默认模型。",
+          ? `已为 ${count} 个角色或 Agent 单独指定模型。`
+          : "已开启，但当前所有角色和 Agent 仍跟随全局默认模型。",
       followDefaultBadge: "跟随默认",
       inheritDefault: "跟随全局默认模型",
       followingDefault: (value: string) => `当前跟随全局默认：${value}`,
       roleModelProfile: "角色模型档案",
       narratorTitle: "AI 主持人",
       narratorDescription: "控制开场、每轮叙事、结局判定和记忆压缩等主持人侧任务。",
+      multiAgentGroupTitle: "多 Agent GM",
+      dicerTitle: "Dicer",
+      dicerDescription: "用于规则判定、行动风险、成功失败和后果边界等内部裁定。",
+      npcManagerTitle: "NPC Manager",
+      npcManagerDescription: "用于 NPC 行为、动机、背景行动和与公开剧情一致的 NPC 状态更新。",
+      directorTitle: "Director",
+      directorDescription: "用于后台节奏、世界状态、隐藏事件和长期推进建议。",
       primaryPlayerTitle: "AI 主角",
       primaryPlayerDescription: "只在故事模式下生效，用于 AI 主玩家的回合草稿生成。",
       companionsTitle: "AI 队友",
@@ -843,6 +858,8 @@
       title: "开场预览",
       regenerate: "重新生成开场白",
       regenerateBusy: "生成中...",
+      invertColors: "反色",
+      restoreColors: "恢复颜色",
       coverAlt: (storyTitle: string) => `${storyTitle} 封面`,
       openCoverAria: "查看大图",
       openCoverButton: "查看大图",

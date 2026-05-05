@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "STORY_A584B02E",
+  "version": "0.1.0",
+  "ruleId": "VHS",
+  "defaultLocale": "zh-CN",
+  "availableLocales": [
+    "zh-CN"
+  ],
+  "title": {
+    "zh-CN": "地球上的冷皮"
+  },
+  "playerCount": {
+    "min": 1,
+    "max": 4
+  },
+  "supportsModes": [
+    "single_player",
+    "multiplayer"
+  ],
+  "coverQuote": {
+    "zh-CN": "地球在你脚下四百公里处缓慢旋转。白色云层铺过海洋，城市灯火在夜侧像一把撒开的金粉。 你是“曙光号国际轨道站”延寿维护任务组成员之一。这不是你们第一次一起执行任务，也不会是最危险的一次——至少现在看起来不是。"
+  },
+  "recommendedLength": "medium",
+  "recommendedPacing": "fast",
+  "gmStyle": "atmospheric-guidance",
+  "tags": [
+    "horror",
+    "investigation",
+    "romance",
+    "fantasy",
+    "science_fiction",
+    "survival"
+  ],
+  "contentWarnings": [
+    "suicide",
+    "horror",
+    "ethical-conflict"
+  ],
+  "authoringSpec": "剧本范式(1)",
+  "startSceneId": "1"
+}

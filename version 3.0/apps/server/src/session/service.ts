@@ -20,6 +20,7 @@ import type {
   Participant,
   PrepareRoundRequest,
   ReplayEvent,
+  RoleTextModelConfigInput,
   RoundDraft,
   SendPrivateChatRequest,
   SaveBundle,
@@ -34,6 +35,7 @@ import type {
   StoryControlMode,
   SubmitTurnRequest,
   SubmitManualNarrationRequest,
+  TurnResolutionStage,
   UpdateStoryControlModeRequest
 } from "../../../../packages/shared-types/src/index.ts";
 import {
@@ -61,6 +63,7 @@ import {
   rebuildSnapshotMemory
 } from "./memory.ts";
 import {
+  resolveMultiAgentRuntimeSelection,
   resolveNarratorRuntimeSelection,
   resolveParticipantRuntimeSelection
 } from "./store.ts";
@@ -537,7 +540,7 @@ type CreateSessionSnapshotOptions = {
 };
 
 type TurnResolutionProgressHandler = (event: {
-  stage: "requesting_narrator" | "waiting_turn_narration" | "judging_ending" | "finalizing_turn" | "memory_deferred";
+  stage: TurnResolutionStage;
   label: string;
   detail: string;
   progress: number;
@@ -652,8 +655,7 @@ function normalizeRuntimeModelConfig(
 
 function normalizeRoleModelConfig(
   input:
-    | AdvancedTextModelConfigInput["narrator"]
-    | AdvancedTextModelConfigInput["primaryPlayer"]
+    | RoleTextModelConfigInput
     | null
     | undefined
 ): SessionRoleModelConfig | undefined {
@@ -686,6 +688,15 @@ function buildCreateSessionRuntimeConfig(input: {
   const narratorConfig = normalizeRoleModelConfig(
     input.request.advancedTextModelConfig?.narrator
   );
+  const dicerConfig = normalizeRoleModelConfig(
+    input.request.advancedTextModelConfig?.dicer
+  );
+  const npcManagerConfig = normalizeRoleModelConfig(
+    input.request.advancedTextModelConfig?.npcManager
+  );
+  const directorConfig = normalizeRoleModelConfig(
+    input.request.advancedTextModelConfig?.director
+  );
   const primaryPlayerConfig =
     input.primaryPlayerMode === "ai"
       ? normalizeRoleModelConfig(input.request.advancedTextModelConfig?.primaryPlayer)
@@ -710,9 +721,16 @@ function buildCreateSessionRuntimeConfig(input: {
 
   const hasParticipantConfigs = Object.keys(participantConfigs).length > 0;
   const roleModelConfigs =
-    narratorConfig || hasParticipantConfigs
+    narratorConfig ||
+    dicerConfig ||
+    npcManagerConfig ||
+    directorConfig ||
+    hasParticipantConfigs
       ? {
           narrator: narratorConfig,
+          dicer: dicerConfig,
+          npcManager: npcManagerConfig,
+          director: directorConfig,
           participants: hasParticipantConfigs ? participantConfigs : undefined
         }
       : undefined;
@@ -1475,9 +1493,10 @@ function queueDirectorGeneration(
       }
 
       const runtimeConfig = store.getRuntimeConfig(sessionId);
-      const narratorRuntimeSelection = resolveNarratorRuntimeSelection(
+      const directorRuntimeSelection = resolveMultiAgentRuntimeSelection(
         beforeRun.session,
-        runtimeConfig
+        runtimeConfig,
+        "director"
       );
       const startedAt = nowIso();
       latestDiagnostics = {
@@ -1487,8 +1506,8 @@ function queueDirectorGeneration(
         storyId: beforeRun.session.storyId,
         worldlineId: beforeRun.session.worldlineId ?? null,
         accessMode: beforeRun.session.modelAccessMode,
-        modelProfileId: narratorRuntimeSelection.modelProfileId ?? null,
-        runtimeModel: narratorRuntimeSelection.runtimeModelConfig?.model ?? null,
+        modelProfileId: directorRuntimeSelection.modelProfileId ?? null,
+        runtimeModel: directorRuntimeSelection.runtimeModelConfig?.model ?? null,
         locale: beforeRun.session.locale,
         difficulty: beforeRun.session.settings.difficulty ?? PHASE1_DEFAULTS.difficulty,
         startedAt,
@@ -1539,8 +1558,8 @@ function queueDirectorGeneration(
       logDirectorTaskDiagnostics("info", "director_generation_start", latestDiagnostics);
       const directorResult = await modelGateway.generatePromptedText({
         accessMode: beforeRun.session.modelAccessMode,
-        modelProfileId: narratorRuntimeSelection.modelProfileId,
-        runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+        modelProfileId: directorRuntimeSelection.modelProfileId,
+        runtimeModelConfig: directorRuntimeSelection.runtimeModelConfig,
         locale: beforeRun.session.locale,
         systemPrompt: directorSystemPrompt,
         userPrompt: directorUserPrompt
@@ -1628,6 +1647,33 @@ function queueDirectorGeneration(
   return promise;
 }
 
+export function resumePendingMultiAgentDirectorGeneration(
+  sessionId: string,
+  store: InMemorySessionStore,
+  contentRoot: string
+): void {
+  const snapshot = store.get(sessionId);
+  if (!snapshot || !isMultiAgentSession(snapshot.session)) {
+    return;
+  }
+
+  if (snapshot.session.status === "ended") {
+    return;
+  }
+
+  const targetRound = snapshot.session.currentRound;
+  const existingOutput = findMultiAgentOutput(
+    getMultiAgentState(snapshot.session),
+    "director",
+    targetRound
+  );
+  if (existingOutput) {
+    return;
+  }
+
+  void queueDirectorGeneration(sessionId, targetRound, contentRoot, store).catch(() => {});
+}
+
 async function waitForDirectorOutput(input: {
   sessionId: string;
   currentSnapshot: SessionSnapshot;
@@ -1702,6 +1748,16 @@ async function runMultiAgentTurnPipeline(input: {
     current.session,
     runtimeConfig
   );
+  const dicerRuntimeSelection = resolveMultiAgentRuntimeSelection(
+    current.session,
+    runtimeConfig,
+    "dicer"
+  );
+  const npcManagerRuntimeSelection = resolveMultiAgentRuntimeSelection(
+    current.session,
+    runtimeConfig,
+    "npcManager"
+  );
   const bundle = await loadSessionContentBundle(input.contentRoot, current);
   const interimSnapshot: SessionSnapshot = {
     ...current,
@@ -1751,8 +1807,8 @@ async function runMultiAgentTurnPipeline(input: {
   );
   const dicerPromise = modelGateway.generatePromptedText({
     accessMode: current.session.modelAccessMode,
-    modelProfileId: narratorRuntimeSelection.modelProfileId,
-    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    modelProfileId: dicerRuntimeSelection.modelProfileId,
+    runtimeModelConfig: dicerRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     systemPrompt: await buildMultiAgentSystemPrompt(
       "dicer",
@@ -1770,8 +1826,8 @@ async function runMultiAgentTurnPipeline(input: {
   });
   const npcManagerPromise = modelGateway.generatePromptedText({
     accessMode: current.session.modelAccessMode,
-    modelProfileId: narratorRuntimeSelection.modelProfileId,
-    runtimeModelConfig: narratorRuntimeSelection.runtimeModelConfig,
+    modelProfileId: npcManagerRuntimeSelection.modelProfileId,
+    runtimeModelConfig: npcManagerRuntimeSelection.runtimeModelConfig,
     locale: current.session.locale,
     systemPrompt: await buildMultiAgentSystemPrompt(
       "npc_manager",

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { useUiText } from "../locales/index.tsx";
 
 type ScreenHeaderProps = {
@@ -7,6 +9,7 @@ type ScreenHeaderProps = {
   backLabel?: string;
   onClose?: () => void;
   closeLabel?: string;
+  actions?: ReactNode;
 };
 
 export function ScreenHeader(props: ScreenHeaderProps) {
@@ -17,7 +20,8 @@ export function ScreenHeader(props: ScreenHeaderProps) {
     onBack,
     backLabel = text.screenHeader.defaultBackLabel,
     onClose,
-    closeLabel = text.screenHeader.defaultCloseLabel
+    closeLabel = text.screenHeader.defaultCloseLabel,
+    actions
   } = props;
 
   return (
@@ -28,6 +32,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
         <p className="lead">{description}</p>
       </div>
       <div className="button-row header-actions">
+        {actions}
         <button className="ghost-button" onClick={onBack} type="button">
           {backLabel}
         </button>

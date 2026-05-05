@@ -1,0 +1,382 @@
+{
+  "created_at": "2026-05-02T23:54:47",
+  "base_url": "https://api.deepseek.com",
+  "profiles": [
+    {
+      "profile_id": "deepseek-chat",
+      "label": "DeepSeek V4 Fast",
+      "model": "deepseek-v4-flash",
+      "timeout_sec": 60.0,
+      "extra_payload": {
+        "temperature": 0.7,
+        "thinking": {
+          "type": "disabled"
+        }
+      }
+    },
+    {
+      "profile_id": "deepseek-reasoner",
+      "label": "DeepSeek V4 Standard",
+      "model": "deepseek-v4-pro",
+      "timeout_sec": 420.0,
+      "extra_payload": {
+        "thinking": {
+          "type": "enabled"
+        },
+        "reasoning_effort": "high"
+      }
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "trpg_narration",
+      "label": "TRPG narrator continuation",
+      "system_prompt": "你是中文 TRPG 主持人。延续场景，给出具体、可继续的结果，不要替玩家做决定。",
+      "user_prompt": "故事标题：VHS复古恐怖录像带\n\n最近上下文：\n- 玩家在废弃录像出租店的后仓找到一台仍在运转的录像机。\n- 电视屏幕里出现了玩家刚才经过的街角，但画面时间似乎慢了三分钟。\n- 柜台抽屉里有一张会员卡，背面写着：请不要倒带。\n\n本轮玩家行动：我把会员卡放到录像机旁边，盯着电视里的街角，等待那三分钟后的事情发生。\n\n任务：写出主持人的下一段推进，控制在 180 到 320 个中文字符。"
+    },
+    {
+      "id": "rag_rule_decision",
+      "label": "RAG-style rule decision",
+      "system_prompt": "你是 TRPG 规则裁判。只根据给定规则片段判断，不要编造额外规则。",
+      "user_prompt": "规则片段：\n1. 当玩家做出有风险且结果不确定的行动时，主持人要求一次判定。\n2. 普通难度判定目标值为 12，困难难度为 16。\n3. 若行动使用了明确有利的工具，判定结果 +2。\n4. 若失败但只差 1 到 2 点，主持人应给出代价成功或部分成功。\n\n场景：玩家想用手电筒和会员卡反光观察录像机内部是否有卡住的磁带。主持人认为这是普通难度。玩家掷骰结果总和为 10。\n\n任务：判断是否成功，并说明主持人下一步应该怎么处理。回答要简洁。"
+    },
+    {
+      "id": "json_asset_plan",
+      "label": "JSON asset plan",
+      "system_prompt": "你是 TRPG 内容资产规划助手。必须返回合法 JSON object，不要输出 Markdown。",
+      "user_prompt": "Return a valid json object for this asset plan. The top-level keys must be:\n- cover_prompt: string\n- locations: array of short strings\n- npc_portraits: array of short strings\n\n剧本：VHS复古恐怖录像带。核心地点是雨夜录像出租店、后仓、地下剪辑室。主要 NPC 是沉默的店员和只存在于录像里的失踪顾客。",
+      "response_format": {
+        "type": "json_object"
+      }
+    }
+  ],
+  "results": [
+    {
+      "case_id": "trpg_narration",
+      "case_label": "TRPG narrator continuation",
+      "profile_id": "deepseek-chat",
+      "profile_label": "DeepSeek V4 Fast",
+      "model": "deepseek-v4-flash",
+      "duration_sec": 1.818,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "15a949c2-4204-4fd3-a48b-1898b9d09913",
+        "object": "chat.completion",
+        "created": 1777780448,
+        "model": "deepseek-v4-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "电视里的画面持续播放着。三分钟后，你看见自己刚才经过的街角出现了一个模糊的人影——但那时街上应该空无一人。那人影站在你曾经站过的地方，缓缓举起一只手，指向录像店的方向。录像机突然发出咔哒声，会员卡的边缘开始渗出暗红色的液体。"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 143,
+          "completion_tokens": 67,
+          "total_tokens": 210,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 143
+        },
+        "system_fingerprint": "fp_058df29938_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "电视里的画面持续播放着。三分钟后，你看见自己刚才经过的街角出现了一个模糊的人影——但那时街上应该空无一人。那人影站在你曾经站过的地方，缓缓举起一只手，指向录像店的方向。录像机突然发出咔哒声，会员卡的边缘开始渗出暗红色的液体。",
+      "reasoning_content": "",
+      "usage": {
+        "prompt_tokens": 143,
+        "completion_tokens": 67,
+        "total_tokens": 210,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 143
+      }
+    },
+    {
+      "case_id": "trpg_narration",
+      "case_label": "TRPG narrator continuation",
+      "profile_id": "deepseek-reasoner",
+      "profile_label": "DeepSeek V4 Standard",
+      "model": "deepseek-v4-pro",
+      "duration_sec": 18.158,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "28f20abf-b757-4300-bb76-c7212aa1d911",
+        "object": "chat.completion",
+        "created": 1777780450,
+        "model": "deepseek-v4-pro",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "你把会员卡轻轻放在录像机旁——卡面在屏幕蓝光下微微反光。电视里，街角的梧桐树叶子还在按三分钟前的节奏晃动。\n\n盯着屏幕等待的分秒格外漫长。\n\n就在你眨眼的一瞬——画面突然抖了一下，像是有人用手指弹了下镜头。接着，屏幕左下角走出一个身影，动作僵硬，逆光中看不清脸，只是径直走向路边的邮筒，往投递口塞了什么东西。\n\n然后它停下来，缓缓转过头，朝屏幕的方向看了过来——像是透过电视，知道你在看着它。\n\n录像机忽然发出“咔嗒”一声，磁带开始自动转动。\n\n你低头看去，会员卡背面的字变了——*请不要倒带*的下面，多了一行新鲜的划痕：\n\n*它看见你了。*",
+              "reasoning_content": "好的，现在我是TRPG主持人了，正在带一个复古恐怖录像带风格的场景。玩家找到了会员卡，盯住了电视屏幕，等待预知的三分钟后画面发生。这个行动很主动，我得给他一个既延续诡异氛围又推动局势的回应。\n\n嗯，玩家没有贸然操作录像机或者倒带，而是选择观察，这很谨慎。我得让这三分钟里发生点不寻常的事，但又不至于立刻吓到他或者给出太明确的答案。毕竟恐怖感在于未知和隐约的威胁。\n\n会员卡有问题，刚才记得卡背写着“请不要倒带”，这肯定是个关键线索。现在电视画面出现异常，正好可以把这个警告和实际状况联系起来。我可以让电视画面随着会员卡开始微微抖动，暗示某种力量正在响应，但先不明确展示到底是什么。\n\n三分钟差不多到了，得让画面里出现变化。直接来个吓人的东西可能太简单粗暴了，不如让电视里的街道场景出现一个模糊的、非人形状的东西，动作像是在操作什么东西——正好可以呼应录像带倒带的音效。观众（玩家）会瞬间明白，这东西在回放录像？或者在做什么别的？\n\n最后扣一下会员卡的变化，“请不要倒带”的字样被划掉了。这暗示警告失效了，或者某种规则被打破了——可能正是因为玩家把卡放在录像机旁边，激活了什么。玩家会开始担心，那现在是不是可以倒带了？还是绝对不能倒带？这种不确定性正是我想要的。\n\n好，这个思路应该行。画面抖动、黑影出现、倒带声响、文字变化，一环扣一环，既给了玩家新信息，又制造了新疑问。就这样继续推动场景。"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 143,
+          "completion_tokens": 511,
+          "total_tokens": 654,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 345
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 143
+        },
+        "system_fingerprint": "fp_9954b31ca7_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "你把会员卡轻轻放在录像机旁——卡面在屏幕蓝光下微微反光。电视里，街角的梧桐树叶子还在按三分钟前的节奏晃动。\n\n盯着屏幕等待的分秒格外漫长。\n\n就在你眨眼的一瞬——画面突然抖了一下，像是有人用手指弹了下镜头。接着，屏幕左下角走出一个身影，动作僵硬，逆光中看不清脸，只是径直走向路边的邮筒，往投递口塞了什么东西。\n\n然后它停下来，缓缓转过头，朝屏幕的方向看了过来——像是透过电视，知道你在看着它。\n\n录像机忽然发出“咔嗒”一声，磁带开始自动转动。\n\n你低头看去，会员卡背面的字变了——*请不要倒带*的下面，多了一行新鲜的划痕：\n\n*它看见你了。*",
+      "reasoning_content": "好的，现在我是TRPG主持人了，正在带一个复古恐怖录像带风格的场景。玩家找到了会员卡，盯住了电视屏幕，等待预知的三分钟后画面发生。这个行动很主动，我得给他一个既延续诡异氛围又推动局势的回应。\n\n嗯，玩家没有贸然操作录像机或者倒带，而是选择观察，这很谨慎。我得让这三分钟里发生点不寻常的事，但又不至于立刻吓到他或者给出太明确的答案。毕竟恐怖感在于未知和隐约的威胁。\n\n会员卡有问题，刚才记得卡背写着“请不要倒带”，这肯定是个关键线索。现在电视画面出现异常，正好可以把这个警告和实际状况联系起来。我可以让电视画面随着会员卡开始微微抖动，暗示某种力量正在响应，但先不明确展示到底是什么。\n\n三分钟差不多到了，得让画面里出现变化。直接来个吓人的东西可能太简单粗暴了，不如让电视里的街道场景出现一个模糊的、非人形状的东西，动作像是在操作什么东西——正好可以呼应录像带倒带的音效。观众（玩家）会瞬间明白，这东西在回放录像？或者在做什么别的？\n\n最后扣一下会员卡的变化，“请不要倒带”的字样被划掉了。这暗示警告失效了，或者某种规则被打破了——可能正是因为玩家把卡放在录像机旁边，激活了什么。玩家会开始担心，那现在是不是可以倒带了？还是绝对不能倒带？这种不确定性正是我想要的。\n\n好，这个思路应该行。画面抖动、黑影出现、倒带声响、文字变化，一环扣一环，既给了玩家新信息，又制造了新疑问。就这样继续推动场景。",
+      "usage": {
+        "prompt_tokens": 143,
+        "completion_tokens": 511,
+        "total_tokens": 654,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 345
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 143
+      }
+    },
+    {
+      "case_id": "rag_rule_decision",
+      "case_label": "RAG-style rule decision",
+      "profile_id": "deepseek-chat",
+      "profile_label": "DeepSeek V4 Fast",
+      "model": "deepseek-v4-flash",
+      "duration_sec": 1.216,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "c00b3879-759b-45ac-8f50-75521fba22b0",
+        "object": "chat.completion",
+        "created": 1777780468,
+        "model": "deepseek-v4-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "失败，差2点，但符合代价成功条件（只差1-2点）。主持人应给出部分成功：玩家看到磁带卡住，但在观察过程中手电筒意外滑落发出声响，可能引起注意。"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 159,
+          "completion_tokens": 47,
+          "total_tokens": 206,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 159
+        },
+        "system_fingerprint": "fp_058df29938_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "失败，差2点，但符合代价成功条件（只差1-2点）。主持人应给出部分成功：玩家看到磁带卡住，但在观察过程中手电筒意外滑落发出声响，可能引起注意。",
+      "reasoning_content": "",
+      "usage": {
+        "prompt_tokens": 159,
+        "completion_tokens": 47,
+        "total_tokens": 206,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 159
+      }
+    },
+    {
+      "case_id": "rag_rule_decision",
+      "case_label": "RAG-style rule decision",
+      "profile_id": "deepseek-reasoner",
+      "profile_label": "DeepSeek V4 Standard",
+      "model": "deepseek-v4-pro",
+      "duration_sec": 5.981,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "716ff65d-5948-465e-85f6-29c1a4adb952",
+        "object": "chat.completion",
+        "created": 1777780469,
+        "model": "deepseek-v4-pro",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "成功。玩家使用手电筒和会员卡反光属于明确有利的工具，结果 +2 后为 12，达到普通难度目标值。主持人应描述玩家看清录像机内部，确定有或无卡住的磁带。",
+              "reasoning_content": "我们被要求根据规则片段判断。规则：普通难度目标值12，使用有利工具+2。玩家掷骰10。如果使用了有利工具（手电筒和会员卡反光），+2后为12，刚好达到目标值，成功。规则说“若行动使用了明确有利的工具，判定结果+2”，所以10+2=12，达到普通难度目标值12，成功。主持人下一步：描述成功观察到录像机内部，发现是否有卡住的磁带。回答：成功，玩家通过反光看清内部。"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 159,
+          "completion_tokens": 162,
+          "total_tokens": 321,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 113
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 159
+        },
+        "system_fingerprint": "fp_9954b31ca7_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "成功。玩家使用手电筒和会员卡反光属于明确有利的工具，结果 +2 后为 12，达到普通难度目标值。主持人应描述玩家看清录像机内部，确定有或无卡住的磁带。",
+      "reasoning_content": "我们被要求根据规则片段判断。规则：普通难度目标值12，使用有利工具+2。玩家掷骰10。如果使用了有利工具（手电筒和会员卡反光），+2后为12，刚好达到目标值，成功。规则说“若行动使用了明确有利的工具，判定结果+2”，所以10+2=12，达到普通难度目标值12，成功。主持人下一步：描述成功观察到录像机内部，发现是否有卡住的磁带。回答：成功，玩家通过反光看清内部。",
+      "usage": {
+        "prompt_tokens": 159,
+        "completion_tokens": 162,
+        "total_tokens": 321,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 113
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 159
+      }
+    },
+    {
+      "case_id": "json_asset_plan",
+      "case_label": "JSON asset plan",
+      "profile_id": "deepseek-chat",
+      "profile_label": "DeepSeek V4 Fast",
+      "model": "deepseek-v4-flash",
+      "duration_sec": 1.647,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "1df68e55-61e3-47aa-a888-a588a9696a65",
+        "object": "chat.completion",
+        "created": 1777780475,
+        "model": "deepseek-v4-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "{\n  \"cover_prompt\": \"VHS tape cover, grainy, rainy night, neon glow from video rental store, retro horror style\",\n  \"locations\": [\"雨夜录像出租店\", \"后仓\", \"地下剪辑室\"],\n  \"npc_portraits\": [\"沉默的店员\", \"录像里的失踪顾客\"]\n}"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 127,
+          "completion_tokens": 69,
+          "total_tokens": 196,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 127
+        },
+        "system_fingerprint": "fp_058df29938_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "{\n  \"cover_prompt\": \"VHS tape cover, grainy, rainy night, neon glow from video rental store, retro horror style\",\n  \"locations\": [\"雨夜录像出租店\", \"后仓\", \"地下剪辑室\"],\n  \"npc_portraits\": [\"沉默的店员\", \"录像里的失踪顾客\"]\n}",
+      "reasoning_content": "",
+      "usage": {
+        "prompt_tokens": 127,
+        "completion_tokens": 69,
+        "total_tokens": 196,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 127
+      }
+    },
+    {
+      "case_id": "json_asset_plan",
+      "case_label": "JSON asset plan",
+      "profile_id": "deepseek-reasoner",
+      "profile_label": "DeepSeek V4 Standard",
+      "model": "deepseek-v4-pro",
+      "duration_sec": 9.715,
+      "status_code": 200,
+      "ok": true,
+      "raw_response": {
+        "id": "438e1f99-e012-4c94-a972-156716d012bc",
+        "object": "chat.completion",
+        "created": 1777780477,
+        "model": "deepseek-v4-pro",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "{\n  \"cover_prompt\": \"A worn VHS tape cover with grainy, distorted horror imagery: rain-slicked streets at night, a dimly lit video rental store with flickering neon, and a shadowy figure emerging from a static-filled screen.\",\n  \"locations\": [\n    \"Rain-swept video rental store at midnight, shelves lined with flickering horror tapes\",\n    \"Cluttered back storage room, stacked with warped VHS sleeves and a broken monitor\",\n    \"Grimy underground editing suite, walls covered in spliced tape and a bloodstained splicing machine\"\n  ],\n  \"npc_portraits\": [\n    \"Silent, gaunt store clerk with tired eyes and a faded name tag, standing motionless behind the counter\",\n    \"Missing customer whose face flickers uneasily within the static of a corrupted VHS tape\"\n  ]\n}",
+              "reasoning_content": "我们被要求输出一个JSON对象，包含cover_prompt，locations数组，npc_portraits数组。剧本是VHS复古恐怖录像带。核心地点：雨夜录像出租店、后仓、地下剪辑室。主要NPC：沉默的店员、只存在于录像里的失踪顾客。\n\n所以cover_prompt描述一个复古恐怖录像带风格的封面。locations是三个地点。npc_portraits是两个NPC的简短描述。\n\n不需要多说，直接输出JSON。"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 127,
+          "completion_tokens": 278,
+          "total_tokens": 405,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 127
+        },
+        "system_fingerprint": "fp_9954b31ca7_prod0820_fp8_kvcache_20260402"
+      },
+      "finish_reason": "stop",
+      "content": "{\n  \"cover_prompt\": \"A worn VHS tape cover with grainy, distorted horror imagery: rain-slicked streets at night, a dimly lit video rental store with flickering neon, and a shadowy figure emerging from a static-filled screen.\",\n  \"locations\": [\n    \"Rain-swept video rental store at midnight, shelves lined with flickering horror tapes\",\n    \"Cluttered back storage room, stacked with warped VHS sleeves and a broken monitor\",\n    \"Grimy underground editing suite, walls covered in spliced tape and a bloodstained splicing machine\"\n  ],\n  \"npc_portraits\": [\n    \"Silent, gaunt store clerk with tired eyes and a faded name tag, standing motionless behind the counter\",\n    \"Missing customer whose face flickers uneasily within the static of a corrupted VHS tape\"\n  ]\n}",
+      "reasoning_content": "我们被要求输出一个JSON对象，包含cover_prompt，locations数组，npc_portraits数组。剧本是VHS复古恐怖录像带。核心地点：雨夜录像出租店、后仓、地下剪辑室。主要NPC：沉默的店员、只存在于录像里的失踪顾客。\n\n所以cover_prompt描述一个复古恐怖录像带风格的封面。locations是三个地点。npc_portraits是两个NPC的简短描述。\n\n不需要多说，直接输出JSON。",
+      "usage": {
+        "prompt_tokens": 127,
+        "completion_tokens": 278,
+        "total_tokens": 405,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 96
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 127
+      }
+    }
+  ]
+}

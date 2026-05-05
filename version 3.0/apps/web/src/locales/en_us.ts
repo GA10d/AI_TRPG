@@ -203,6 +203,14 @@ export const enUs = {
       commitRoundLogWait: "Waiting for the narrator response and ending judge result.",
       commitRoundLogDone: (round: number) => `Round ${round} submission completed.`,
       commitRoundLogFailed: (reason: string) => `Round submission failed: ${reason}`,
+      directorGenerationQueued: (round: number) =>
+        `Director queued background guidance for round ${round}.`,
+      directorGenerationRunning: (round: number) =>
+        `Director is generating background guidance for round ${round}.`,
+      directorGenerationReady: (round: number) =>
+        `Director background guidance for round ${round} is ready.`,
+      directorGenerationFailed: (round: number, reason: string) =>
+        `Director background guidance for round ${round} failed: ${reason}`,
       autoModeSubmitLocked: "Auto play is active, so manual submission is disabled.",
       reasonerTimeoutHint:
         "This session is using DeepSeek Standard. If timeouts continue, raise TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS or TRPG_SERVER_PROXY_TIMEOUT_MS.",
@@ -855,13 +863,13 @@ export const enUs = {
     advancedModel: {
       title: "Advanced Setup",
       description:
-        "By default every AI follows the global text model above. Turn this on to assign separate model profiles to the narrator, AI protagonist, and each AI teammate.",
+        "By default every AI and multi-agent unit follows the global text model above. Turn this on to assign separate model profiles to the narrator, Dicer, NPC Manager, Director, AI protagonist, and each AI teammate.",
       enabled: "Enabled",
       disabled: "Disabled",
       enabledSummary: (count: number) =>
         count > 0
-          ? `${count} roles now use dedicated model profiles.`
-          : "Advanced setup is on, but every role is still following the global default model.",
+          ? `${count} roles or agents now use dedicated model profiles.`
+          : "Advanced setup is on, but every role and agent is still following the global default model.",
       followDefaultBadge: "Use default",
       inheritDefault: "Follow the global default model",
       followingDefault: (value: string) => `Currently following the global default: ${value}`,
@@ -869,6 +877,16 @@ export const enUs = {
       narratorTitle: "AI Narrator",
       narratorDescription:
         "Handles the opening, turn narration, ending checks, and narrator-side memory work.",
+      multiAgentGroupTitle: "Multi-Agent GM",
+      dicerTitle: "Dicer",
+      dicerDescription:
+        "Used for rules adjudication, action risk, success or failure, and consequence boundaries.",
+      npcManagerTitle: "NPC Manager",
+      npcManagerDescription:
+        "Used for NPC behavior, motives, background actions, and NPC state updates consistent with public story history.",
+      directorTitle: "Director",
+      directorDescription:
+        "Used for background pacing, world state, hidden events, and long-range direction notes.",
       primaryPlayerTitle: "AI Protagonist",
       primaryPlayerDescription:
         "Only applies in Story Mode, for the AI lead player's round draft generation.",
@@ -883,6 +901,8 @@ export const enUs = {
       title: "Opening Preview",
       regenerate: "Regenerate Opening",
       regenerateBusy: "Generating...",
+      invertColors: "Invert Colors",
+      restoreColors: "Restore Colors",
       coverAlt: (storyTitle: string) => `${storyTitle} cover`,
       openCoverAria: "View full image",
       openCoverButton: "View full image",

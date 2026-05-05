@@ -257,6 +257,9 @@ function normalizeAdvancedTextModelConfigInput(
   }
 
   const narrator = normalizeRoleTextModelConfigInput(input.narrator);
+  const dicer = normalizeRoleTextModelConfigInput(input.dicer);
+  const npcManager = normalizeRoleTextModelConfigInput(input.npcManager);
+  const director = normalizeRoleTextModelConfigInput(input.director);
   const primaryPlayer = normalizeRoleTextModelConfigInput(input.primaryPlayer);
   const companionOverrides = (input.companionOverrides ?? []).map((item) =>
     normalizeRoleTextModelConfigInput(item)
@@ -267,12 +270,22 @@ function normalizeAdvancedTextModelConfigInput(
   }
 
   const hasCompanionOverride = companionOverrides.some(Boolean);
-  if (!narrator && !primaryPlayer && !hasCompanionOverride) {
+  if (
+    !narrator &&
+    !dicer &&
+    !npcManager &&
+    !director &&
+    !primaryPlayer &&
+    !hasCompanionOverride
+  ) {
     return null;
   }
 
   return {
     narrator,
+    dicer,
+    npcManager,
+    director,
     primaryPlayer,
     companionOverrides
   };
@@ -707,6 +720,7 @@ export function App() {
   const stagedSessionBootTokenRef = useRef(0);
   const autoPreparedRoundKeyRef = useRef<string | null>(null);
   const autoCommittedRoundKeyRef = useRef<string | null>(null);
+  const directorTaskActivityKeyRef = useRef<string | null>(null);
   const pendingComicGenerationKeysRef = useRef<Set<string>>(new Set());
   const comicGenerationTaskCount = pendingComicGenerationTasks.length;
   const isComicGenerating = comicGenerationTaskCount > 0;
@@ -957,6 +971,9 @@ export function App() {
 
       const nextConfig: AdvancedTextModelConfigInput = {
         narrator: normalizeForAccessMode(current.narrator),
+        dicer: normalizeForAccessMode(current.dicer),
+        npcManager: normalizeForAccessMode(current.npcManager),
+        director: normalizeForAccessMode(current.director),
         primaryPlayer: normalizeForAccessMode(current.primaryPlayer),
         companionOverrides: (current.companionOverrides ?? []).map((item) =>
           normalizeForAccessMode(item)
@@ -1015,6 +1032,83 @@ export function App() {
       ].slice(-48);
     });
   }
+
+  function getDirectorTaskActivityKey(
+    sessionId: string,
+    task: NonNullable<NonNullable<SessionSnapshot["session"]["gameState"]["multiAgent"]>["directorTask"]>
+  ): string {
+    const statusTime =
+      task.status === "ready"
+        ? task.completedAt ?? task.startedAt ?? task.queuedAt
+        : task.status === "failed"
+          ? [task.completedAt ?? "", task.error ?? task.diagnostics?.errorMessage ?? ""].join(":")
+          : task.status === "running"
+            ? task.startedAt ?? task.queuedAt
+            : task.queuedAt;
+
+    return [sessionId, task.round, task.status, statusTime].join("|");
+  }
+
+  function getDirectorTaskActivityMessage(
+    task: NonNullable<NonNullable<SessionSnapshot["session"]["gameState"]["multiAgent"]>["directorTask"]>
+  ): string {
+    switch (task.status) {
+      case "queued":
+        return uiText.app.status.directorGenerationQueued(task.round);
+      case "running":
+        return uiText.app.status.directorGenerationRunning(task.round);
+      case "ready":
+        return uiText.app.status.directorGenerationReady(task.round);
+      case "failed":
+        return uiText.app.status.directorGenerationFailed(
+          task.round,
+          task.diagnostics?.errorMessage?.trim() || task.error?.trim() || "unknown error"
+        );
+      default:
+        return "";
+    }
+  }
+
+  useEffect(() => {
+    if (view !== "game" || !snapshot) {
+      return;
+    }
+
+    const directorTask = snapshot.session.gameState.multiAgent?.directorTask ?? null;
+    if (!directorTask) {
+      directorTaskActivityKeyRef.current = null;
+      return;
+    }
+
+    const activityKey = getDirectorTaskActivityKey(snapshot.session.id, directorTask);
+    if (directorTaskActivityKeyRef.current === activityKey) {
+      return;
+    }
+
+    directorTaskActivityKeyRef.current = activityKey;
+    const tone: StatusState["tone"] = directorTask.status === "failed" ? "error" : "neutral";
+    const message = getDirectorTaskActivityMessage(directorTask);
+    if (!message) {
+      return;
+    }
+
+    appendGameActivity(message, tone);
+    setStatus({
+      message,
+      tone
+    });
+  }, [
+    snapshot?.session.gameState.multiAgent?.directorTask?.completedAt,
+    snapshot?.session.gameState.multiAgent?.directorTask?.diagnostics?.errorMessage,
+    snapshot?.session.gameState.multiAgent?.directorTask?.error,
+    snapshot?.session.gameState.multiAgent?.directorTask?.queuedAt,
+    snapshot?.session.gameState.multiAgent?.directorTask?.round,
+    snapshot?.session.gameState.multiAgent?.directorTask?.startedAt,
+    snapshot?.session.gameState.multiAgent?.directorTask?.status,
+    snapshot?.session.id,
+    uiText,
+    view
+  ]);
 
   function appendReasonerTimeoutHintIfNeeded(
     currentSnapshot: SessionSnapshot,
@@ -1515,6 +1609,33 @@ export function App() {
       };
     }
 
+    if (normalizedConfig?.dicer) {
+      roleModelConfigs.dicer = {
+        modelProfileId: normalizedConfig.dicer.modelProfileId,
+        runtimeModelConfig: normalizeRuntimeConfig(
+          normalizedConfig.dicer.runtimeModelConfig
+        )
+      };
+    }
+
+    if (normalizedConfig?.npcManager) {
+      roleModelConfigs.npcManager = {
+        modelProfileId: normalizedConfig.npcManager.modelProfileId,
+        runtimeModelConfig: normalizeRuntimeConfig(
+          normalizedConfig.npcManager.runtimeModelConfig
+        )
+      };
+    }
+
+    if (normalizedConfig?.director) {
+      roleModelConfigs.director = {
+        modelProfileId: normalizedConfig.director.modelProfileId,
+        runtimeModelConfig: normalizeRuntimeConfig(
+          normalizedConfig.director.runtimeModelConfig
+        )
+      };
+    }
+
     if (currentSnapshot && normalizedConfig?.primaryPlayer) {
       participantRoleConfigs[currentSnapshot.session.playerParticipantId] = {
         modelProfileId: normalizedConfig.primaryPlayer.modelProfileId,
@@ -1549,7 +1670,11 @@ export function App() {
       comicGenerationInterval: normalizeComicGenerationInterval(comicGenerationInterval),
       runtimeModelConfig: normalizeRuntimeConfig(runtimeModelConfig),
       roleModelConfigs:
-        roleModelConfigs.narrator || roleModelConfigs.participants
+        roleModelConfigs.narrator ||
+        roleModelConfigs.dicer ||
+        roleModelConfigs.npcManager ||
+        roleModelConfigs.director ||
+        roleModelConfigs.participants
           ? roleModelConfigs
           : undefined
     };
@@ -1697,6 +1822,36 @@ export function App() {
     updateAdvancedTextModelConfig((current) => ({
       ...(current ?? {}),
       narrator: value ? normalizeRoleTextModelConfigInput(value) : null,
+      companionOverrides: [...(current?.companionOverrides ?? [])]
+    }));
+  }
+
+  function handleAdvancedDicerTextModelConfigChange(
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => ({
+      ...(current ?? {}),
+      dicer: value ? normalizeRoleTextModelConfigInput(value) : null,
+      companionOverrides: [...(current?.companionOverrides ?? [])]
+    }));
+  }
+
+  function handleAdvancedNpcManagerTextModelConfigChange(
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => ({
+      ...(current ?? {}),
+      npcManager: value ? normalizeRoleTextModelConfigInput(value) : null,
+      companionOverrides: [...(current?.companionOverrides ?? [])]
+    }));
+  }
+
+  function handleAdvancedDirectorTextModelConfigChange(
+    value: RoleTextModelConfigInput | null
+  ): void {
+    updateAdvancedTextModelConfig((current) => ({
+      ...(current ?? {}),
+      director: value ? normalizeRoleTextModelConfigInput(value) : null,
       companionOverrides: [...(current?.companionOverrides ?? [])]
     }));
   }
@@ -3580,6 +3735,15 @@ export function App() {
           onAdvancedTextModelEnabledChange={setAdvancedTextModelEnabled}
           onAdvancedNarratorTextModelConfigChange={
             handleAdvancedNarratorTextModelConfigChange
+          }
+          onAdvancedDicerTextModelConfigChange={
+            handleAdvancedDicerTextModelConfigChange
+          }
+          onAdvancedNpcManagerTextModelConfigChange={
+            handleAdvancedNpcManagerTextModelConfigChange
+          }
+          onAdvancedDirectorTextModelConfigChange={
+            handleAdvancedDirectorTextModelConfigChange
           }
           onAdvancedPrimaryPlayerTextModelConfigChange={
             handleAdvancedPrimaryPlayerTextModelConfigChange

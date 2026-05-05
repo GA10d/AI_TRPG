@@ -7,6 +7,11 @@
       "prompt": "contemporary American superhero comic style, bold vibrant colors, dynamic heroic poses, detailed muscular anatomy, cinematic action scenes, modern digital art"
     },
     {
+      "id": "realistic",
+      "name": "Realistic",
+      "prompt": "photorealistic cinematic realism, true-to-life human proportions, natural facial features, realistic clothing materials, believable lighting, grounded environments, subtle color grading, detailed textures, documentary-like visual authenticity, no stylized cartoon or comic exaggeration"
+    },
+    {
       "id": "manga",
       "name": "Manga",
       "prompt": "Japanese manga style, clean precise black linework, screen tone shading, expressive eyes, dynamic speed lines, black and white with impact effects"

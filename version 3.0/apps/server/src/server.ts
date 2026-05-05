@@ -87,6 +87,7 @@ import {
   loadSessionFromSaveBundle,
   prepareRound,
   rebuildSessionMemoryForSession,
+  resumePendingMultiAgentDirectorGeneration,
   sendPrivateChat,
   submitManualNarration,
   submitTurn,
@@ -1017,7 +1018,8 @@ async function handleApiRequest(
   if (url.pathname === "/api/saves/load" && request.method === "POST") {
     const payload = await readJsonBody<LoadSaveRequest>(request);
     const snapshot = loadSessionFromSaveBundle(payload.saveBundle, store);
-    sendJson(response, 200, snapshot);
+    resumePendingMultiAgentDirectorGeneration(snapshot.session.id, store, contentRoot);
+    sendJson(response, 200, store.get(snapshot.session.id) ?? snapshot);
     return true;
   }
 
@@ -1088,7 +1090,8 @@ async function handleApiRequest(
     const localSettings = await getLocalSaveSettings(localSettingsPath, defaultLocalSaveRoot);
     const saveBundle = await loadSaveBundleFromDisk(localSettings.effectiveSaveDirectory, saveId);
     const snapshot = loadSessionFromSaveBundle(saveBundle, store);
-    sendJson(response, 200, snapshot);
+    resumePendingMultiAgentDirectorGeneration(snapshot.session.id, store, contentRoot);
+    sendJson(response, 200, store.get(snapshot.session.id) ?? snapshot);
     return true;
   }
 

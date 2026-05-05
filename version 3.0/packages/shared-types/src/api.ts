@@ -35,6 +35,9 @@ export type RoleTextModelConfigInput = {
 
 export type AdvancedTextModelConfigInput = {
   narrator?: RoleTextModelConfigInput | null;
+  dicer?: RoleTextModelConfigInput | null;
+  npcManager?: RoleTextModelConfigInput | null;
+  director?: RoleTextModelConfigInput | null;
   primaryPlayer?: RoleTextModelConfigInput | null;
   companionOverrides?: Array<RoleTextModelConfigInput | null>;
 };

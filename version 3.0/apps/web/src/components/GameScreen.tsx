@@ -772,6 +772,34 @@ export function GameScreen(props: GameScreenProps) {
   }, [isMultiAgentMode, sidePanelMode, supportsReasoningPanel]);
 
   useEffect(() => {
+    if (
+      !snapshot ||
+      sidePanelMode !== "multi_agent" ||
+      !isMultiAgentMode ||
+      currentMultiAgentRound?.director ||
+      (currentDirectorTask?.status !== "queued" && currentDirectorTask?.status !== "running")
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void onRefreshSession();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    currentDirectorTask?.round,
+    currentDirectorTask?.status,
+    currentMultiAgentRound?.director,
+    isMultiAgentMode,
+    onRefreshSession,
+    sidePanelMode,
+    snapshot?.session.id
+  ]);
+
+  useEffect(() => {
     if (!isActivityStageTimingActive) {
       setActivityStageStartedAt(null);
       return;

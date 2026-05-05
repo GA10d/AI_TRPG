@@ -205,6 +205,14 @@ export const jaJp = {
       commitRoundLogWait: "ナレーター応答とエンディング判定の返却を待っています。",
       commitRoundLogDone: (round: number) => `ラウンド ${round} の送信が完了しました。`,
       commitRoundLogFailed: (reason: string) => `ラウンド送信に失敗しました: ${reason}`,
+      directorGenerationQueued: (round: number) =>
+        `Director がラウンド ${round} の背景ガイダンス生成をキューに入れました。`,
+      directorGenerationRunning: (round: number) =>
+        `Director がラウンド ${round} の背景ガイダンスを生成しています。`,
+      directorGenerationReady: (round: number) =>
+        `Director のラウンド ${round} 背景ガイダンスが生成されました。`,
+      directorGenerationFailed: (round: number, reason: string) =>
+        `Director のラウンド ${round} 背景ガイダンス生成に失敗しました: ${reason}`,
       autoModeSubmitLocked: "自動進行中のため、手動送信はできません。",
       reasonerTimeoutHint:
         "このセッションは DeepSeek Standard を使っています。タイムアウトが続く場合は TRPG_DEEPSEEK_STANDARD_TIMEOUT_MS または TRPG_SERVER_PROXY_TIMEOUT_MS を上げてください。",
@@ -868,13 +876,13 @@ export const jaJp = {
     advancedModel: {
       title: "詳細設定",
       description:
-        "既定ではすべての AI が上の共通テキストモデルを使います。ここを有効にすると、ナレーター、AI 主人公、各 AI 仲間ごとに別のモデルプロファイルを指定できます。",
+        "既定ではすべての AI と複数 Agent ユニットが上の共通テキストモデルを使います。ここを有効にすると、ナレーター、Dicer、NPC Manager、Director、AI 主人公、各 AI 仲間ごとに別のモデルプロファイルを指定できます。",
       enabled: "有効",
       disabled: "無効",
       enabledSummary: (count: number) =>
         count > 0
-          ? `${count} 役に個別モデルを設定しています。`
-          : "詳細設定は有効ですが、現在はすべての役が共通モデルを使っています。",
+          ? `${count} 役または Agent に個別モデルを設定しています。`
+          : "詳細設定は有効ですが、現在はすべての役と Agent が共通モデルを使っています。",
       followDefaultBadge: "既定を使用",
       inheritDefault: "共通の既定モデルを使う",
       followingDefault: (value: string) => `現在は共通既定を使用中: ${value}`,
@@ -882,6 +890,14 @@ export const jaJp = {
       narratorTitle: "AI ナレーター",
       narratorDescription:
         "導入、各ターンの叙述、エンディング判定、記憶圧縮などナレーター側の処理に使います。",
+      multiAgentGroupTitle: "複数 Agent GM",
+      dicerTitle: "Dicer",
+      dicerDescription: "ルール判定、行動リスク、成否、結果範囲の内部裁定に使います。",
+      npcManagerTitle: "NPC Manager",
+      npcManagerDescription:
+        "NPC の行動、動機、裏での動き、公開履歴と矛盾しない NPC 状態更新に使います。",
+      directorTitle: "Director",
+      directorDescription: "背景のテンポ、世界状態、隠しイベント、長期的な進行メモに使います。",
       primaryPlayerTitle: "AI 主人公",
       primaryPlayerDescription:
         "ストーリーモードでのみ有効で、AI 主役の行動草稿生成に使われます。",
@@ -896,6 +912,8 @@ export const jaJp = {
       title: "開場プレビュー",
       regenerate: "開場を再生成",
       regenerateBusy: "生成中...",
+      invertColors: "反転",
+      restoreColors: "色を戻す",
       coverAlt: (storyTitle: string) => `${storyTitle} のカバー`,
       openCoverAria: "大きい画像を表示",
       openCoverButton: "大きく見る",

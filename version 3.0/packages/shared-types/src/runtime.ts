@@ -472,6 +472,30 @@ export type SaveRuntimeConfig = {
         model?: string;
       };
     };
+    dicer?: {
+      modelProfileId?: string;
+      runtimeModelConfig?: {
+        apiKey?: string;
+        baseUrl?: string;
+        model?: string;
+      };
+    };
+    npcManager?: {
+      modelProfileId?: string;
+      runtimeModelConfig?: {
+        apiKey?: string;
+        baseUrl?: string;
+        model?: string;
+      };
+    };
+    director?: {
+      modelProfileId?: string;
+      runtimeModelConfig?: {
+        apiKey?: string;
+        baseUrl?: string;
+        model?: string;
+      };
+    };
     participants?: Record<
       string,
       | {

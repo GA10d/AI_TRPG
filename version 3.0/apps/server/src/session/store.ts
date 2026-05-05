@@ -15,6 +15,10 @@ export type ResolvedSessionRuntimeSelection = {
   };
 };
 
+type SessionRoleModelConfig =
+  | NonNullable<NonNullable<SessionRuntimeConfig["roleModelConfigs"]>["narrator"]>
+  | undefined;
+
 function resolveGlobalRuntimeSelection(
   session: Session,
   runtimeConfig: SessionRuntimeConfig | null
@@ -38,6 +42,41 @@ export function resolveNarratorRuntimeSelection(
     runtimeModelConfig:
       narratorConfig?.runtimeModelConfig ?? runtimeConfig?.runtimeModelConfig
   };
+}
+
+function resolveExplicitRoleRuntimeSelection(
+  session: Session,
+  runtimeConfig: SessionRuntimeConfig | null,
+  roleConfig: SessionRoleModelConfig
+): ResolvedSessionRuntimeSelection {
+  if (!roleConfig) {
+    return resolveGlobalRuntimeSelection(session, runtimeConfig);
+  }
+
+  return {
+    modelProfileId:
+      roleConfig.modelProfileId ??
+      runtimeConfig?.modelProfileId ??
+      session.settings.modelProfileId,
+    runtimeModelConfig:
+      roleConfig.runtimeModelConfig ?? runtimeConfig?.runtimeModelConfig
+  };
+}
+
+export function resolveMultiAgentRuntimeSelection(
+  session: Session,
+  runtimeConfig: SessionRuntimeConfig | null,
+  role: "dicer" | "npcManager" | "director" | "narrator"
+): ResolvedSessionRuntimeSelection {
+  if (role === "narrator") {
+    return resolveNarratorRuntimeSelection(session, runtimeConfig);
+  }
+
+  return resolveExplicitRoleRuntimeSelection(
+    session,
+    runtimeConfig,
+    runtimeConfig?.roleModelConfigs?.[role]
+  );
 }
 
 export function resolveParticipantRuntimeSelection(
