@@ -18,6 +18,10 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:4316",
         changeOrigin: true
+      },
+      "/video": {
+        target: "http://127.0.0.1:4316",
+        changeOrigin: true
       }
     },
     fs: {

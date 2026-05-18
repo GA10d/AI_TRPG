@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { access, readFile } from "node:fs/promises";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -126,6 +126,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, "../../..");
 const contentRoot = join(projectRoot, "content");
 const webDistRoot = join(projectRoot, "apps", "web", "dist");
+const videoRoot = join(projectRoot, "apps", "video");
 const defaultLocalSaveRoot = join(projectRoot, "local_data", "saves");
 const defaultComicRoot = join(projectRoot, "local_data", "comics");
 const defaultNpcPortraitRoot = join(projectRoot, "local_data", "npc_portraits");
@@ -149,6 +150,7 @@ const mimeTypes: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".mp4": "video/mp4",
   ".webp": "image/webp",
   ".svg": "image/svg+xml"
 };
@@ -341,7 +343,8 @@ async function serveAbsoluteFile(
   absolutePath: string,
   rootDir: string
 ): Promise<void> {
-  if (!absolutePath.startsWith(rootDir)) {
+  const relativePath = relative(rootDir, absolutePath);
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
     sendText(response, 403, "Forbidden");
     return;
   }
@@ -366,6 +369,15 @@ async function serveStaticFile(response: ServerResponse, relativePath: string): 
   const normalizedPath = relativePath === "/" ? "/index.html" : relativePath;
   const absolutePath = resolve(webDistRoot, `.${normalizedPath}`);
   await serveAbsoluteFile(response, absolutePath, webDistRoot);
+}
+
+async function serveVideoFile(response: ServerResponse, relativePath: string): Promise<void> {
+  const pathSegments = relativePath
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment));
+  const absolutePath = resolve(videoRoot, ...pathSegments);
+  await serveAbsoluteFile(response, absolutePath, videoRoot);
 }
 
 async function serveApiOnlyHint(response: ServerResponse): Promise<void> {
@@ -1695,6 +1707,11 @@ const server = createServer(async (request, response) => {
 
     const url = new URL(request.url, `http://127.0.0.1:${port}`);
     if (request.method === "GET") {
+      if (url.pathname.startsWith("/video/")) {
+        await serveVideoFile(response, url.pathname.replace("/video/", ""));
+        return;
+      }
+
       if (await pathExists(webDistRoot)) {
         await serveStaticFile(response, url.pathname);
       } else {
