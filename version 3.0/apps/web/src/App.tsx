@@ -656,8 +656,12 @@ function buildWorldlineComicPlan(
   };
 }
 
-export function App() {
-  const [view, setView] = useState<AppView>("menu");
+type AppProps = {
+  initialView?: AppView;
+};
+
+export function App({ initialView = "menu" }: AppProps) {
+  const [view, setView] = useState<AppView>(initialView);
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const [activeSessionRuntimeConfig, setActiveSessionRuntimeConfig] =
     useState<SaveRuntimeConfig | null>(null);

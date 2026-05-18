@@ -10,12 +10,14 @@ const introVideoSources: Record<IntroVideoStage, string> = {
 const SKIP_HOLD_DURATION_MS = 3000;
 
 type IntroVideoScreenProps = {
+  completeOnSelectionInput?: boolean;
   onComplete?: () => void;
   passOverlay?: ReactNode;
   selectionOverlay?: ReactNode;
 };
 
 export function IntroVideoScreen({
+  completeOnSelectionInput = true,
   onComplete,
   passOverlay = null,
   selectionOverlay = null
@@ -41,6 +43,7 @@ export function IntroVideoScreen({
     }
 
     advanceRequestedRef.current = true;
+    setStage("pass");
   }, [stage]);
 
   useEffect(() => {
@@ -115,7 +118,7 @@ export function IntroVideoScreen({
   }, [requestAdvance, stage]);
 
   useEffect(() => {
-    if (stage !== "selection") {
+    if (!completeOnSelectionInput || stage !== "selection") {
       return;
     }
 
@@ -132,7 +135,7 @@ export function IntroVideoScreen({
       window.removeEventListener("pointerdown", handleInput);
       window.removeEventListener("touchstart", handleInput);
     };
-  }, [completeIntro, stage]);
+  }, [completeIntro, completeOnSelectionInput, stage]);
 
   useEffect(() => {
     const video = videoRef.current;
