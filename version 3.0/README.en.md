@@ -4,6 +4,30 @@ A text-first AI TRPG prototype.
 
 This repository contains a full project skeleton under active development: a `React + Vite` web client, a `Node + TypeScript` session service, editable content packs, reserved boundaries for both single-agent and multi-agent orchestration, and integration foundations for text and image models. The current focus is to stabilize a single-player AI TRPG loop that is playable, saveable, replayable, and extensible.
 
+## Showcase
+
+### Multi-genre Covers
+
+These sample covers show that the same AI TRPG framework can support different tones and settings, including fox-themed fantasy, romance, and space science fiction.
+
+| Fox | Love | Space |
+| --- | --- | --- |
+| ![Fox-themed game cover](show_case/cover%20fox.png) | ![Romance-themed game cover](show_case/cover%20love.png) | ![Space-themed game cover](show_case/cover%20space.png) |
+
+### Current Look
+
+These screenshots show the current opening cover and main menu.
+
+| Opening cover | Main menu |
+| --- | --- |
+| ![Current project opening cover](show_case/%E5%B0%81%E9%9D%A2.png) | ![Current project main menu](show_case/%E4%B8%BB%E8%8F%9C%E5%8D%95.png) |
+
+### Demo
+
+[Watch the demo video](show_case/%E6%BC%94%E7%A4%BAdemo.mp4)
+
+<video controls src="show_case/%E6%BC%94%E7%A4%BAdemo.mp4" width="100%"></video>
+
 ## Current Features
 
 - Web main menu, new game, continue, records, settings, and exit flow
