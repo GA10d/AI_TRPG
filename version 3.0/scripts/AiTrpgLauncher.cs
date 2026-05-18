@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -60,11 +61,7 @@ internal static class AiTrpgLauncher
                 return 1;
             }
 
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = GameUrl,
-                UseShellExecute = true
-            });
+            OpenGameWindow(projectRoot);
             return 0;
         }
         catch (Exception ex)
@@ -90,6 +87,91 @@ internal static class AiTrpgLauncher
         }
 
         return null;
+    }
+
+    private static void OpenGameWindow(string projectRoot)
+    {
+        string browserArguments = BuildFullscreenBrowserArguments(projectRoot);
+        string[] browserCandidates = GetBrowserCandidates();
+
+        foreach (string browserCandidate in browserCandidates)
+        {
+            if (TryStartBrowser(browserCandidate, browserArguments, projectRoot))
+            {
+                return;
+            }
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = GameUrl,
+            UseShellExecute = true
+        });
+    }
+
+    private static string BuildFullscreenBrowserArguments(string projectRoot)
+    {
+        string profileDirectory = Path.Combine(projectRoot, "local_data", "launcher_browser_profile");
+        Directory.CreateDirectory(profileDirectory);
+
+        return "--no-first-run " +
+            "--disable-first-run-ui " +
+            "--start-fullscreen " +
+            "--user-data-dir=\"" + profileDirectory + "\" " +
+            "--app=\"" + GameUrl + "\"";
+    }
+
+    private static string[] GetBrowserCandidates()
+    {
+        List<string> candidates = new List<string>();
+
+        AddBrowserCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft\\Edge\\Application\\msedge.exe");
+        AddBrowserCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft\\Edge\\Application\\msedge.exe");
+        AddBrowserCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google\\Chrome\\Application\\chrome.exe");
+        AddBrowserCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google\\Chrome\\Application\\chrome.exe");
+        AddBrowserCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Google\\Chrome\\Application\\chrome.exe");
+
+        candidates.Add("msedge.exe");
+        candidates.Add("chrome.exe");
+
+        return candidates.ToArray();
+    }
+
+    private static void AddBrowserCandidate(List<string> candidates, string root, string relativePath)
+    {
+        if (String.IsNullOrEmpty(root))
+        {
+            return;
+        }
+
+        candidates.Add(Path.Combine(root, relativePath));
+    }
+
+    private static bool TryStartBrowser(string browserPath, string arguments, string workingDirectory)
+    {
+        try
+        {
+            bool isExplicitPath = browserPath.IndexOf(Path.DirectorySeparatorChar) >= 0 ||
+                browserPath.IndexOf(Path.AltDirectorySeparatorChar) >= 0;
+
+            if (isExplicitPath && !File.Exists(browserPath))
+            {
+                return false;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = browserPath,
+                Arguments = arguments,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = true
+            });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void StartServerWindow(string projectRoot, string serverScript)

@@ -8,6 +8,7 @@ const introVideoSources: Record<IntroVideoStage, string> = {
   selection: "/video/selection.mp4"
 };
 const SKIP_HOLD_DURATION_MS = 3000;
+const VIDEO_CONTROL_SELECTOR = "[data-intro-video-control]";
 
 type IntroVideoScreenProps = {
   completeOnSelectionInput?: boolean;
@@ -15,6 +16,10 @@ type IntroVideoScreenProps = {
   passOverlay?: ReactNode;
   selectionOverlay?: ReactNode;
 };
+
+function isVideoControlEvent(event: Event): boolean {
+  return event.target instanceof Element && event.target.closest(VIDEO_CONTROL_SELECTOR) !== null;
+}
 
 export function IntroVideoScreen({
   completeOnSelectionInput = true,
@@ -27,6 +32,7 @@ export function IntroVideoScreen({
   const advanceRequestedRef = useRef(false);
   const completeRequestedRef = useRef(false);
   const [stage, setStage] = useState<IntroVideoStage>("idle");
+  const [isMuted, setIsMuted] = useState(true);
 
   const completeIntro = useCallback(() => {
     if (completeRequestedRef.current) {
@@ -56,7 +62,11 @@ export function IntroVideoScreen({
       holdSkipTimerRef.current = null;
     };
 
-    const startHoldSkipTimer = () => {
+    const startHoldSkipTimer = (event?: Event) => {
+      if (event && isVideoControlEvent(event)) {
+        return;
+      }
+
       if (completeRequestedRef.current || holdSkipTimerRef.current !== null) {
         return;
       }
@@ -72,7 +82,7 @@ export function IntroVideoScreen({
         return;
       }
 
-      startHoldSkipTimer();
+      startHoldSkipTimer(event);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -104,7 +114,13 @@ export function IntroVideoScreen({
       return;
     }
 
-    const handleInput = () => requestAdvance();
+    const handleInput = (event: Event) => {
+      if (isVideoControlEvent(event)) {
+        return;
+      }
+
+      requestAdvance();
+    };
 
     window.addEventListener("keydown", handleInput);
     window.addEventListener("pointerdown", handleInput);
@@ -122,7 +138,11 @@ export function IntroVideoScreen({
       return;
     }
 
-    const handleInput = () => {
+    const handleInput = (event: Event) => {
+      if (isVideoControlEvent(event)) {
+        return;
+      }
+
       completeIntro();
     };
 
@@ -143,11 +163,26 @@ export function IntroVideoScreen({
       return;
     }
 
+    video.muted = isMuted;
     video.load();
     void video.play().catch(() => {
       // Muted autoplay should normally work; user input will retry playback below.
     });
-  }, [stage]);
+  }, [isMuted, stage]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    video.muted = isMuted;
+    if (!isMuted) {
+      void video.play().catch(() => {
+        setIsMuted(true);
+      });
+    }
+  }, [isMuted]);
 
   function handleVideoEnded(): void {
     const video = videoRef.current;
@@ -178,7 +213,7 @@ export function IntroVideoScreen({
         className="intro-video"
         src={introVideoSources[stage]}
         autoPlay
-        muted
+        muted={isMuted}
         playsInline
         preload="auto"
         loop={stage === "selection"}
@@ -204,6 +239,17 @@ export function IntroVideoScreen({
         {stage === "pass" ? passOverlay : null}
         {stage === "selection" ? selectionOverlay : null}
       </div>
+      <button
+        aria-label={isMuted ? "开启视频声音" : "关闭视频声音"}
+        className="intro-video-sound-toggle"
+        data-intro-video-control
+        onClick={() => setIsMuted((current) => !current)}
+        type="button"
+      >
+        <span className="intro-video-sound-icon" aria-hidden="true">
+          {isMuted ? "MUTE" : "SOUND"}
+        </span>
+      </button>
     </section>
   );
 }

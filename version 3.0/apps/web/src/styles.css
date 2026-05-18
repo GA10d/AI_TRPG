@@ -77,6 +77,35 @@ img {
   pointer-events: none;
 }
 
+.intro-video-sound-toggle {
+  position: absolute;
+  right: clamp(26px, 3vw, 58px);
+  bottom: clamp(72px, 8.2vh, 104px);
+  z-index: 4;
+  min-width: 86px;
+  min-height: 32px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 244, 231, 0.26);
+  background: rgba(8, 8, 10, 0.46);
+  color: rgba(255, 244, 232, 0.88);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.intro-video-sound-toggle:hover,
+.intro-video-sound-toggle:focus-visible {
+  background: rgba(255, 246, 234, 0.18);
+  border-color: rgba(255, 244, 231, 0.52);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .intro-video-selection-slot {
   width: min(92vw, 720px);
   min-height: 220px;
@@ -4358,4 +4387,515 @@ pre {
   .content-generator-mode-button {
     width: 100%;
   }
+}
+
+/* Global noir UI skin: keep the selection-video menu language across the app. */
+:root {
+  color-scheme: dark;
+  --panel: rgba(8, 8, 10, 0.86);
+  --panel-border: rgba(255, 255, 255, 0.14);
+  --text: rgba(246, 244, 239, 0.94);
+  --text-strong: #fff8ef;
+  --ink-soft: rgba(246, 244, 239, 0.7);
+  --muted: rgba(215, 211, 205, 0.68);
+  --accent: #d94135;
+  --accent-strong: #ff675d;
+  --accent-soft: rgba(217, 65, 53, 0.16);
+  --accent-glow: rgba(217, 65, 53, 0.28);
+  --danger: #e04438;
+  --shadow: 0 26px 72px rgba(0, 0, 0, 0.45);
+}
+
+body {
+  color: var(--text);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.022) 0,
+      rgba(255, 255, 255, 0.022) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    linear-gradient(160deg, #050506 0%, #101012 48%, #060607 100%);
+}
+
+a {
+  color: var(--accent-strong);
+}
+
+.app-shell {
+  background:
+    linear-gradient(90deg, rgba(217, 65, 53, 0.06), transparent 24%, transparent 76%, rgba(217, 65, 53, 0.04)),
+    #050506;
+}
+
+.panel,
+.summary-card,
+.meta-card,
+.log-card,
+.state-card,
+.info-banner,
+.turn-form,
+.record-card,
+.game-topbar,
+.menu-notice-card,
+.selection-card,
+.setting-field,
+.model-capability-item,
+.settings-model-list-item,
+.settings-model-modal,
+.setup-detail-modal,
+.setup-detail-tab,
+.setup-advanced-model-toggle,
+.setup-advanced-model-card,
+.companion-card,
+.companion-tag-subsection,
+.companion-tag-button,
+.companion-personality-modal,
+.companion-personality-modal-selection,
+.companion-preset-item,
+.message-item,
+.replay-item,
+.empty-state,
+.content-generator-card,
+.content-generator-runtime,
+.content-generator-rule-meta,
+.content-generator-file-card,
+.content-generator-preview,
+.content-generator-image-preview,
+.game-loading-tab,
+.game-loading-stage,
+.game-focus-panel,
+.game-side-panel,
+.game-draft-panel,
+.game-draft-item,
+.game-judge-item,
+.game-reasoning-item,
+.game-agent-response-item,
+.game-reasoning-text,
+.game-history-item,
+.game-panel-toggle,
+.game-composer,
+.game-activity-panel,
+.game-activity-live,
+.game-activity-item,
+.game-drawer-panel,
+.game-art-asset-card,
+.game-art-asset-preview,
+.game-comic-card,
+.game-comic-preview,
+.game-comic-preview-loading,
+.game-comic-lightbox-panel,
+.playthrough-node,
+.playthrough-timeline-card,
+.game-private-chat-message,
+.game-npc-detail {
+  background: rgba(8, 8, 10, 0.82);
+  border-color: rgba(255, 255, 255, 0.13);
+  color: var(--text);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.34);
+}
+
+.panel,
+.settings-model-modal,
+.setup-detail-modal,
+.companion-personality-modal,
+.game-drawer-panel,
+.game-comic-lightbox-panel {
+  backdrop-filter: blur(14px);
+}
+
+.hero-panel,
+.page-panel,
+.summary-panel,
+.story-select-page-panel,
+.setup-page-panel,
+.content-generator-main,
+.content-generator-sidebar,
+.content-generator-results {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(6, 6, 8, 0.9);
+}
+
+h1,
+h2,
+h3,
+h4,
+.summary-title,
+.state-primary,
+.selection-card-title,
+.model-capability-label,
+.settings-model-list-item,
+.setup-detail-tab-label,
+.playthrough-node-title,
+.playthrough-timeline-title {
+  color: var(--text-strong);
+}
+
+.lead,
+.summary-text,
+.state-secondary,
+.message-body,
+.replay-body,
+.meta-label,
+.status-line,
+.field-hint,
+.selection-card-meta,
+.selection-card-copy,
+.model-capability-state,
+.model-capability-meta,
+.settings-model-detail,
+.setup-detail-tab-copy,
+.companion-selected-placeholder,
+.game-history-meta,
+.game-activity-meta,
+.playthrough-node-meta,
+.playthrough-node-copy,
+.playthrough-timeline-meta,
+.playthrough-timeline-copy,
+.game-private-chat-meta {
+  color: var(--muted);
+}
+
+.eyebrow,
+.companion-selection-label,
+.companion-tag-section-title,
+.companion-personality-modal-selection-title,
+.settings-model-sidebar-title,
+.setup-advanced-model-group-title,
+.game-activity-statusline-label {
+  color: var(--accent-strong);
+  letter-spacing: 0.18em;
+}
+
+button,
+select,
+textarea,
+input {
+  color: var(--text);
+}
+
+select,
+textarea,
+input,
+.text-input,
+.character-setup-input,
+.content-generator-textarea,
+.game-composer textarea {
+  background: rgba(0, 0, 0, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+select:focus,
+textarea:focus,
+input:focus,
+.text-input:focus,
+.character-setup-input:focus,
+.content-generator-textarea:focus,
+.game-composer textarea:focus {
+  border-color: rgba(217, 65, 53, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(217, 65, 53, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+option {
+  background: #08080a;
+  color: var(--text);
+}
+
+.primary-button,
+.menu-button,
+.content-generator-submit {
+  border: 1px solid rgba(217, 65, 53, 0.52);
+  background: linear-gradient(135deg, rgba(217, 65, 53, 0.86), rgba(91, 8, 7, 0.94));
+  color: #fff8ef;
+}
+
+.ghost-button,
+.ghost-button-small,
+.menu-link-button,
+.pane-header-button,
+.pane-toggle-button,
+.playthrough-node-button,
+.playthrough-timeline-button,
+.content-generator-mode-button,
+.game-panel-toggle,
+.video-menu-footer-button,
+.video-menu-notice-close {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.44);
+  color: rgba(246, 244, 239, 0.88);
+}
+
+.primary-button:hover,
+.ghost-button:hover,
+.ghost-button-small:hover,
+.menu-button:hover,
+.content-generator-submit:hover,
+.playthrough-node-button:hover,
+.playthrough-timeline-button:hover,
+.content-generator-mode-button:hover,
+.game-panel-toggle:hover:not(:disabled),
+.primary-button:focus-visible,
+.ghost-button:focus-visible,
+.ghost-button-small:focus-visible,
+.menu-button:focus-visible,
+.content-generator-submit:focus-visible,
+.playthrough-node-button:focus-visible,
+.playthrough-timeline-button:focus-visible,
+.content-generator-mode-button:focus-visible,
+.game-panel-toggle:focus-visible {
+  border-color: rgba(217, 65, 53, 0.66);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff8ef;
+  box-shadow: 0 0 0 3px rgba(217, 65, 53, 0.16);
+}
+
+.menu-button-danger,
+.ghost-button-danger,
+.game-activity-statusline-error,
+.status-error {
+  border-color: rgba(224, 68, 56, 0.55);
+  color: #ff958d;
+}
+
+.menu-button-danger {
+  background: linear-gradient(135deg, rgba(224, 68, 56, 0.9), rgba(82, 8, 7, 0.96));
+}
+
+.badge,
+.flag-chip,
+.record-tag,
+.summary-chip,
+.companion-tag-button-selected,
+.content-generator-mode-button-active,
+.game-loading-tab-active,
+.game-loading-stage-active,
+.game-panel-toggle-active {
+  border-color: rgba(217, 65, 53, 0.44);
+  background: rgba(217, 65, 53, 0.16);
+  color: #ff958d;
+}
+
+.flag-chip-warning,
+.summary-chip-warning,
+.info-banner-warning,
+.content-generator-warning-block,
+.game-activity-live-error,
+.game-activity-item-error,
+.setup-advanced-model-card-warning {
+  border-color: rgba(224, 68, 56, 0.42);
+  background: rgba(224, 68, 56, 0.12);
+  color: #ffb1aa;
+}
+
+.info-banner-success,
+.game-loading-tab-completed,
+.game-loading-stage-completed,
+.content-generator-progress-item-completed {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(246, 244, 239, 0.78);
+}
+
+.selection-card:hover,
+.selection-card:focus-visible,
+.settings-model-list-item:hover,
+.settings-model-list-item:focus-visible,
+.setup-detail-tab:hover,
+.setup-detail-tab:focus-visible,
+.companion-tag-button:hover,
+.companion-tag-button:focus-visible,
+.collapsed-pane-toggle:hover,
+.collapsed-pane-toggle:focus-visible {
+  border-color: rgba(217, 65, 53, 0.54);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+}
+
+.selection-card-active,
+.settings-model-list-item-active,
+.setup-detail-tab-active {
+  border-color: rgba(217, 65, 53, 0.62);
+  background:
+    linear-gradient(90deg, rgba(217, 65, 53, 0.2), rgba(255, 255, 255, 0.08)),
+    rgba(8, 8, 10, 0.9);
+  box-shadow: 0 0 0 1px rgba(217, 65, 53, 0.18);
+}
+
+.menu-splitter-line,
+.story-resize-handle-line,
+.game-resizer-column::before,
+.game-resizer-row::before,
+.playthrough-timeline-rail::before {
+  background: linear-gradient(
+    180deg,
+    rgba(217, 65, 53, 0),
+    rgba(217, 65, 53, 0.56),
+    rgba(217, 65, 53, 0)
+  );
+}
+
+.game-resizer-row::before {
+  background: linear-gradient(
+    90deg,
+    rgba(217, 65, 53, 0),
+    rgba(217, 65, 53, 0.56),
+    rgba(217, 65, 53, 0)
+  );
+}
+
+.content-generator-progress-track,
+.game-loading-progress-track,
+.bootstrap-screen-progress-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.content-generator-progress-fill,
+.game-loading-progress-bar,
+.bootstrap-screen-progress-bar {
+  background: linear-gradient(90deg, rgba(217, 65, 53, 0.94), rgba(255, 255, 255, 0.82));
+}
+
+.opening-block {
+  background: rgba(0, 0, 0, 0.84);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.opening-block-inverted {
+  background: rgba(246, 244, 239, 0.94);
+  color: #08080a;
+}
+
+.opening-block-inverted .opening-markdown,
+.opening-block-inverted .preview-meta-line {
+  color: #08080a;
+}
+
+.story-visual-card,
+.setup-preview-visual,
+.game-loading-cover,
+.game-npc-portrait {
+  background:
+    linear-gradient(145deg, rgba(217, 65, 53, 0.18), rgba(255, 255, 255, 0.035)),
+    #0b0b0d;
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+.story-cover-expand-button {
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--text);
+}
+
+.story-cover-lightbox,
+.settings-model-modal-backdrop,
+.setup-detail-modal-backdrop,
+.companion-personality-modal-backdrop,
+.game-drawer-backdrop,
+.game-comic-lightbox {
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.character-setup-input-shell-loading .character-setup-input {
+  background: rgba(0, 0, 0, 0.64);
+  color: rgba(246, 244, 239, 0.7);
+}
+
+.character-setup-loading-overlay {
+  background:
+    linear-gradient(180deg, rgba(8, 8, 10, 0.9), rgba(8, 8, 10, 0.72)),
+    rgba(0, 0, 0, 0.72);
+}
+
+.playthrough-node {
+  border-color: rgba(217, 65, 53, 0.28);
+}
+
+.playthrough-node-current,
+.playthrough-node-dragging {
+  box-shadow:
+    0 0 0 3px rgba(217, 65, 53, 0.2),
+    0 22px 44px rgba(0, 0, 0, 0.36);
+}
+
+.playthrough-timeline-dot {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(217, 65, 53, 0.88);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.74);
+}
+
+.message-item,
+.replay-item,
+.game-history-item-player,
+.game-history-item-gm,
+.game-private-chat-message-self,
+.game-private-chat-message-peer {
+  background: rgba(8, 8, 10, 0.78);
+}
+
+.game-focus-panel,
+.game-side-panel,
+.game-draft-panel,
+.game-activity-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(8, 8, 10, 0.86);
+}
+
+.game-composer {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)),
+    rgba(5, 5, 6, 0.94);
+}
+
+.bootstrap-screen {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.022) 0,
+      rgba(255, 255, 255, 0.022) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    #050506;
+  color: var(--text);
+}
+
+.bootstrap-screen-title,
+.bootstrap-screen-cover-fallback-title {
+  color: var(--text-strong);
+}
+
+.bootstrap-screen-wait {
+  color: #ff958d;
+}
+
+.game-comic-spinner {
+  border-color: rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(217, 65, 53, 0.92);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(217, 65, 53, 0.46);
+  border: 2px solid rgba(8, 8, 10, 0.92);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 65, 53, 0.74);
 }
